@@ -190,15 +190,21 @@ export function clampPreset(raw: unknown): ClaudioPreset {
 // exactly why clampPreset above is mandatory rather than belt-and-braces.
 // ---------------------------------------------------------------------------
 
+// NOTE: `minimum`/`maximum` are NOT allowed here. Strict structured outputs
+// reject them outright — the API returns
+//   400: "For 'number' type, properties maximum, minimum are not supported"
+// so ranges live in the descriptions and clampPreset() is what actually
+// enforces them at runtime. That is why the clamp is load-bearing.
+
 const ADSR_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: ["attack", "decay", "sustain", "release"],
   properties: {
-    attack: { type: "number", minimum: 0.001, maximum: 4, description: "Seconds." },
-    decay: { type: "number", minimum: 0.001, maximum: 4, description: "Seconds." },
-    sustain: { type: "number", minimum: 0, maximum: 1, description: "Level held while the note is down, 0-1." },
-    release: { type: "number", minimum: 0.001, maximum: 4, description: "Seconds after note-off." },
+    attack: { type: "number", description: "Seconds, 0.001 to 4." },
+    decay: { type: "number", description: "Seconds, 0.001 to 4." },
+    sustain: { type: "number", description: "Level held while the note is down, 0 to 1." },
+    release: { type: "number", description: "Seconds after note-off, 0.001 to 4." },
   },
 } as const;
 
@@ -207,12 +213,11 @@ const INNER_FM_SCHEMA = {
   additionalProperties: false,
   required: ["ratio", "index"],
   properties: {
-    ratio: { type: "number", minimum: 0.25, maximum: 12, description: "Frequency ratio of this inner modulator." },
+    ratio: { type: "number", description: "Frequency ratio of this inner modulator, 0.25 to 12." },
     index: {
       type: "number",
-      minimum: 0,
-      maximum: 12,
-      description: "Modulation depth. 0 turns this inner operator OFF (the host becomes a plain oscillator).",
+      description:
+        "Modulation depth, 0 to 12. 0 turns this inner operator OFF (the host becomes a plain oscillator).",
     },
   },
 } as const;
@@ -237,8 +242,6 @@ export const PRESET_JSON_SCHEMA = {
     name: { type: "string", description: "Short evocative patch name, e.g. 'Glassy Bell'. Max 40 chars." },
     harmonicity: {
       type: "number",
-      minimum: 0.25,
-      maximum: 12,
       description:
         "Modulator:carrier frequency ratio — sets sideband SPACING. Integers give harmonic, pitched, " +
         "instrument-like spectra (1 = full/hollow, 2 = odd-harmonic clarinet-ish, 3 = nasal). " +
@@ -246,8 +249,6 @@ export const PRESET_JSON_SCHEMA = {
     },
     modulationIndex: {
       type: "number",
-      minimum: 0,
-      maximum: 30,
       description:
         "Depth of the main modulator. THE primary brightness control — raising it adds sidebands, " +
         "so more partials and a brighter, denser tone. 0 = pure sine, 2-6 warm, 10-20 bright, 20+ aggressive.",
@@ -269,7 +270,7 @@ export const PRESET_JSON_SCHEMA = {
         "Modulator amplitude envelope — this IS the BRIGHTNESS CONTOUR over time. A modEnv decay shorter " +
         "than the ampEnv decay gives the classic 'bright attack that mellows out' of struck and plucked sounds.",
     },
-    detune: { type: "number", minimum: -100, maximum: 100, description: "Cents." },
-    gain: { type: "number", minimum: 0, maximum: 1, description: "Output level." },
+    detune: { type: "number", description: "Cents." },
+    gain: { type: "number", description: "Output level." },
   },
 } as const;

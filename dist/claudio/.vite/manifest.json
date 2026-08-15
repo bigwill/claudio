@@ -1,8 +1,27 @@
 {
+  "_sdk-CppPnwHd.js": {
+    "file": "assets/sdk-CppPnwHd.js",
+    "name": "sdk",
+    "dynamicImports": [
+      "node_modules/@anthropic-ai/sdk/tools/agent-toolset/node.mjs"
+    ]
+  },
+  "node_modules/@anthropic-ai/sdk/tools/agent-toolset/node.mjs": {
+    "file": "assets/node-4vlCKBFS.js",
+    "name": "node",
+    "src": "node_modules/@anthropic-ai/sdk/tools/agent-toolset/node.mjs",
+    "isDynamicEntry": true,
+    "imports": [
+      "_sdk-CppPnwHd.js"
+    ]
+  },
   "virtual:cloudflare/worker-entry": {
     "file": "index.js",
     "name": "index",
     "src": "virtual:cloudflare/worker-entry",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_sdk-CppPnwHd.js"
+    ]
   }
 }
