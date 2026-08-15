@@ -95,6 +95,8 @@ const state = {
   followLatest: true,
   /** Newest first. Kept as data so the view can order and fade it. */
   chat: [] as { role: "you" | "agent"; text: string }[],
+  /** Rail rows whose rationale the user expanded — survives re-render. */
+  expanded: new Set<string>(),
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
@@ -399,7 +401,10 @@ function renderAttempts(): void {
             </div>
             <span class="dist">${scored ? d.toFixed(1) : ""}</span>
           </div>
-          <div class="muted" style="font-size:13px">${escapeHtml(a.rationale)}</div>
+          <div class="why${state.expanded.has(a.presetId) ? " open" : ""}">${escapeHtml(a.rationale)}</div>
+          <button class="morelink" data-expand="${a.presetId}">${
+            state.expanded.has(a.presetId) ? "less" : "more"
+          }</button>
           ${pending || scored ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}
         </div>`;
     })
@@ -407,6 +412,17 @@ function renderAttempts(): void {
 
   // Any attempt is loadable at any time, finished or not — the user may simply
   // like one and want to keep playing it.
+  list.querySelectorAll<HTMLButtonElement>("[data-expand]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      // The whole row loads the preset on click; expanding must not do that too.
+      e.stopPropagation();
+      const id = btn.dataset.expand!;
+      if (state.expanded.has(id)) state.expanded.delete(id);
+      else state.expanded.add(id);
+      renderAttempts();
+    });
+  });
+
   list.querySelectorAll<HTMLElement>("[data-load]").forEach((el) => {
     el.addEventListener("click", async () => {
       const a = state.attempts.find((x) => x.presetId === el.dataset.load);
