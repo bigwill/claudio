@@ -13,5 +13,9 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["src", "scripts", "vite.config.ts", "worker-configuration.d.ts"]
+  // scripts/ is deliberately excluded: those are Node-only dev utilities run
+  // through node's type stripper, and they'd need @types/node globals that
+  // conflict with the Workers/DOM lib set the app compiles against. They're
+  // verified by being run (npm run test:dsp / npm run analyze), not by tsc.
+  "include": ["src", "vite.config.ts", "worker-configuration.d.ts"]
 }

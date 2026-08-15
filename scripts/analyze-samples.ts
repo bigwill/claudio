@@ -14,10 +14,9 @@ import { join } from "node:path";
 // Node's type stripper resolves relative specifiers literally, so "./features"
 // would 404, while writing "./features.ts" fails tsc. Rewriting in a resolve
 // hook satisfies both — same trick as scripts/dsp-selftest.ts.
-// @ts-ignore - node: builtins are untyped in this project
 const { registerHooks } = await import("node:module");
 registerHooks({
-  resolve(specifier: string, context: unknown, next: (s: string, c: unknown) => unknown) {
+  resolve(specifier, context, next) {
     if (specifier.startsWith(".") && !/\.[cm]?[jt]s$/.test(specifier)) {
       return next(`${specifier}.ts`, context);
     }
