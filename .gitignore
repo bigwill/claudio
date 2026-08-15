@@ -7,3 +7,6 @@ dist/
 # Test audio. Untracked so a `git add -A` can't drag megabytes of binaries in.
 # Remove this line if we decide to ship them as built-in starter samples.
 samples/
+
+# macOS
+.DS_Store
