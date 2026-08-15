@@ -77,7 +77,7 @@ namespaces and separate secrets**.
 | Env | Branch | Worker | URL | Command |
 |---|---|---|---|---|
 | default | `develop` | `claudio` | `claudio.<subdomain>.workers.dev` | `npm run deploy` |
-| production | `main` | `claudio-prod` | `claudio.humble.audio` | `npm run deploy:prod` |
+| production | `main` | `claudio-prod` | `claudio-prod.<subdomain>.workers.dev` <br>(`claudio.humble.audio` pending DNS) | `npm run deploy:prod` |
 
 Each needs its own key: `npx wrangler secret put ANTHROPIC_API_KEY [--env production]`.
 
@@ -86,15 +86,26 @@ Each needs its own key: `npx wrangler secret put ANTHROPIC_API_KEY [--env produc
 > `dist/`, so a deploy-time `--env` flag is silently ignored and you end up
 > deploying to the wrong Worker. `npm run deploy:prod` sets it correctly.
 
-**Custom domain prerequisite.** `custom_domain: true` requires Cloudflare to be
-authoritative for the zone — a CNAME from an external DNS provider to
-`*.workers.dev` will not route, since workers.dev doesn't dispatch on arbitrary
-Host headers. `humble.audio` currently uses 101domain nameservers and its apex
-serves a separate live site, so the low-risk path is to delegate only the
-subdomain: add `claudio.humble.audio` as its own zone in Cloudflare, then create
-NS records for host `claudio` at 101domain pointing to the nameservers Cloudflare
-issues. Everything else on the domain is untouched. Once it activates,
-`npm run deploy:prod` creates and manages the DNS record itself.
+**Custom domain prerequisite.** `custom_domain: true` requires **Cloudflare to be
+authoritative for the hostname's zone**. The route is currently commented out in
+`wrangler.jsonc` because it is not, and enabling it fails the deploy outright
+("Could not find zone").
+
+A CNAME at an external registrar pointing to `*.workers.dev` is **not** a
+substitute. The browser opens TLS with SNI for `claudio.humble.audio`, and
+Cloudflare holds no certificate for that name — the handshake fails before
+routing is ever considered, and Cloudflare will not issue a cert for a hostname
+it does not control. (Host-header routing is a second problem, but the cert is
+the one you hit first.) The paid escapes are Cloudflare for SaaS custom
+hostnames, or Business-plan partial/CNAME zone setup.
+
+`humble.audio` uses 101domain nameservers and its apex serves a separate live
+site, so the low-risk path is **subdomain delegation**: add
+`claudio.humble.audio` as its own zone in Cloudflare, then create NS records for
+host `claudio` at 101domain pointing to the two nameservers Cloudflare issues.
+Nothing else on the domain is touched. Once the zone is Active, uncomment the
+`routes` line and run `npm run deploy:prod` — wrangler creates the DNS record and
+provisions the certificate itself.
 
 `GET /api/ping` reports whether the key is visible to the Worker and exercises the Durable Object binding.
 

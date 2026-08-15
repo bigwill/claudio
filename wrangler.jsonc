@@ -40,11 +40,24 @@
   "env": {
     "production": {
       "name": "claudio-prod",
-      // custom_domain: true makes Cloudflare create and manage the DNS
-      // record itself, provided humble.audio is a zone on this account.
-      "routes": [{ "pattern": "claudio.humble.audio", "custom_domain": true }],
-      // Keep production off workers.dev — one canonical URL.
-      "workers_dev": false,
+
+      // Reachable at claudio-prod.<subdomain>.workers.dev until the custom
+      // domain is sorted. Without this, production has no route at all and is
+      // simply unreachable — which is where it sat after the first deploy
+      // attempt failed to attach the route.
+      "workers_dev": true,
+
+      // TODO: re-enable once Cloudflare is authoritative for the hostname.
+      //
+      //   "routes": [{ "pattern": "claudio.humble.audio", "custom_domain": true }],
+      //
+      // This line CANNOT be enabled until claudio.humble.audio is a zone on
+      // this Cloudflare account (deploy fails: "Could not find zone"). A CNAME
+      // at an external registrar pointing to *.workers.dev does not work as a
+      // substitute: the browser sends SNI for claudio.humble.audio and
+      // Cloudflare has no certificate for it, so TLS fails before routing is
+      // ever considered. Cloudflare must hold the zone to issue that cert.
+      // See README "Custom domain prerequisite".
       "assets": {
         "binding": "ASSETS",
         "not_found_handling": "single-page-application",
