@@ -14,6 +14,8 @@ import {
   analyzeTarget,
   ensureAudio,
   evaluatePreset,
+  noteOff,
+  noteOn,
   playBuffer,
   playNote,
   setLivePreset,
@@ -71,13 +73,26 @@ function shell(): void {
       <div id="attempts"></div>
     </div>
 
+    <div class="panel" id="kbpanel">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <span class="tag">play</span>
+        <span class="muted" style="font-size:12px">
+          click the keys, or use <code>A S D F G H J K</code> · <code>Z</code>/<code>X</code> to shift octave
+        </span>
+      </div>
+      <div id="keyboard"></div>
+    </div>
+
     <div class="panel hidden" id="chatpanel">
+      <div id="chips" class="row" style="margin-bottom:10px"></div>
       <div class="row">
-        <input id="chat" type="text" placeholder="brighter · more attack bite · less metallic" style="flex:1" />
+        <input id="chat" type="text" placeholder="glassier · more punch · hollow it out" style="flex:1" />
         <button id="send">Send</button>
       </div>
       <div id="chatlog" class="muted" style="margin-top:10px"></div>
     </div>`;
+
+  buildKeyboard();
 
   const drop = $("drop")!;
   const file = $<HTMLInputElement>("file")!;
@@ -92,9 +107,132 @@ function shell(): void {
     if (f) start(f);
   });
 
-  $("send")?.addEventListener("click", sendChat);
+  $("send")?.addEventListener("click", () => sendChat());
   $<HTMLInputElement>("chat")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") sendChat();
+  });
+}
+
+// --- keyboard --------------------------------------------------------------
+
+/** Two octaves, so a patch can be judged in more than one register. */
+const KB_SEMITONES = 24;
+const BLACK = new Set([1, 3, 6, 8, 10]);
+/** Home-row layout, white keys only — enough to noodle without learning a map. */
+const TYPING_KEYS = ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"];
+
+let octaveBase = 48; // C3
+const held = new Map<string, number>();
+
+function buildKeyboard(): void {
+  const kb = $("keyboard");
+  if (!kb) return;
+
+  const whites: string[] = [];
+  const blacks: string[] = [];
+  let whiteIndex = 0;
+
+  for (let i = 0; i < KB_SEMITONES; i++) {
+    const midi = octaveBase + i;
+    if (BLACK.has(i % 12)) {
+      // Positioned against the preceding white key's slot.
+      blacks.push(
+        `<div class="key black" data-midi="${midi}" style="left:calc(${whiteIndex} * var(--kw) - var(--kw) * 0.3)"></div>`,
+      );
+    } else {
+      const label = TYPING_KEYS[whiteIndex]?.toUpperCase() ?? "";
+      whites.push(
+        `<div class="key white" data-midi="${midi}"><span>${label}</span></div>`,
+      );
+      whiteIndex++;
+    }
+  }
+
+  kb.innerHTML =
+    `<div class="keys" style="--kw:calc(100% / ${whiteIndex})">${whites.join("")}${blacks.join("")}</div>` +
+    `<div class="muted" style="font-size:12px;margin-top:6px">octave: C${Math.floor(octaveBase / 12) - 1}</div>`;
+
+  kb.querySelectorAll<HTMLElement>(".key").forEach((el) => {
+    const midi = Number(el.dataset.midi);
+    const down = (e: Event) => {
+      e.preventDefault();
+      press(`m${midi}`, midi, el);
+    };
+    el.addEventListener("mousedown", down);
+    el.addEventListener("touchstart", down, { passive: false });
+    el.addEventListener("mouseup", () => release(`m${midi}`));
+    el.addEventListener("mouseleave", () => release(`m${midi}`));
+    el.addEventListener("touchend", () => release(`m${midi}`));
+  });
+}
+
+function keyEl(midi: number): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`.key[data-midi="${midi}"]`);
+}
+
+async function press(id: string, midi: number, el?: HTMLElement | null): Promise<void> {
+  if (held.has(id)) return;
+  held.set(id, midi);
+  (el ?? keyEl(midi))?.classList.add("on");
+  await ensureAudio();
+  noteOn(midi, 0.9);
+}
+
+function release(id: string): void {
+  const midi = held.get(id);
+  if (midi === undefined) return;
+  held.delete(id);
+  keyEl(midi)?.classList.remove("on");
+  // Monophonic: only release when nothing else is being held.
+  if (held.size === 0) noteOff();
+  else {
+    const last = [...held.values()].pop()!;
+    noteOn(last, 0.9);
+  }
+}
+
+function bindTypingKeyboard(): void {
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+
+    const k = e.key.toLowerCase();
+    if (k === "z" || k === "x") {
+      octaveBase = Math.min(84, Math.max(24, octaveBase + (k === "x" ? 12 : -12)));
+      held.clear();
+      noteOff();
+      buildKeyboard();
+      return;
+    }
+    const idx = TYPING_KEYS.indexOf(k);
+    if (idx < 0) return;
+    // Map the Nth white key back to a semitone offset.
+    let seen = 0;
+    for (let i = 0; i < KB_SEMITONES; i++) {
+      if (BLACK.has(i % 12)) continue;
+      if (seen === idx) { press(k, octaveBase + i); return; }
+      seen++;
+    }
+  });
+  window.addEventListener("keyup", (e) => release(e.key.toLowerCase()));
+  window.addEventListener("blur", () => { held.clear(); noteOff(); });
+}
+
+// --- suggestion chips ------------------------------------------------------
+
+function renderChips(suggestions: string[] | undefined): void {
+  const row = $("chips");
+  if (!row) return;
+  if (!suggestions?.length) { row.innerHTML = ""; return; }
+  row.innerHTML = suggestions
+    .map((s, i) => `<button class="chip" data-i="${i}">${escapeHtml(s)}</button>`)
+    .join("");
+  row.querySelectorAll<HTMLButtonElement>(".chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const text = suggestions[Number(btn.dataset.i)];
+      if (text) sendChat(text);
+    });
   });
 }
 
@@ -244,23 +382,26 @@ async function drain(step: Step): Promise<void> {
       "good",
     );
     logChat("agent", step.text);
+    renderChips(step.suggestions);
     $("chatpanel")?.classList.remove("hidden");
   } else if (step.kind === "message") {
     if (step.preset) { state.current = step.preset; setLivePreset(step.preset); }
     setStatus("Ready.");
     logChat("agent", step.text);
+    renderChips(step.suggestions);
     $("chatpanel")?.classList.remove("hidden");
   } else if (step.kind === "error") {
     setStatus(`Agent error: ${step.message}`);
   }
 }
 
-async function sendChat(): Promise<void> {
+async function sendChat(preset?: string): Promise<void> {
   const input = $<HTMLInputElement>("chat");
-  if (!input || !state.sessionId || state.busy) return;
-  const msg = input.value.trim();
+  if (!state.sessionId || state.busy) return;
+  const msg = (preset ?? input?.value ?? "").trim();
   if (!msg) return;
-  input.value = "";
+  if (input && !preset) input.value = "";
+  renderChips([]); // chips are stale the moment one is used
   logChat("you", msg);
   state.busy = true;
   try {
@@ -277,6 +418,7 @@ async function sendChat(): Promise<void> {
 
 async function boot(): Promise<void> {
   shell();
+  bindTypingKeyboard();
   try {
     const res = await api("/api/ping");
     const info = (await res.json()) as { hasAnthropicKey?: boolean };

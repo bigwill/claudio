@@ -150,6 +150,24 @@ export function playNote(midi = 60, velocity = 0.9, durSec = 1.2): void {
   liveVoice!.triggerAttackRelease(hz, d, undefined, v);
 }
 
+/**
+ * Hold-to-sustain, for the on-screen keyboard.
+ *
+ * Tone.FMSynth is monophonic, so this is last-note-priority: a new noteOn
+ * while one is held retriggers at the new pitch. Polyphony would mean
+ * PolySynth and a voice pool, which is more than a playable octave needs.
+ */
+export function noteOn(midi: number, velocity = 0.9): void {
+  if (!liveVoice) setLivePreset(livePreset ?? DEFAULT_PRESET);
+  const v = Math.min(1, Math.max(0.01, Number.isFinite(velocity) ? velocity : 0.9));
+  const hz = midiToHz(Number.isFinite(midi) ? midi : 60);
+  liveVoice!.triggerAttack(hz, undefined, v);
+}
+
+export function noteOff(): void {
+  if (liveVoice) liveVoice.triggerRelease();
+}
+
 /** Release any sounding note without tearing the voice down. */
 export function stopLive(): void {
   if (liveVoice) liveVoice.triggerRelease();

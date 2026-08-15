@@ -263,12 +263,21 @@ var TOOLS = [{
 	input_schema: {
 		type: "object",
 		additionalProperties: false,
-		required: ["preset", "rationale"],
+		required: [
+			"preset",
+			"rationale",
+			"suggestions"
+		],
 		properties: {
 			preset: PRESET_JSON_SCHEMA,
 			rationale: {
 				type: "string",
 				description: "One or two sentences for the user: what this patch is, and where it still differs from the sample."
+			},
+			suggestions: {
+				type: "array",
+				items: { type: "string" },
+				description: `Exactly 4 short next moves the user might want, phrased the way a musician talks — "glassier", "more punch", "hollow it out", "let it breathe", "darker and further away", "make it a bass". Two to five words each, imperative, NO parameter names or numbers (never 'raise modulationIndex to 12'). SPREAD THEM OUT so they open genuinely different doors: they should not be four synonyms for brighter. A good set moves along different axes — brightness, attack/envelope, harmonic character (hollow / metallic / woody), register or role (make it a bass, make it a pad) — and includes at least one that is a real departure rather than a small tweak. Bias them toward what would sound interesting on THIS patch, not toward closing the remaining distance to the sample.`
 			}
 		}
 	}
@@ -705,7 +714,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 			};
 		}
 		if (call && call.name === "finalize") {
-			const { preset, rationale } = readToolInput(call.input);
+			const { preset, rationale, suggestions } = readToolInput(call.input);
 			const presetId = crypto.randomUUID();
 			this.meta.pendingToolUseId = null;
 			this.meta.pendingPresetId = null;
@@ -723,7 +732,8 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 				text: text ? `${text}\n\n${rationale}` : rationale,
 				preset,
 				presetId,
-				distance: this.meta.bestDistance
+				distance: this.meta.bestDistance,
+				suggestions
 			};
 		}
 		this.meta.status = "idle";
@@ -739,9 +749,11 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 /** Tool input is agent-authored JSON — clamp it before it can reach an AudioParam. */
 function readToolInput(input) {
 	const obj = input ?? {};
+	const suggestions = Array.isArray(obj.suggestions) ? obj.suggestions.filter((s) => typeof s === "string").map((s) => s.trim()).filter(Boolean).slice(0, 4).map((s) => s.length > 48 ? `${s.slice(0, 47)}…` : s) : [];
 	return {
 		preset: clampPreset(obj.preset),
-		rationale: typeof obj.rationale === "string" ? obj.rationale : ""
+		rationale: typeof obj.rationale === "string" ? obj.rationale : "",
+		suggestions
 	};
 }
 //#endregion

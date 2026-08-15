@@ -13,6 +13,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { PRESET_JSON_SCHEMA, RANGE } from "../shared/preset";
+import { SUGGESTION_COUNT } from "../shared/protocol";
 
 export type MessageParam = Anthropic.MessageParam;
 
@@ -48,6 +49,25 @@ const RATIONALE = {
     "and what you expect to happen to the measurement. Name the hypothesis so the next diff can confirm or refute it.",
 } as const;
 
+/**
+ * One-click exploration chips. The user is playing the on-screen keyboard with
+ * both hands; these let them keep moving without typing. They are sent back
+ * verbatim as chat messages, so they must read as instructions to you.
+ */
+const SUGGESTIONS = {
+  type: "array",
+  items: { type: "string" },
+  description:
+    `Exactly ${SUGGESTION_COUNT} short next moves the user might want, phrased the way a musician talks — ` +
+    `"glassier", "more punch", "hollow it out", "let it breathe", "darker and further away", "make it a bass". ` +
+    "Two to five words each, imperative, NO parameter names or numbers (never 'raise modulationIndex to 12'). " +
+    "SPREAD THEM OUT so they open genuinely different doors: they should not be four synonyms for brighter. " +
+    "A good set moves along different axes — brightness, attack/envelope, harmonic character (hollow / metallic " +
+    "/ woody), register or role (make it a bass, make it a pad) — and includes at least one that is a real " +
+    "departure rather than a small tweak. Bias them toward what would sound interesting on THIS patch, not " +
+    "toward closing the remaining distance to the sample.",
+} as const;
+
 export const TOOLS: Anthropic.Tool[] = [
   {
     name: "propose_preset",
@@ -78,7 +98,7 @@ export const TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       additionalProperties: false,
-      required: ["preset", "rationale"],
+      required: ["preset", "rationale", "suggestions"],
       properties: {
         preset: PRESET_JSON_SCHEMA,
         rationale: {
@@ -86,6 +106,7 @@ export const TOOLS: Anthropic.Tool[] = [
           description:
             "One or two sentences for the user: what this patch is, and where it still differs from the sample.",
         },
+        suggestions: SUGGESTIONS,
       },
     },
   } as unknown as Anthropic.Tool,

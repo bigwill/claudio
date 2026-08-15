@@ -19,7 +19,7 @@ import { renderPreset, renderIdle, type PreparedAudio, type RenderSpec } from ".
 import * as voice from "./voice";
 
 export type { PreparedAudio, RenderSpec } from "./render";
-export { presetToOptions, buildVoice, ensureAudio, setLivePreset, stopLive, disposeLive, midiToHz } from "./voice";
+export { presetToOptions, buildVoice, ensureAudio, setLivePreset, stopLive, disposeLive, midiToHz, noteOn, noteOff } from "./voice";
 export { renderPreset, renderIdle, isRendering, MAX_RENDER_MS } from "./render";
 
 export interface TargetAnalysis {

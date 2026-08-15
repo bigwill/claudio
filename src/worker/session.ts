@@ -5,6 +5,7 @@ import { clampPreset, type ClaudioPreset } from "../shared/preset";
 import type { FeatureDiff, FeatureSummary } from "../shared/features";
 import {
   MAX_ITERATIONS,
+  SUGGESTION_COUNT,
   type Attempt,
   type SessionSnapshot,
   type SessionStatus,
@@ -370,7 +371,7 @@ export class SessionDO extends DurableObject<Env> {
     }
 
     if (call && call.name === "finalize") {
-      const { preset, rationale } = readToolInput(call.input);
+      const { preset, rationale, suggestions } = readToolInput(call.input);
       const presetId = crypto.randomUUID();
 
       this.meta.pendingToolUseId = null;
@@ -385,6 +386,7 @@ export class SessionDO extends DurableObject<Env> {
         preset,
         presetId,
         distance: this.meta.bestDistance,
+        suggestions,
       };
     }
 
@@ -401,10 +403,25 @@ export class SessionDO extends DurableObject<Env> {
 }
 
 /** Tool input is agent-authored JSON — clamp it before it can reach an AudioParam. */
-function readToolInput(input: unknown): { preset: ClaudioPreset; rationale: string } {
-  const obj = (input ?? {}) as { preset?: unknown; rationale?: unknown };
+function readToolInput(input: unknown): {
+  preset: ClaudioPreset;
+  rationale: string;
+  suggestions: string[];
+} {
+  const obj = (input ?? {}) as { preset?: unknown; rationale?: unknown; suggestions?: unknown };
+  // Agent-authored, so treat as untrusted: strings only, trimmed, capped in
+  // both count and length so a runaway response can't wreck the chip row.
+  const suggestions = Array.isArray(obj.suggestions)
+    ? obj.suggestions
+        .filter((s): s is string => typeof s === "string")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, SUGGESTION_COUNT)
+        .map((s) => (s.length > 48 ? `${s.slice(0, 47)}…` : s))
+    : [];
   return {
     preset: clampPreset(obj.preset),
     rationale: typeof obj.rationale === "string" ? obj.rationale : "",
+    suggestions,
   };
 }

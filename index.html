@@ -68,6 +68,32 @@
       }
       .hidden { display: none; }
       code { color: var(--accent); }
+
+      /* keyboard */
+      .keys { position: relative; height: 130px; user-select: none; touch-action: none; }
+      .key { position: absolute; top: 0; border-radius: 0 0 5px 5px; cursor: pointer; }
+      .key.white {
+        position: relative; display: inline-block; width: var(--kw); height: 100%;
+        background: #ece9f5; border: 1px solid #0e0d12; margin-left: -1px;
+        vertical-align: top;
+      }
+      .key.white > span {
+        position: absolute; bottom: 7px; left: 0; right: 0; text-align: center;
+        font-size: 10px; color: #7b7690;
+      }
+      .key.black {
+        width: calc(var(--kw) * 0.6); height: 62%; background: #26232f;
+        border: 1px solid #0e0d12; z-index: 2;
+      }
+      .key.white.on { background: var(--accent); }
+      .key.black.on { background: #6f5bc4; }
+
+      /* suggestion chips */
+      .chip {
+        border-radius: 999px; padding: 6px 13px; font-size: 13px;
+        background: #262336; border-color: #3d3852;
+      }
+      .chip:hover:not(:disabled) { background: #2f2b42; border-color: var(--accent); }
     </style>
   </head>
   <body>

@@ -27,6 +27,17 @@ export interface Attempt {
   distance: number | null;
 }
 
+/**
+ * Suggested next moves, in the user's language ("glassier", "more punch").
+ * Rendered as one-click chips so someone with both hands on the keyboard can
+ * keep exploring without typing. Clicking one just sends it as a chat message,
+ * so it needs no separate code path.
+ */
+export type Suggestions = string[];
+
+/** How many chips to show, and what the agent is asked to produce. */
+export const SUGGESTION_COUNT = 4;
+
 export type Step =
   | {
       kind: "render";
@@ -43,6 +54,7 @@ export type Step =
       text: string;
       preset: ClaudioPreset | null;
       iteration: number;
+      suggestions?: Suggestions;
     }
   | {
       kind: "done";
@@ -50,6 +62,7 @@ export type Step =
       preset: ClaudioPreset;
       presetId: string;
       distance: number | null;
+      suggestions?: Suggestions;
     }
   | {
       kind: "error";
