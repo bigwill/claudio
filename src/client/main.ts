@@ -75,6 +75,13 @@ interface AttemptView {
   rationale: string;
   distance: number | null;
   features: FeatureSummary | null;
+  /**
+   * Whether the browser is still rendering this one. Tracked explicitly rather
+   * than inferred from `distance === null`: prompt-started sessions have no
+   * target, so they never get a distance at all, and inferring made every
+   * finished row animate as though it were still loading.
+   */
+  pending: boolean;
 }
 
 const state = {
@@ -376,9 +383,10 @@ function renderAttempts(): void {
   list.innerHTML = state.attempts
     .map((a, i) => {
       const d = a.distance;
-      const pending = d === null;
-      const pct = pending ? 0 : Math.max(0, Math.min(100, 100 - d));
-      const isBest = !pending && d === best;
+      const pending = a.pending;
+      const scored = d !== null;
+      const pct = scored ? Math.max(0, Math.min(100, 100 - d)) : 0;
+      const isBest = scored && d === best;
       const isLoaded = state.loadedPresetId === a.presetId;
       return `
         <div class="attempt ${pending ? "working" : ""}" data-load="${a.presetId}" style="cursor:pointer">
@@ -387,10 +395,10 @@ function renderAttempts(): void {
               ${isBest ? '<span class="tag" style="color:var(--good);border-color:var(--good)">best</span>' : ""}
               ${isLoaded ? '<span class="tag" style="color:var(--accent);border-color:var(--accent)">loaded</span>' : ""}
             </div>
-            <span class="dist">${pending ? "" : d.toFixed(1)}</span>
+            <span class="dist">${scored ? d.toFixed(1) : ""}</span>
           </div>
           <div class="muted" style="font-size:13px">${escapeHtml(a.rationale)}</div>
-          <div class="bar"><i style="width:${pct}%"></i></div>
+          ${pending || scored ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}
         </div>`;
     })
     .join("");
@@ -534,7 +542,10 @@ async function drain(step: Step): Promise<void> {
     const { presetId, preset, iterationsRemaining } = step;
 
     state.current = preset;
-    state.attempts.push({ presetId, preset, rationale: step.rationale, distance: null, features: null });
+    state.attempts.push({
+      presetId, preset, rationale: step.rationale,
+      distance: null, features: null, pending: true,
+    });
     renderAttempts();
     setStatus(`Rendering “${preset.name}” · ${iterationsRemaining} left`, "working");
 
@@ -545,7 +556,7 @@ async function drain(step: Step): Promise<void> {
         ? await evaluatePreset(preset, state.target)
         : await measurePreset(preset);
       const a = state.attempts.find((x) => x.presetId === presetId);
-      if (a) { a.distance = diff ? diff.distance : null; a.features = features; }
+      if (a) { a.distance = diff ? diff.distance : null; a.features = features; a.pending = false; }
       // Load it the moment it has been rendered, so the newest patch is always
       // playable — the user may like an in-progress one and want to keep it.
       await loadPreset(preset, presetId);
@@ -557,6 +568,9 @@ async function drain(step: Step): Promise<void> {
     } catch (err) {
       // A bad preset must not wedge the session — report it and let the agent
       // self-correct rather than throwing out of the loop.
+      const failed = state.attempts.find((x) => x.presetId === presetId);
+      if (failed) failed.pending = false;
+      renderAttempts();
       setStatus(`Render failed, telling the agent: ${String(err)}`);
       step = await apiClient.submitRenderError(sessionId, presetId, String(err));
     }
@@ -641,6 +655,7 @@ async function restoreSession(id: string): Promise<void> {
     rationale: a.rationale,
     distance: a.distance,
     features: a.features,
+    pending: false,
   }));
   renderAttempts();
 
