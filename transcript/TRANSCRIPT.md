@@ -1,8 +1,10 @@
 # Claudio — build transcript
 
-Full Claude Code session that produced this repo: ~96 minutes, start to deployed.
+The complete Claude Code session that produced this repo: ~96 minutes, from an empty
+directory to a deployed app.
+
+_35 user turns · 365 assistant turns_
 Raw event log: `session.jsonl` (this file is the readable rendering of it).
-_27 user turns · 343 assistant turns_
 
 > **Note on the string `V4d2CExmJE-5J-P2kYsL7kD1`** appearing in this log: that was a
 > short-lived shared-secret gate key, generated and then deleted during the session when
@@ -11,8 +13,8 @@ _27 user turns · 343 assistant turns_
 > transcript stays a faithful record. No Anthropic API key ever appears here; that was set
 > directly via `wrangler secret put` and was never visible to the session.
 >
-> The log necessarily stops just short of its own final commit — it is a snapshot of the
-> session taken during the last turn.
+> The log necessarily stops a beat short of its own final commit — it is a snapshot taken
+> during the last turn.
 
 ---
 
@@ -18469,3 +18471,295 @@ I've written all of this into the README's Deploying section, along with the `CL
 ### 🧑 User
 
 ok, add this last stuff to the transcript if it isn't already and push and deploy. I'll have to sort out the prod DNS later. then, that's a wrap! 96 minutes! nice work!
+
+**Claude**
+
+`[Bash]` Refresh transcript with the full session
+
+**Claude**
+
+`[Bash]` Commit transcript and deploy develop
+
+**Claude**
+
+`[Bash]` Push everything and verify final state
+
+**Claude**
+
+That's a wrap. 🎛️
+
+**Everything pushed and deployed:**
+- `main` and `develop` in sync at `github.com/bigwill/claudio` — 24 commits, 3.2MB, working tree clean
+- Live and healthy at https://claudio.will-104.workers.dev (app 200, Durable Object answering, key visible)
+- Transcript refreshed through the end: 27 user turns, 343 assistant turns
+
+**Left for you:** the `claudio.humble.audio` DNS. `claudio-prod` is deployed and keyed, waiting on the subdomain delegation — steps are in the README's Deploying section so you don't have to reconstruct them from memory later.
+
+**What we got in 96 minutes:** the closed render-compare loop working end to end against real audio, a 4-op FM engine out of Tone's nested oscillators, a hand-written STFT analyzer validated against your 12 non-FM samples, conversational refinement, agent-proposed exploration chips, a polyphonic keyboard, URL-addressed sessions, and the whole thing deployed on Workers + Durable Objects.
+
+Three things I'd flag if you pick this up again:
+- **The audio is still the least-verified layer** — everything measures correctly, but only your ears can say whether "Glass Chime" sounds like one.
+- **The recurring bug class was persisted state with nothing alive to advance it** (dangling `tool_use`, stranded `"thinking"`). The DO outliving the browser is where I'd look first when something breaks.
+- **`noiseRatio` reading 0.00 on a shaker** is the best argument in the repo for testing against real data early — no synthetic signal would have caught it.
+
+Thanks — genuinely good session. The steering was sharp, especially catching the missing sharps and the preset never going live.
+
+### 🧑 User
+
+ok, walk through what i need to do at 101domains and at Cloudflare for the DNS
+
+**Claude**
+
+Here's the whole sequence. Two phases, and the order matters — Cloudflare first, because it issues the nameservers you'll need at 101domain.
+
+## Phase 1 — Cloudflare (get the nameservers)
+
+1. Dashboard → **Add a domain** (or "Add a site")
+2. Enter **`claudio.humble.audio`** — the full subdomain, *not* `humble.audio`. This is the whole trick: you're creating a zone for just that subdomain, so the apex and your Shopify store are never involved.
+3. Select the **Free** plan
+4. It'll offer to scan for existing records — there won't be any. Continue; an empty zone is correct. **Don't add any records yourself** — wrangler creates the one you need.
+5. Cloudflare shows **two nameservers**, something like `dana.ns.cloudflare.com` / `rick.ns.cloudflare.com`. Copy both.
+
+The zone will sit in **"Pending"** until step 2 completes.
+
+## Phase 2 — 101domain (delegate the subdomain)
+
+In 101domain's DNS management for `humble.audio`:
+
+1. **Check for an existing `claudio` record first.** If there's an A or CNAME on that host, delete it — an NS delegation and a record on the same name conflict.
+2. Add **two NS records**:
+
+| Type | Host / Name | Value | TTL |
+|---|---|---|---|
+| NS | `claudio` | `<first>.ns.cloudflare.com` | 3600 (or lowest) |
+| NS | `claudio` | `<second>.ns.cloudflare.com` | 3600 (or lowest) |
+
+Two things that vary by registrar UI:
+- Some want just the label `claudio`, others the full `claudio.humble.audio`. Match whatever their existing records look like.
+- Values may need a trailing dot (`dana.ns.cloudflare.com.`). Again, match their convention.
+
+**Leave everything else alone** — your apex A record (`23.227.38.65`, the Shopify store) and all other records stay exactly as they are.
+
+## Phase 3 — verify and ship
+
+Delegation usually lands in minutes, sometimes a couple of hours. Check with:
+
+```bash
+dig +short NS claudio.humble.audio      # should show the two Cloudflare nameservers
+dig +short A humble.audio               # should STILL be 23.227.38.65 — sanity check
+```
+
+Once Cloudflare shows the zone **Active**:
+
+```bash
+cd /Users/willstockwell/agent-workspace/claudio/develop
+npm run deploy:prod
+```
+
+That's the step that creates the DNS record and provisions the TLS cert — you don't create either by hand. Then:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://claudio.humble.audio/
+curl -s https://claudio.humble.audio/api/ping
+```
+
+Expect `200` and `hasAnthropicKey: true` (that secret is already set on `claudio-prod`).
+
+## The one thing that could derail it
+
+**If 101domain won't let you add NS records for a subdomain** — some registrars restrict record types on their bundled DNS — subdomain delegation is off the table, and the fallback is moving the whole `humble.audio` zone to Cloudflare. That's a bigger job: you'd inventory every existing record first (Shopify A records, any MX for email, TXT/SPF/DKIM, `www`), recreate them in Cloudflare, *then* switch the apex nameservers. Getting MX or SPF wrong there breaks email, so it's worth doing carefully rather than quickly.
+
+Ping me when the NS records are in and I'll verify the delegation and run the production deploy for you.
+
+### 🧑 User
+
+Ok I'll just have to setup claudio.humble.audio as a CNAME at 101domains. I don't think my production environment has active routes. sort that out for e
+
+### 🧑 User
+
+Ok I'll just have to setup claudio.humble.audio as a CNAME at 101domains. I don't think my production environment has active routes. sort that out for me
+
+**Claude**
+
+I have to push back on one part of that, because it won't work — and you'd discover it as a confusing TLS error rather than a clean failure.
+
+**A CNAME from 101domain to `*.workers.dev` can't serve `claudio.humble.audio`.** When a browser connects, it sends SNI for `claudio.humble.audio`; Cloudflare only holds a certificate for `*.workers.dev`, so the handshake fails with a cert-name mismatch before any routing happens. Cloudflare won't issue a cert for a hostname it isn't authoritative for. (Routing on a foreign `Host` header is the second problem, but the cert kills it first.)
+
+The workarounds that *do* exist are: Cloudflare for SaaS custom hostnames (needs a paid zone you own in Cloudflare), or partial/CNAME zone setup (Business plan, $200/mo). Neither is proportionate here.
+
+But you're right that **production is currently unreachable**, and I can fix that now:
+
+**Claude**
+
+`[Edit]` /Users/willstockwell/agent-workspace/claudio/develop/wrangler.jsonc
+
+**Claude**
+
+`[Bash]` Deploy production with a working route
+
+**Claude**
+
+`[Bash]` Verify prod and demonstrate the CNAME failure
+
+**Claude**
+
+Production is live and the CNAME failure is confirmed empirically (`000` = handshake failed, exactly as predicted). Updating the docs to match reality:
+
+**Claude**
+
+`[Bash]` Commit, merge and push prod routing fix
+
+**Claude**
+
+Sorted. **Production is live at https://claudio-prod.will-104.workers.dev** — 200, Durable Object responding, `hasAnthropicKey: true`.
+
+You were right that it had no routes. The first prod deploy uploaded the Worker but failed to attach `claudio.humble.audio`, and I'd set `workers_dev: false` to keep one canonical URL — so `claudio-prod` was live and completely unreachable. It now has a workers.dev route as an interim, and the custom-domain line is commented out in `wrangler.jsonc` with the reason inline, since leaving it enabled fails the deploy every time.
+
+On the CNAME: I tested it rather than just asserting it. Forcing a connection for `claudio.humble.audio` at Cloudflare's edge returns `000` — the connection dies at the TLS handshake, before any routing logic runs. That's the cert-name mismatch, and no DNS configuration at 101domain can fix it, because the certificate has to come from whoever holds the zone.
+
+So your options, honestly ranked:
+
+1. **Subdomain delegation** (NS records at 101domain, not CNAME) — the walkthrough I gave still stands and is ~10 minutes of work. Your apex and Shopify store stay untouched.
+2. **Leave it on workers.dev.** For a prototype this is genuinely fine — it's live, HTTPS, and stable.
+3. **Registrar redirect**, if 101domain offers web forwarding: `claudio.humble.audio` → 301 → the workers.dev URL. The address bar shows workers.dev after the bounce, so it's cosmetic at best.
+
+There's no version where a plain CNAME works, and I'd rather you hear that now than debug a cert error later.
+
+Everything's committed, merged to `main`, and pushed. The README now carries the constraint and the exact steps to finish it when you're ready — including the one-line uncomment in `wrangler.jsonc`.
+
+### 🧑 User
+
+Ok, i need to do manual work at 101domains. I see claudio-prod.will-104.workers.dev
+
+**Claude**
+
+Good — that's production confirmed working.
+
+For the manual work, the only thing to keep straight: **NS records, not a CNAME**, and you need the nameservers from Cloudflare *before* you can do the 101domain half.
+
+**First, in Cloudflare** (2 minutes): Add a domain → `claudio.humble.audio` → Free plan → skip the record scan → copy the two nameservers it issues (e.g. `dana.ns.cloudflare.com`, `rick.ns.cloudflare.com`). Zone will show "Pending."
+
+**Then at 101domain**, in DNS management for `humble.audio`:
+
+| Type | Host | Value |
+|---|---|---|
+| NS | `claudio` | `<first>.ns.cloudflare.com` |
+| NS | `claudio` | `<second>.ns.cloudflare.com` |
+
+Two records, same host, different values.
+
+- If there's already an A or CNAME on host `claudio`, **delete it** — it conflicts with the delegation.
+- Some UIs want `claudio`, others `claudio.humble.audio`, and some need a trailing dot on the values. Match whatever the existing records in that panel look like.
+- Touch nothing else. Your apex A record (`23.227.38.65`) and any MX/TXT stay exactly as they are.
+
+**To check it landed:**
+```bash
+dig +short NS claudio.humble.audio    # the two Cloudflare nameservers
+dig +short A humble.audio             # still 23.227.38.65
+```
+
+Usually minutes, occasionally a few hours. Once Cloudflare shows the zone **Active**, tell me and I'll uncomment the `routes` line in `wrangler.jsonc`, deploy, and verify the cert and endpoint — about 30 seconds of work on my end.
+
+And if 101domain won't let you create NS records on a subdomain, say so — that's the signal that delegation is off the table and we'd weigh moving the apex versus just staying on workers.dev.
+
+### 🧑 User
+
+CNAME
+
+**Claude**
+
+`[Bash]` Check current DNS state for the subdomain
+
+**Claude**
+
+Checked live — there's nothing at `claudio.humble.audio` yet (no CNAME, no NS, no A; the zone still answers only from `ns1.101domain.com`).
+
+So I want to make sure I read you right, because the two possibilities lead to very different places:
+
+**If you mean 101domain only offers CNAME for a subdomain** (no NS record type available) — then delegation is off the table, and a CNAME won't serve this hostname for the cert reason. Your real options become:
+
+1. **Move the whole `humble.audio` zone to Cloudflare.** The only path to a Workers custom domain here. It means inventorying every existing record — the Shopify apex, `www`, MX, SPF/DKIM TXT — recreating them in Cloudflare, then switching nameservers at 101domain. Very doable, but email breaks if a record is missed, so it's careful work rather than quick work.
+2. **Stay on `claudio-prod.will-104.workers.dev`.** Live, HTTPS, stable. For a prototype this costs you nothing but the vanity URL.
+
+**If you mean you're about to create the CNAME anyway** — it'll resolve, but every browser will show a certificate error, because Cloudflare has no cert for a name it isn't authoritative for. I tested this above; the connection dies at handshake.
+
+Which is it? If 101domain genuinely has no NS record type, say the word and I'll help you build the record inventory for a zone move — that's the part worth being methodical about.
+
+### 🧑 User
+
+I added this on 101domains-- 
+claudio
+6 Hours
+CNAME
+claudio-prod.will-104.workers.dev.
+
+**Claude**
+
+`[Bash]` Test the CNAME end to end
+
+**Claude**
+
+Not resolving yet. Let me query 101domain's nameservers directly to bypass negative caching and see whether the record actually saved:
+
+**Claude**
+
+`[Bash]` Query authoritative nameservers directly
+
+**Claude**
+
+The record **is** saved correctly — both 101domain nameservers return it. It just isn't visible to my resolver yet (the zone's negative-cache TTL is 3600s, so up to an hour).
+
+Rather than wait, let me simulate exactly what your browser will do once it propagates:
+
+**Claude**
+
+`[Bash]` Simulate the browser request once DNS propagates
+
+**Claude**
+
+Your record is correct — both 101domain nameservers serve it, TTL 21600. It's only invisible to me for another ~hour (the zone's negative-cache TTL).
+
+But I simulated exactly what your browser will do when it does propagate, and here's the answer:
+
+```
+curl: (35) sslv3 alert handshake failure
+http_code: 000
+```
+
+Cloudflare's edge **refuses the TLS handshake outright** for SNI `claudio.humble.audio` — it offers no certificate at all, because it has no record of that hostname. So once DNS propagates you'll get a browser error page (`ERR_SSL_...` / "can't establish a secure connection"), not the app. This isn't a propagation issue or a config detail I can fix on my side; the request never reaches your Worker.
+
+**The CNAME can't be made to work.** I'd take it back out, or leave it knowing it'll serve an error once it propagates.
+
+Where that leaves you:
+
+**Option 1 — move `humble.audio` to Cloudflare.** The only route to `claudio.humble.audio`. Inventory the existing records first (Shopify apex `23.227.38.65`, `www`, MX, SPF/DKIM TXT), recreate them in Cloudflare, then switch nameservers at 101domain. I can help build that inventory and check nothing's missed — the email records are where this goes wrong.
+
+**Option 2 — ship on `claudio-prod.will-104.workers.dev`.** Live now, HTTPS, stable, zero risk to your storefront.
+
+One practical note either way: you set a **6-hour TTL** on that CNAME. If you do switch to NS delegation later, lower it to 300 first and wait out the old TTL — otherwise resolvers hold the stale CNAME for six hours after you change it.
+
+Given this was a 96-minute prototype and it's deployed and working, Option 2 is the proportionate call. But if you want the vanity URL, say the word and we'll do the zone move carefully.
+
+### 🧑 User
+
+give it time. we're done here!
+
+**Claude**
+
+Fair enough — and worth being clear about what "give it time" will produce: the CNAME will propagate within the hour and then serve a TLS error, since Cloudflare refuses the handshake for a hostname it doesn't hold. Time won't change that one. But it costs nothing to leave sitting there, and the zone move is a decision for a day when you're not 96 minutes into a timebox.
+
+**Where things landed:**
+
+- **Live:** `claudio.will-104.workers.dev` (develop) and `claudio-prod.will-104.workers.dev` (production, keyed and working)
+- **Repo:** `github.com/bigwill/claudio` — private, 25 commits, `main` and `develop` in sync, working tree clean
+- **In-tree deliverables:** `PLAN.md`, `README.md`, and the full session transcript in both raw and readable form
+
+Built in ~96 minutes against a 2-hour box: the closed render-compare loop, a 4-op FM engine coaxed out of Tone's nested oscillators, a hand-written STFT analyzer validated against your 12 non-FM samples, conversational refinement, agent-proposed exploration chips, a polyphonic keyboard, and URL-addressed sessions — with chat, chips, keyboard, and sessions all originally stretch goals.
+
+The README carries the unfinished business: the one-line uncomment in `wrangler.jsonc` and the subdomain-delegation steps, for whenever the domain matters.
+
+Genuinely enjoyable build — thanks for the sharp steering, especially catching the unbound sharps and the preset never going live. Nice work. 🎹
+
+### 🧑 User
+
+nice end cap for the transcript. add it, commit and push. well done!
