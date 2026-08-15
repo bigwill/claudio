@@ -21,7 +21,34 @@
         color: var(--text);
         font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, sans-serif;
       }
-      main { max-width: 940px; margin: 0 auto; padding: 32px 20px 80px; }
+      main { max-width: 1180px; margin: 0 auto; padding: 32px 20px 80px; }
+
+      /* Two columns: iterations live in the rail, the instrument stays centre stage. */
+      .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+      .rail { position: sticky; top: 24px; }
+      @media (max-width: 860px) {
+        .layout { grid-template-columns: minmax(0, 1fr); }
+        .rail { position: static; order: 2; }
+      }
+
+      /* "working" indicator */
+      .dots { display: inline-flex; gap: 4px; margin-left: 2px; vertical-align: middle; }
+      .dots > i {
+        width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+        animation: pulse 1.1s ease-in-out infinite;
+      }
+      .dots > i:nth-child(2) { animation-delay: .15s; }
+      .dots > i:nth-child(3) { animation-delay: .3s; }
+      @keyframes pulse {
+        0%, 80%, 100% { opacity: .22; transform: translateY(0); }
+        40% { opacity: 1; transform: translateY(-3px); }
+      }
+      .working { border-color: var(--accent) !important; }
+      .working .bar > i {
+        background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        background-size: 200% 100%; animation: sweep 1.1s linear infinite; width: 100% !important;
+      }
+      @keyframes sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
       h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -0.01em; }
       .sub { color: var(--dim); margin: 0 0 28px; font-size: 14px; }
       .panel {
@@ -99,7 +126,7 @@
       }
       .chip:hover:not(:disabled) { background: #2f2b42; border-color: var(--accent); }
     </style>
-    <script type="module" crossorigin src="/assets/index-BXQ592mE.js"></script>
+    <script type="module" crossorigin src="/assets/index-Bpgp-k46.js"></script>
   </head>
   <body>
     <main id="app">

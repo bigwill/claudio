@@ -18,6 +18,7 @@ import {
   noteOn,
   playBuffer,
   playNote,
+  renderIdle,
   setLivePreset,
   type TargetAnalysis,
 } from "./audio";
@@ -44,6 +45,7 @@ const state = {
   target: null as TargetAnalysis | null,
   attempts: [] as AttemptView[],
   current: null as ClaudioPreset | null,
+  loadedPresetId: null as string | null,
   busy: false,
 };
 
@@ -57,40 +59,52 @@ function shell(): void {
     <h1>Claudio</h1>
     <p class="sub">Upload a sound. An agent reverse-engineers it into an FM patch, then you talk to it.</p>
 
-    <div class="panel">
-      <div id="drop">Drop a WAV here, or click to choose
-        <input id="file" type="file" accept="audio/*" class="hidden" />
-      </div>
-      <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
-    </div>
+    <div class="layout">
+      <aside class="rail">
+        <div class="panel hidden" id="attemptspanel">
+          <div class="row" style="margin-bottom:6px;justify-content:space-between">
+            <span class="tag">iterations</span>
+            <span class="muted" style="font-size:12px">click one to load it</span>
+          </div>
+          <div id="attempts"></div>
+        </div>
+      </aside>
 
-    <div class="panel" id="statuspanel">
-      <div class="row"><span class="tag">status</span><span id="status" class="muted">Waiting for a sample.</span></div>
-    </div>
+      <section>
+        <div class="panel">
+          <div id="drop">Drop a WAV here, or click to choose
+            <input id="file" type="file" accept="audio/*" class="hidden" />
+          </div>
+          <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
+        </div>
 
-    <div class="panel hidden" id="attemptspanel">
-      <div class="row" style="margin-bottom:6px"><span class="tag">iterations</span></div>
-      <div id="attempts"></div>
-    </div>
+        <div class="panel" id="statuspanel">
+          <div class="row"><span class="tag">status</span><span id="status" class="muted">Waiting for a sample.</span></div>
+        </div>
 
-    <div class="panel" id="kbpanel">
-      <div class="row" style="justify-content:space-between;margin-bottom:8px">
-        <span class="tag">play</span>
-        <span class="muted" style="font-size:12px">
-          click the keys, or type — <code>A S D F&hellip;</code> naturals, <code>W E T Y U</code> sharps ·
-          <code>Z</code>/<code>X</code> shifts octave · chords work
-        </span>
-      </div>
-      <div id="keyboard"></div>
-    </div>
+        <div class="panel" id="kbpanel">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <span class="row" style="gap:8px">
+              <span class="tag">play</span>
+              <span id="nowplaying" class="muted" style="font-size:12px">init patch</span>
+            </span>
+            <span class="muted" style="font-size:12px">
+              click the keys, or type — <code>A S D F&hellip;</code> naturals, <code>W E T Y U</code> sharps ·
+              <code>Z</code>/<code>X</code> shifts octave · chords work
+            </span>
+          </div>
+          <div id="keyboard"></div>
+        </div>
 
-    <div class="panel hidden" id="chatpanel">
-      <div id="chips" class="row" style="margin-bottom:10px"></div>
-      <div class="row">
-        <input id="chat" type="text" placeholder="glassier · more punch · hollow it out" style="flex:1" />
-        <button id="send">Send</button>
-      </div>
-      <div id="chatlog" class="muted" style="margin-top:10px"></div>
+        <div class="panel hidden" id="chatpanel">
+          <div id="chips" class="row" style="margin-bottom:10px"></div>
+          <div class="row">
+            <input id="chat" type="text" placeholder="glassier · more punch · hollow it out" style="flex:1" />
+            <button id="send">Send</button>
+          </div>
+          <div id="chatlog" class="muted" style="margin-top:10px"></div>
+        </div>
+      </section>
     </div>`;
 
   buildKeyboard();
@@ -247,13 +261,18 @@ function renderChips(suggestions: string[] | undefined): void {
   });
 }
 
-function setStatus(text: string, tone: "muted" | "good" = "muted"): void {
+function setStatus(text: string, tone: "muted" | "good" | "working" = "muted"): void {
   const el = $("status");
+  const panel = $("statuspanel");
   if (!el) return;
-  el.textContent = text;
+  // Animated dots, so waiting *feels* like waiting rather than reading as a
+  // frozen sentence.
+  el.innerHTML =
+    escapeHtml(text) + (tone === "working" ? '<span class="dots"><i></i><i></i><i></i></span>' : "");
   el.className = tone === "good" ? "" : "muted";
   if (tone === "good") el.style.color = "var(--good)";
   else el.style.removeProperty("color");
+  panel?.classList.toggle("working", tone === "working");
 }
 
 function renderAttempts(): void {
@@ -271,18 +290,18 @@ function renderAttempts(): void {
   list.innerHTML = state.attempts
     .map((a, i) => {
       const d = a.distance;
-      const pct = d === null ? 0 : Math.max(0, Math.min(100, 100 - d));
-      const isBest = d !== null && d === best;
+      const pending = d === null;
+      const pct = pending ? 0 : Math.max(0, Math.min(100, 100 - d));
+      const isBest = !pending && d === best;
+      const isLoaded = state.loadedPresetId === a.presetId;
       return `
-        <div class="attempt">
+        <div class="attempt ${pending ? "working" : ""}" data-load="${a.presetId}" style="cursor:pointer">
           <div class="row" style="justify-content:space-between">
             <div><strong>${i + 1}. ${escapeHtml(a.preset.name)}</strong>
               ${isBest ? '<span class="tag" style="color:var(--good);border-color:var(--good)">best</span>' : ""}
+              ${isLoaded ? '<span class="tag" style="color:var(--accent);border-color:var(--accent)">loaded</span>' : ""}
             </div>
-            <div class="row">
-              <span class="dist">${d === null ? "…" : d.toFixed(1)}</span>
-              <button data-play="${a.presetId}">▶︎</button>
-            </div>
+            <span class="dist">${pending ? "" : d.toFixed(1)}</span>
           </div>
           <div class="muted" style="font-size:13px">${escapeHtml(a.rationale)}</div>
           <div class="bar"><i style="width:${pct}%"></i></div>
@@ -290,15 +309,39 @@ function renderAttempts(): void {
     })
     .join("");
 
-  list.querySelectorAll<HTMLButtonElement>("[data-play]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const a = state.attempts.find((x) => x.presetId === btn.dataset.play);
-      if (!a) return;
-      await ensureAudio();
-      setLivePreset(a.preset);
-      playNote(midiForTarget(), 0.9, 1.5);
+  // Any attempt is loadable at any time, finished or not — the user may simply
+  // like one and want to keep playing it.
+  list.querySelectorAll<HTMLElement>("[data-load]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const a = state.attempts.find((x) => x.presetId === el.dataset.load);
+      if (a) await loadPreset(a.preset, a.presetId, { audition: true });
     });
   });
+}
+
+/**
+ * Make a preset the audible one.
+ *
+ * Waits for render-idle first: `Tone.Offline` swaps the GLOBAL Tone context
+ * while it runs, so constructing the live voice mid-render would build it in
+ * the offline context and it would never be heard.
+ */
+async function loadPreset(
+  preset: ClaudioPreset,
+  presetId: string | null,
+  opts: { audition?: boolean } = {},
+): Promise<void> {
+  await renderIdle();
+  state.current = preset;
+  state.loadedPresetId = presetId;
+  setLivePreset(preset);
+  const label = $("nowplaying");
+  if (label) label.textContent = preset.name;
+  renderAttempts();
+  if (opts.audition) {
+    await ensureAudio();
+    playNote(midiForTarget(), 0.9, 1.5);
+  }
 }
 
 function escapeHtml(s: string): string {
@@ -325,7 +368,7 @@ async function start(file: File): Promise<void> {
   renderAttempts();
 
   try {
-    setStatus(`Analyzing ${file.name}…`);
+    setStatus(`Analyzing ${file.name}`, "working");
     const target = await analyzeTarget(file);
     state.target = target;
 
@@ -340,7 +383,7 @@ async function start(file: File): Promise<void> {
       playBuffer(target.prepared);
     });
 
-    setStatus("Asking the agent for a first preset…");
+    setStatus("Listening to your sample, sketching a patch", "working");
     state.sessionId = await apiClient.createSession();
     const step = await apiClient.setTarget(state.sessionId, target.features, target.info);
     await drain(step);
@@ -367,14 +410,16 @@ async function drain(step: Step): Promise<void> {
     state.current = preset;
     state.attempts.push({ presetId, preset, rationale: step.rationale, distance: null, features: null });
     renderAttempts();
-    setStatus(`Rendering “${preset.name}” (${iterationsRemaining} left)…`);
+    setStatus(`Rendering “${preset.name}” · ${iterationsRemaining} left`, "working");
 
     try {
       const { features, diff } = await evaluatePreset(preset, state.target!);
       const a = state.attempts.find((x) => x.presetId === presetId);
       if (a) { a.distance = diff.distance; a.features = features; }
-      renderAttempts();
-      setStatus(`distance ${diff.distance.toFixed(1)} — ${diff.verdict}`);
+      // Load it the moment it has been rendered, so the newest patch is always
+      // playable — the user may like an in-progress one and want to keep it.
+      await loadPreset(preset, presetId);
+      setStatus(`distance ${diff.distance.toFixed(1)} — ${diff.verdict}`, "working");
       step = await apiClient.submitAnalysis(sessionId, presetId, features, diff);
     } catch (err) {
       // A bad preset must not wedge the session — report it and let the agent
@@ -385,9 +430,7 @@ async function drain(step: Step): Promise<void> {
   }
 
   if (step.kind === "done") {
-    state.current = step.preset;
-    await ensureAudio().catch(() => {});
-    setLivePreset(step.preset);
+    await loadPreset(step.preset, step.presetId);
     setStatus(
       `Done — “${step.preset.name}”${step.distance !== null ? ` at distance ${step.distance.toFixed(1)}` : ""}.`,
       "good",
@@ -396,7 +439,7 @@ async function drain(step: Step): Promise<void> {
     renderChips(step.suggestions);
     $("chatpanel")?.classList.remove("hidden");
   } else if (step.kind === "message") {
-    if (step.preset) { state.current = step.preset; setLivePreset(step.preset); }
+    if (step.preset) await loadPreset(step.preset, null);
     setStatus("Ready.");
     logChat("agent", step.text);
     renderChips(step.suggestions);
@@ -416,7 +459,7 @@ async function sendChat(preset?: string): Promise<void> {
   logChat("you", msg);
   state.busy = true;
   try {
-    setStatus("Thinking…");
+    setStatus("Thinking", "working");
     await drain(await apiClient.chat(state.sessionId, msg));
   } catch (err) {
     setStatus(`Failed: ${String(err)}`);
