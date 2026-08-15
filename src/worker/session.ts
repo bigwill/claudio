@@ -39,7 +39,18 @@ interface Meta {
   /** The crux: the tool_use we owe a tool_result for. */
   pendingToolUseId: string | null;
   pendingPresetId: string | null;
+  /** When the current status was entered — used to detect abandoned turns. */
+  statusSince: number;
 }
+
+/**
+ * A turn that has been "in flight" longer than this has no live request behind
+ * it. The usual cause is a page reload mid-turn: the client vanishes, the
+ * request is cancelled, and the persisted status is never advanced. Without a
+ * staleness escape the session is stuck forever — the same failure shape as a
+ * dangling tool_use.
+ */
+const STALE_TURN_MS = 90_000;
 
 const freshMeta = (): Meta => ({
   status: "idle",
@@ -52,6 +63,7 @@ const freshMeta = (): Meta => ({
   bestDistance: null,
   pendingToolUseId: null,
   pendingPresetId: null,
+  statusSince: 0,
 });
 
 interface ToolCall {
@@ -111,6 +123,11 @@ export class SessionDO extends DurableObject<Env> {
   // Persistence helpers. Never held across a network call.
   // -------------------------------------------------------------------------
 
+  private setStatus(status: SessionStatus): void {
+    this.meta.status = status;
+    this.meta.statusSince = Date.now();
+  }
+
   private saveMeta(): void {
     this.ctx.storage.sql.exec(
       `INSERT INTO meta (id, json) VALUES (1, ?)
@@ -145,6 +162,7 @@ export class SessionDO extends DurableObject<Env> {
     this.meta = {
       ...freshMeta(),
       status: "thinking",
+      statusSince: Date.now(),
       target: features,
       targetInfo: info,
     };
@@ -190,7 +208,7 @@ export class SessionDO extends DurableObject<Env> {
 
     this.meta.pendingToolUseId = null;
     this.meta.pendingPresetId = null;
-    this.meta.status = "thinking";
+    this.setStatus("thinking");
     this.saveMeta();
 
     const remaining = this.iterationsRemaining();
@@ -227,7 +245,7 @@ export class SessionDO extends DurableObject<Env> {
 
     this.meta.pendingToolUseId = null;
     this.meta.pendingPresetId = null;
-    this.meta.status = "thinking";
+    this.setStatus("thinking");
     this.saveMeta();
 
     this.appendMessage({
@@ -250,14 +268,37 @@ export class SessionDO extends DurableObject<Env> {
   }
 
   async chat(message: string): Promise<Step> {
-    if (this.meta.status === "thinking") {
+    // Only refuse if a turn is GENUINELY in flight. A status of "thinking" with
+    // no live request behind it is the signature of a page reload mid-turn: the
+    // client vanished, its request was cancelled, and nothing ever advanced the
+    // state. Refusing forever would strand the session on a reload.
+    const age = Date.now() - (this.meta.statusSince || 0);
+    if (this.meta.status === "thinking" && age < STALE_TURN_MS) {
       throw new ProtocolError("A turn is already in flight for this session.");
     }
-    if (this.meta.status === "awaiting_render") {
-      throw new ProtocolError("Still waiting on a render; submit the analysis (or a render error) first.");
+
+    // A chat message means the user has moved on from any pending render — most
+    // likely they reloaded, so the browser that owed us an analysis is gone.
+    // Close the tool call rather than demanding an analysis nobody will send.
+    if (this.meta.pendingToolUseId) {
+      this.appendMessage({
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: this.meta.pendingToolUseId,
+            content:
+              "That render was never completed (the page was reloaded). No measurement is available " +
+              "for it. Respond to the user's message below instead.",
+            is_error: true,
+          },
+        ],
+      });
+      this.meta.pendingToolUseId = null;
+      this.meta.pendingPresetId = null;
     }
 
-    this.meta.status = "thinking";
+    this.setStatus("thinking");
     this.saveMeta();
 
     this.appendMessage({ role: "user", content: [{ type: "text", text: message }] });
@@ -339,7 +380,7 @@ export class SessionDO extends DurableObject<Env> {
       });
     } catch (err) {
       // Never leave status on "thinking" — that wedges the session permanently.
-      this.meta.status = this.meta.pendingToolUseId ? "awaiting_render" : "idle";
+      this.setStatus(this.meta.pendingToolUseId ? "awaiting_render" : "idle");
       this.saveMeta();
       const missing = err instanceof MissingApiKeyError;
       return {
@@ -368,7 +409,7 @@ export class SessionDO extends DurableObject<Env> {
     // and the loop stalls looking like the agent simply chose to chat — a
     // silent, badly mislabelled failure. Surface it instead.
     if (message.stop_reason === "max_tokens" && !call) {
-      this.meta.status = "idle";
+      this.setStatus("idle");
       this.saveMeta();
       return {
         kind: "error",
@@ -386,7 +427,7 @@ export class SessionDO extends DurableObject<Env> {
       this.meta.iteration += 1;
       this.meta.pendingToolUseId = call.id;
       this.meta.pendingPresetId = presetId;
-      this.meta.status = "awaiting_render";
+      this.setStatus("awaiting_render");
       this.meta.history.push({ presetId, preset, rationale, features: null, distance: null });
       this.saveMeta();
 
@@ -426,7 +467,7 @@ export class SessionDO extends DurableObject<Env> {
 
       this.meta.pendingToolUseId = null;
       this.meta.pendingPresetId = null;
-      this.meta.status = "done";
+      this.setStatus("done");
       this.meta.history.push({ presetId, preset, rationale, features: null, distance: null });
       this.saveMeta();
 
@@ -458,7 +499,7 @@ export class SessionDO extends DurableObject<Env> {
     }
 
     // Plain text answer (only reachable from chat, where tool_choice is "auto").
-    this.meta.status = "idle";
+    this.setStatus("idle");
     this.saveMeta();
     return {
       kind: "message",

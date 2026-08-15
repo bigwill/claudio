@@ -481,6 +481,14 @@ async function runClaude(opts) {
 }
 //#endregion
 //#region src/worker/session.ts
+/**
+* A turn that has been "in flight" longer than this has no live request behind
+* it. The usual cause is a page reload mid-turn: the client vanishes, the
+* request is cancelled, and the persisted status is never advanced. Without a
+* staleness escape the session is stuck forever — the same failure shape as a
+* dangling tool_use.
+*/
+var STALE_TURN_MS = 9e4;
 var freshMeta = () => ({
 	status: "idle",
 	target: null,
@@ -491,7 +499,8 @@ var freshMeta = () => ({
 	bestPresetId: null,
 	bestDistance: null,
 	pendingToolUseId: null,
-	pendingPresetId: null
+	pendingPresetId: null,
+	statusSince: 0
 });
 /** Thrown for client mistakes (stale presetId, wrong status) — mapped to 409. */
 var ProtocolError = class extends Error {
@@ -530,6 +539,10 @@ var SessionDO = class extends DurableObject {
 			id: this.ctx.id.toString()
 		};
 	}
+	setStatus(status) {
+		this.meta.status = status;
+		this.meta.statusSince = Date.now();
+	}
 	saveMeta() {
 		this.ctx.storage.sql.exec(`INSERT INTO meta (id, json) VALUES (1, ?)
        ON CONFLICT(id) DO UPDATE SET json = excluded.json`, JSON.stringify(this.meta));
@@ -554,6 +567,7 @@ var SessionDO = class extends DurableObject {
 		this.meta = {
 			...freshMeta(),
 			status: "thinking",
+			statusSince: Date.now(),
 			target: features,
 			targetInfo: info
 		};
@@ -589,7 +603,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 		}
 		this.meta.pendingToolUseId = null;
 		this.meta.pendingPresetId = null;
-		this.meta.status = "thinking";
+		this.setStatus("thinking");
 		this.saveMeta();
 		const remaining = this.iterationsRemaining();
 		this.appendMessage({
@@ -620,7 +634,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 		const toolUseId = this.requirePending(presetId);
 		this.meta.pendingToolUseId = null;
 		this.meta.pendingPresetId = null;
-		this.meta.status = "thinking";
+		this.setStatus("thinking");
 		this.saveMeta();
 		this.appendMessage({
 			role: "user",
@@ -641,9 +655,22 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 		});
 	}
 	async chat(message) {
-		if (this.meta.status === "thinking") throw new ProtocolError("A turn is already in flight for this session.");
-		if (this.meta.status === "awaiting_render") throw new ProtocolError("Still waiting on a render; submit the analysis (or a render error) first.");
-		this.meta.status = "thinking";
+		const age = Date.now() - (this.meta.statusSince || 0);
+		if (this.meta.status === "thinking" && age < STALE_TURN_MS) throw new ProtocolError("A turn is already in flight for this session.");
+		if (this.meta.pendingToolUseId) {
+			this.appendMessage({
+				role: "user",
+				content: [{
+					type: "tool_result",
+					tool_use_id: this.meta.pendingToolUseId,
+					content: "That render was never completed (the page was reloaded). No measurement is available for it. Respond to the user's message below instead.",
+					is_error: true
+				}]
+			});
+			this.meta.pendingToolUseId = null;
+			this.meta.pendingPresetId = null;
+		}
+		this.setStatus("thinking");
 		this.saveMeta();
 		this.appendMessage({
 			role: "user",
@@ -702,7 +729,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 				isFirstProposal: opts.isFirstProposal
 			});
 		} catch (err) {
-			this.meta.status = this.meta.pendingToolUseId ? "awaiting_render" : "idle";
+			this.setStatus(this.meta.pendingToolUseId ? "awaiting_render" : "idle");
 			this.saveMeta();
 			return {
 				kind: "error",
@@ -723,7 +750,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 			input: block.input
 		};
 		if (message.stop_reason === "max_tokens" && !call) {
-			this.meta.status = "idle";
+			this.setStatus("idle");
 			this.saveMeta();
 			return {
 				kind: "error",
@@ -737,7 +764,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 			this.meta.iteration += 1;
 			this.meta.pendingToolUseId = call.id;
 			this.meta.pendingPresetId = presetId;
-			this.meta.status = "awaiting_render";
+			this.setStatus("awaiting_render");
 			this.meta.history.push({
 				presetId,
 				preset,
@@ -769,7 +796,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 			});
 			this.meta.pendingToolUseId = null;
 			this.meta.pendingPresetId = null;
-			this.meta.status = "done";
+			this.setStatus("done");
 			this.meta.history.push({
 				presetId,
 				preset,
@@ -796,7 +823,7 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 				is_error: true
 			}]
 		});
-		this.meta.status = "idle";
+		this.setStatus("idle");
 		this.saveMeta();
 		return {
 			kind: "message",
