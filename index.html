@@ -4,11 +4,77 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Claudio — FM sound design</title>
+    <style>
+      :root {
+        --bg: #14131a;
+        --panel: #1d1c26;
+        --line: #322f40;
+        --text: #e8e6f0;
+        --dim: #9a95b0;
+        --accent: #b9a4ff;
+        --good: #7ee0a8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      main { max-width: 940px; margin: 0 auto; padding: 32px 20px 80px; }
+      h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -0.01em; }
+      .sub { color: var(--dim); margin: 0 0 28px; font-size: 14px; }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+      #drop {
+        border: 1.5px dashed var(--line);
+        border-radius: 10px;
+        padding: 34px 18px;
+        text-align: center;
+        color: var(--dim);
+        cursor: pointer;
+        transition: border-color .15s, color .15s;
+      }
+      #drop.over, #drop:hover { border-color: var(--accent); color: var(--text); }
+      button {
+        background: #2b2839; color: var(--text); border: 1px solid var(--line);
+        border-radius: 7px; padding: 7px 13px; font: inherit; font-size: 14px; cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: var(--accent); }
+      button:disabled { opacity: .45; cursor: default; }
+      input[type=text], input[type=password] {
+        background: #14131a; color: var(--text); border: 1px solid var(--line);
+        border-radius: 7px; padding: 8px 11px; font: inherit; font-size: 14px;
+      }
+      .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .attempt { border-top: 1px solid var(--line); padding: 11px 0; }
+      .attempt:first-child { border-top: 0; }
+      .dist { font-variant-numeric: tabular-nums; font-weight: 600; }
+      .bar { height: 4px; background: #2b2839; border-radius: 2px; overflow: hidden; margin-top: 7px; }
+      .bar > i { display: block; height: 100%; background: var(--accent); }
+      .muted { color: var(--dim); }
+      .tag {
+        font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+        color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
+      }
+      pre {
+        background: #14131a; border: 1px solid var(--line); border-radius: 7px;
+        padding: 11px; overflow-x: auto; font-size: 12px; margin: 8px 0 0;
+      }
+      .hidden { display: none; }
+      code { color: var(--accent); }
+    </style>
   </head>
   <body>
     <main id="app">
       <h1>Claudio</h1>
-      <p id="boot">Loading…</p>
+      <p class="sub">Upload a sound. An agent reverse-engineers it into an FM patch, then you talk to it.</p>
+      <div class="panel"><p id="boot" class="muted">Starting…</p></div>
     </main>
     <script type="module" src="/src/client/main.ts"></script>
   </body>

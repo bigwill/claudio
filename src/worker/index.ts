@@ -21,22 +21,6 @@ const errorStep = (message: string, retryable = false): Step => ({
   retryable,
 });
 
-/**
- * Shared-secret gate on /api/*. Not real auth — just a cheap door so a shared
- * *.workers.dev link isn't an open endpoint spending the Anthropic key.
- * Accepts ?k=<secret> or an X-App-Key header.
- *
- * If APP_SECRET is unset (e.g. first deploy, before `wrangler secret put`),
- * the gate is open — otherwise you can't deploy your way out of a locked door.
- */
-function authorized(request: Request, env: Env): boolean {
-  const expected = env.APP_SECRET;
-  if (!expected) return true;
-  const url = new URL(request.url);
-  const provided = url.searchParams.get("k") ?? request.headers.get("x-app-key");
-  return provided === expected;
-}
-
 async function readJson<T>(request: Request): Promise<T> {
   try {
     return (await request.json()) as T;
@@ -56,10 +40,8 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
-    if (!authorized(request, env)) {
-      return json({ error: "unauthorized" }, 401);
-    }
-
+    // The app is intentionally open — no auth gate. Low expected volume, and
+    // the Anthropic key stays server-side either way.
     if (url.pathname === "/api/ping") {
       const stub = env.SESSION.getByName("ping");
       const pong = await stub.ping();
@@ -67,7 +49,6 @@ export default {
         ok: true,
         durableObject: pong,
         hasAnthropicKey: Boolean(env.ANTHROPIC_API_KEY),
-        secretGate: env.APP_SECRET ? "enabled" : "open",
       });
     }
 
