@@ -152,6 +152,7 @@ function shell(): void {
   $("send")?.addEventListener("click", () => sendChat());
   $<HTMLInputElement>("chat")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") sendChat();
+    if (e.key === "Escape") (e.target as HTMLInputElement).blur();
   });
 }
 
@@ -494,6 +495,10 @@ async function sendChat(preset?: string): Promise<void> {
   const msg = (preset ?? input?.value ?? "").trim();
   if (!msg) return;
   if (input && !preset) input.value = "";
+  // Hand the keyboard back to the instrument. bindTypingKeyboard ignores
+  // keystrokes while an input has focus, so leaving focus in the box means the
+  // next thing you play types instead — right when you want to hear the change.
+  input?.blur();
   renderChips([]); // chips are stale the moment one is used
   logChat("you", msg);
   state.busy = true;
