@@ -95,7 +95,18 @@ export interface SetTargetRequest {
 export interface SubmitAnalysisRequest {
   presetId: string;
   features: FeatureSummary;
-  diff: FeatureDiff;
+  /**
+   * Absent in prompt-started sessions: there is no target sample, so there is
+   * nothing to diff against. The measured features are still sent — they tell
+   * the agent what its patch actually came out as, which is real feedback even
+   * without a reference.
+   */
+  diff?: FeatureDiff | null;
+}
+
+/** Start a session from a description instead of an audio file. */
+export interface PromptRequest {
+  prompt: string;
 }
 
 export interface SubmitRenderErrorRequest {
@@ -139,6 +150,7 @@ export const API = {
   createSession: "/api/session",
   session: (id: string) => `/api/session/${id}`,
   target: (id: string) => `/api/session/${id}/target`,
+  prompt: (id: string) => `/api/session/${id}/prompt`,
   analysis: (id: string) => `/api/session/${id}/analysis`,
   renderError: (id: string) => `/api/session/${id}/render-error`,
   chat: (id: string) => `/api/session/${id}/chat`,

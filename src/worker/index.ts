@@ -3,6 +3,7 @@ export { SessionDO } from "./session";
 import { newSessionId } from "../shared/protocol";
 import type {
   ChatRequest,
+  PromptRequest,
   CreateSessionResponse,
   SetTargetRequest,
   Step,
@@ -85,12 +86,19 @@ export default {
             }
             return json(await session.setTarget(body.features, body.info));
           }
+          case "prompt": {
+            const body = await readJson<PromptRequest>(request);
+            if (!body?.prompt?.trim()) return json(errorStep("Missing prompt."), 400);
+            return json(await session.startFromPrompt(body.prompt.trim().slice(0, 2000)));
+          }
           case "analysis": {
             const body = await readJson<SubmitAnalysisRequest>(request);
-            if (!body?.presetId || !body?.features || !body?.diff) {
-              return json(errorStep("Missing presetId, features or diff."), 400);
+            // diff is optional: prompt-started sessions have no target to
+            // compare against, only the measured features of the render.
+            if (!body?.presetId || !body?.features) {
+              return json(errorStep("Missing presetId or features."), 400);
             }
-            return json(await session.submitAnalysis(body.presetId, body.features, body.diff));
+            return json(await session.submitAnalysis(body.presetId, body.features, body.diff ?? null));
           }
           case "render-error": {
             const body = await readJson<SubmitRenderErrorRequest>(request);

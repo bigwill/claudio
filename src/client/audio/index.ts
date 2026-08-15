@@ -30,7 +30,8 @@ export interface TargetAnalysis {
 
 export interface PresetEvaluation {
   features: FeatureSummary;
-  diff: FeatureDiff;
+  /** null when there is no target — prompt-started sessions. */
+  diff: FeatureDiff | null;
   prepared: PreparedAudio;
 }
 
@@ -96,6 +97,32 @@ export function specForTarget(target: TargetAnalysis): RenderSpec {
     sampleRate: f.sampleRate || target.prepared.sampleRate,
     gateMs: Math.max(20, durationMs - releaseMs),
   };
+}
+
+/**
+ * The render spec for a prompt-started session, where there is no target to
+ * inherit f0 / duration / sample rate from. A3 for ~1.5s is a neutral audition
+ * pitch — low enough to hear a bass, high enough to hear a bell.
+ */
+export function specForPrompt(): RenderSpec {
+  return {
+    f0: 220,
+    durationMs: 1500,
+    sampleRate: getAudioContext().sampleRate,
+    gateMs: 1000,
+  };
+}
+
+/**
+ * Render a preset and measure it, with no reference to compare against.
+ * Used by prompt-started sessions: the agent still learns what its patch
+ * actually came out as, which is real feedback — there is just no distance.
+ */
+export async function measurePreset(preset: ClaudioPreset): Promise<PresetEvaluation> {
+  const p = clampPreset(preset);
+  const prepared = await renderPreset(p, specForPrompt());
+  const features = extractFeatures(prepared.data, prepared.sampleRate);
+  return { features, diff: null, prepared };
 }
 
 /**

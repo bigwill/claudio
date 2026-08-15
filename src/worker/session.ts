@@ -192,19 +192,58 @@ export class SessionDO extends DurableObject<Env> {
     return await this.turn({ force: true, isFirstProposal: true });
   }
 
-  async submitAnalysis(presetId: string, features: FeatureSummary, diff: FeatureDiff): Promise<Step> {
+  /**
+   * Start from a description instead of a sample ("a glassy bell, quite short").
+   *
+   * Same loop, minus the reference: the browser still renders and measures each
+   * proposal, so the agent still learns what it actually built — it just has
+   * nothing to compare against, and no distance to minimise. Here the user's
+   * words ARE the specification.
+   */
+  async startFromPrompt(prompt: string): Promise<Step> {
+    this.meta = { ...freshMeta(), status: "thinking", statusSince: Date.now() };
+    this.messages = [];
+    this.ctx.storage.sql.exec(`DELETE FROM messages`);
+    this.saveMeta();
+
+    this.appendMessage({
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text:
+            `There is NO target sample this time. The user asked for a sound in their own words:\n\n` +
+            `"${prompt}"\n\n` +
+            `Design it from the description. Call propose_preset — the browser will render it and report ` +
+            `back the features your patch actually measures, so you can check it against what you intended. ` +
+            `There is no distance to minimise here; the user's words are the whole specification. ` +
+            `Finalize as soon as the patch matches the description — one proposal is often enough.`,
+        },
+      ],
+    });
+
+    return await this.turn({ force: true, isFirstProposal: true });
+  }
+
+  async submitAnalysis(
+    presetId: string,
+    features: FeatureSummary,
+    diff: FeatureDiff | null,
+  ): Promise<Step> {
     const toolUseId = this.requirePending(presetId);
 
     // Record the measurement against the attempt it belongs to.
     const attempt = this.meta.history.find((a) => a.presetId === presetId);
     if (attempt) {
       attempt.features = features;
-      attempt.distance = diff.distance;
+      attempt.distance = diff ? diff.distance : null;
     }
-    if (this.meta.bestDistance === null || diff.distance < this.meta.bestDistance) {
+    if (diff && (this.meta.bestDistance === null || diff.distance < this.meta.bestDistance)) {
       this.meta.bestDistance = diff.distance;
       this.meta.bestPresetId = presetId;
     }
+    // Prompt-started sessions have no distance, so "best" is simply the latest.
+    if (!diff) this.meta.bestPresetId = presetId;
 
     this.meta.pendingToolUseId = null;
     this.meta.pendingPresetId = null;
@@ -218,7 +257,9 @@ export class SessionDO extends DurableObject<Env> {
         {
           type: "tool_result",
           tool_use_id: toolUseId,
-          content: JSON.stringify({
+          content: JSON.stringify(
+            diff
+              ? {
             distance: diff.distance,
             breakdown: diff.breakdown,
             verdict: diff.verdict,
@@ -232,7 +273,18 @@ export class SessionDO extends DurableObject<Env> {
               remaining <= 0
                 ? "Iteration budget exhausted. You MUST call finalize now, with the BEST preset seen (lowest distance so far), not necessarily this one."
                 : `Either propose the next preset with propose_preset (attack the largest weighted errors in priorities[], one or two changes, and say what you expect), or call finalize if this is good enough. You MUST call finalize when iterations_remaining reaches 0.`,
-          }),
+                }
+              : {
+                  rendered: true,
+                  measured_features: features,
+                  iteration: this.meta.iteration,
+                  iterations_remaining: remaining,
+                  note:
+                    remaining <= 0
+                      ? "No target sample — there is nothing to score against. Iteration budget exhausted; call finalize now."
+                      : "No target sample: these are the features YOUR patch actually measures. Check them against what the user asked for — is it as bright, as percussive, as inharmonic as they described? Adjust with propose_preset if not, otherwise call finalize. One proposal is often enough here.",
+                },
+          ),
         },
       ],
     });

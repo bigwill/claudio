@@ -36,11 +36,15 @@ export function setTarget(
   return post<Step>(API.target(sessionId), { features, info });
 }
 
+export function startFromPrompt(sessionId: string, prompt: string): Promise<Step> {
+  return post<Step>(API.prompt(sessionId), { prompt });
+}
+
 export function submitAnalysis(
   sessionId: string,
   presetId: string,
   features: FeatureSummary,
-  diff: FeatureDiff,
+  diff: FeatureDiff | null,
 ): Promise<Step> {
   return post<Step>(API.analysis(sessionId), { presetId, features, diff });
 }

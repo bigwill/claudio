@@ -83,49 +83,6 @@ export const DEFAULT_PRESET: ClaudioPreset = {
   gain: 0.8,
 };
 
-/** Archetypes — used as UI starting points and as few-shot anchors for the agent. */
-export const FACTORY_PRESETS: ClaudioPreset[] = [
-  {
-    name: "Glassy Bell",
-    harmonicity: 3.47,
-    modulationIndex: 14,
-    carrierWave: "sine",
-    modulatorWave: "sine",
-    carrierFm: { ratio: 1, index: 0 },
-    modulatorFm: { ratio: 2.01, index: 3 },
-    ampEnv: { attack: 0.001, decay: 2.4, sustain: 0, release: 1.6 },
-    modEnv: { attack: 0.001, decay: 0.5, sustain: 0.08, release: 0.5 },
-    detune: 0,
-    gain: 0.8,
-  },
-  {
-    name: "Tine Piano",
-    harmonicity: 2,
-    modulationIndex: 7,
-    carrierWave: "sine",
-    modulatorWave: "sine",
-    carrierFm: { ratio: 1, index: 0 },
-    modulatorFm: { ratio: 1, index: 0 },
-    ampEnv: { attack: 0.002, decay: 1.2, sustain: 0.12, release: 0.8 },
-    modEnv: { attack: 0.001, decay: 0.18, sustain: 0.02, release: 0.3 },
-    detune: 0,
-    gain: 0.85,
-  },
-  {
-    name: "Brass Swell",
-    harmonicity: 1,
-    modulationIndex: 9,
-    carrierWave: "sine",
-    modulatorWave: "triangle",
-    carrierFm: { ratio: 1, index: 0 },
-    modulatorFm: { ratio: 1, index: 1.5 },
-    ampEnv: { attack: 0.08, decay: 0.3, sustain: 0.8, release: 0.35 },
-    modEnv: { attack: 0.16, decay: 0.4, sustain: 0.65, release: 0.35 },
-    detune: 0,
-    gain: 0.8,
-  },
-];
-
 // ---------------------------------------------------------------------------
 // clampPreset — MANDATORY. The agent authors these values, and an AudioParam
 // assigned NaN throws and permanently poisons the node. Never skip this.

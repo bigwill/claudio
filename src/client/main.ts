@@ -14,6 +14,7 @@ import {
   analyzeTarget,
   ensureAudio,
   evaluatePreset,
+  measurePreset,
   noteOff,
   noteOn,
   playBuffer,
@@ -29,6 +30,26 @@ export async function api(path: string, init: RequestInit = {}): Promise<Respons
   headers.set("content-type", "application/json");
   return fetch(path, { ...init, headers });
 }
+
+/**
+ * One-click ways in, for someone with no sample to hand. Each runs the ordinary
+ * prompt path, so the agent designs it fresh and you get its rationale.
+ *
+ * Chosen to span the engine rather than to be eight kinds of bell: non-integer
+ * vs integer harmonicity, the two ends of the envelope range (pad and kick),
+ * and — in "gritty acid lead" — the sawtooth-modulator substitution that stands
+ * in for the operator feedback this engine doesn't have.
+ */
+const STARTER_PROMPTS = [
+  "glassy bell",
+  "rubber bass",
+  "metallic pluck",
+  "warm electric piano",
+  "hollow wooden flute",
+  "gritty acid lead",
+  "icy shimmering pad",
+  "thumpy kick drum",
+];
 
 // --- session addressing ----------------------------------------------------
 
@@ -98,6 +119,13 @@ function shell(): void {
             <div id="drop">Drop a WAV here, or click to choose
               <input id="file" type="file" accept="audio/*" class="hidden" />
             </div>
+            <div class="or"><span>or describe it</span></div>
+            <div class="row">
+              <input id="promptbox" type="text" style="flex:1"
+                     placeholder="a glassy bell · dark rubbery bass · metallic pluck with a long tail" />
+              <button id="promptgo">Design it</button>
+            </div>
+            <div id="starters" class="row" style="margin-top:10px"></div>
             <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
           </div>
 
@@ -151,6 +179,27 @@ function shell(): void {
   attempts?.addEventListener("scroll", () => {
     const atBottom = attempts.scrollHeight - attempts.scrollTop - attempts.clientHeight < 24;
     state.followLatest = atBottom;
+  });
+
+  const starters = $("starters");
+  if (starters) {
+    starters.innerHTML = STARTER_PROMPTS.map(
+      (p, i) => `<button class="chip" data-starter="${i}">${escapeHtml(p)}</button>`,
+    ).join("");
+    starters.querySelectorAll<HTMLButtonElement>("[data-starter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const text = STARTER_PROMPTS[Number(btn.dataset.starter)];
+        const box = $<HTMLInputElement>("promptbox");
+        // Show what was asked — it stays editable if they want to tweak and retry.
+        if (box && text) box.value = text;
+        startFromPrompt();
+      });
+    });
+  }
+
+  $("promptgo")?.addEventListener("click", () => startFromPrompt());
+  $<HTMLInputElement>("promptbox")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") startFromPrompt();
   });
 
   $("send")?.addEventListener("click", () => sendChat());
@@ -410,6 +459,7 @@ async function start(file: File): Promise<void> {
   renderAttempts();
 
   try {
+    $("starters")?.classList.add("hidden");
     setStatus(`Analyzing ${file.name}`, "working");
     const target = await analyzeTarget(file);
     state.target = target;
@@ -438,6 +488,38 @@ async function start(file: File): Promise<void> {
   }
 }
 
+/** Start from a description rather than a sample. No target, so no distance. */
+async function startFromPrompt(): Promise<void> {
+  const box = $<HTMLInputElement>("promptbox");
+  const prompt = box?.value.trim();
+  if (!prompt || state.busy) return;
+  box?.blur();
+
+  state.busy = true;
+  state.attempts = [];
+  state.target = null;
+  renderAttempts();
+
+  try {
+    $("starters")?.classList.add("hidden");
+    setStatus(`Designing “${prompt}”`, "working");
+    state.sessionId = await apiClient.createSession();
+    putSessionInUrl(state.sessionId);
+
+    const info = $("targetinfo");
+    if (info) {
+      info.classList.remove("hidden");
+      info.innerHTML = `<span class="tag">prompt</span> ${escapeHtml(prompt)}`;
+    }
+
+    await drain(await apiClient.startFromPrompt(state.sessionId, prompt));
+  } catch (err) {
+    setStatus(`Failed: ${String(err)}`);
+  } finally {
+    state.busy = false;
+  }
+}
+
 /**
  * Render → analyze → report, for as long as the agent keeps proposing.
  * A render failure is reported to the agent rather than thrown: an out-of-range
@@ -457,13 +539,20 @@ async function drain(step: Step): Promise<void> {
     setStatus(`Rendering “${preset.name}” · ${iterationsRemaining} left`, "working");
 
     try {
-      const { features, diff } = await evaluatePreset(preset, state.target!);
+      // No target means a prompt-started session: still render and measure so
+      // the agent sees what it built, there's just nothing to score against.
+      const { features, diff } = state.target
+        ? await evaluatePreset(preset, state.target)
+        : await measurePreset(preset);
       const a = state.attempts.find((x) => x.presetId === presetId);
-      if (a) { a.distance = diff.distance; a.features = features; }
+      if (a) { a.distance = diff ? diff.distance : null; a.features = features; }
       // Load it the moment it has been rendered, so the newest patch is always
       // playable — the user may like an in-progress one and want to keep it.
       await loadPreset(preset, presetId);
-      setStatus(`distance ${diff.distance.toFixed(1)} — ${diff.verdict}`, "working");
+      setStatus(
+        diff ? `distance ${diff.distance.toFixed(1)} — ${diff.verdict}` : `Rendered “${preset.name}”`,
+        "working",
+      );
       step = await apiClient.submitAnalysis(sessionId, presetId, features, diff);
     } catch (err) {
       // A bad preset must not wedge the session — report it and let the agent

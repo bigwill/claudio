@@ -120,7 +120,11 @@ npm run typecheck
 
 `npm run analyze` is the useful one: it decodes real WAVs with a small RIFF reader and prints the feature table plus a cross-distance matrix, so you can see whether the analysis actually distinguishes a chime from a kick. Its self-distance check (every sample must be distance 0 from itself) catches most extractor bugs in about a second.
 
-Drop your own `.wav` files in `samples/` — it's gitignored, so nothing binary sneaks into commits.
+`samples/` ships with the repo: twelve WAVs spanning the archetypes FM is good at
+and several it isn't — a Monopoly, a JD-800, a Juno-106, a TR-808, an upright bass
+DI, and hand percussion. They're deliberately **not** FM sounds, which is the
+point: the tool approximates arbitrary audio rather than recovering FM patches.
+Drop your own in alongside them.
 
 ## Layout
 
