@@ -118,8 +118,30 @@ function shell(): void {
 /** Two octaves, so a patch can be judged in more than one register. */
 const KB_SEMITONES = 24;
 const BLACK = new Set([1, 3, 6, 8, 10]);
-/** Home-row layout, white keys only — enough to noodle without learning a map. */
-const TYPING_KEYS = ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"];
+
+/**
+ * The standard tracker/DAW two-row layout: home row is the white keys, the row
+ * above holds the sharps, positioned so they sit where the black keys actually
+ * are. Note the gaps — there is deliberately no binding above D (E/F have no
+ * black key between them) or above G (likewise B/C), which is what makes the
+ * shape feel like a keyboard rather than an arbitrary strip of buttons.
+ *
+ *   w   e       t   y   u       o   p
+ *  C#  D#      F#  G#  A#     C#' D#'
+ * a   s   d   f   g   h   j   k   l   ;
+ * C   D   E   F   G   A   B   C'  D'  E'
+ */
+const KEY_MAP: Record<string, number> = {
+  // white
+  a: 0, s: 2, d: 4, f: 5, g: 7, h: 9, j: 11, k: 12, l: 14, ";": 16,
+  // black
+  w: 1, e: 3, t: 6, y: 8, u: 10, o: 13, p: 15,
+};
+
+/** Reverse lookup so each drawn key can print the letter that plays it. */
+const LABEL_FOR_SEMITONE = new Map<number, string>(
+  Object.entries(KEY_MAP).map(([k, semi]) => [semi, k === ";" ? ";" : k.toUpperCase()]),
+);
 
 let octaveBase = 48; // C3
 const held = new Map<string, number>();
@@ -134,16 +156,15 @@ function buildKeyboard(): void {
 
   for (let i = 0; i < KB_SEMITONES; i++) {
     const midi = octaveBase + i;
+    const label = LABEL_FOR_SEMITONE.get(i) ?? "";
     if (BLACK.has(i % 12)) {
-      // Positioned against the preceding white key's slot.
+      // Straddles the gap between the previous white key and the next one.
       blacks.push(
-        `<div class="key black" data-midi="${midi}" style="left:calc(${whiteIndex} * var(--kw) - var(--kw) * 0.3)"></div>`,
+        `<div class="key black" data-midi="${midi}" style="left:calc(${whiteIndex} * var(--kw) - var(--kw) * 0.3)">` +
+          `<span>${label}</span></div>`,
       );
     } else {
-      const label = TYPING_KEYS[whiteIndex]?.toUpperCase() ?? "";
-      whites.push(
-        `<div class="key white" data-midi="${midi}"><span>${label}</span></div>`,
-      );
+      whites.push(`<div class="key white" data-midi="${midi}"><span>${label}</span></div>`);
       whiteIndex++;
     }
   }
@@ -205,15 +226,9 @@ function bindTypingKeyboard(): void {
       buildKeyboard();
       return;
     }
-    const idx = TYPING_KEYS.indexOf(k);
-    if (idx < 0) return;
-    // Map the Nth white key back to a semitone offset.
-    let seen = 0;
-    for (let i = 0; i < KB_SEMITONES; i++) {
-      if (BLACK.has(i % 12)) continue;
-      if (seen === idx) { press(k, octaveBase + i); return; }
-      seen++;
-    }
+    const semi = KEY_MAP[k];
+    if (semi === undefined) return;
+    press(k, octaveBase + semi);
   });
   window.addEventListener("keyup", (e) => release(e.key.toLowerCase()));
   window.addEventListener("blur", () => { held.clear(); noteOff(); });
