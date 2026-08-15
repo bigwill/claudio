@@ -17,5 +17,44 @@
 
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SessionDO"] }],
 
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  // ---------------------------------------------------------------------
+  // Environments
+  //
+  //   default (this file's top level) — the `develop` branch, served at
+  //     claudio.<subdomain>.workers.dev. Deploy with `npm run deploy`.
+  //
+  //   production — the `main` branch, served at claudio.humble.audio.
+  //     Deploy with `npm run deploy:prod`.
+  //
+  // Production is a SEPARATE Worker (claudio-prod), which means a separate
+  // Durable Object namespace and separate secrets. That's deliberate: dev
+  // iteration can't disturb live sessions, and a `npm run deploy` from a
+  // half-finished branch can't reach the custom domain.
+  //
+  // assets / durable_objects / migrations are NOT inherited into an
+  // environment — they must be repeated here or the production Worker
+  // deploys without them.
+  // ---------------------------------------------------------------------
+  "env": {
+    "production": {
+      "name": "claudio-prod",
+      // custom_domain: true makes Cloudflare create and manage the DNS
+      // record itself, provided humble.audio is a zone on this account.
+      "routes": [{ "pattern": "claudio.humble.audio", "custom_domain": true }],
+      // Keep production off workers.dev — one canonical URL.
+      "workers_dev": false,
+      "assets": {
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"]
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "SESSION", "class_name": "SessionDO" }]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SessionDO"] }],
+      "observability": { "enabled": true }
+    }
+  }
 }

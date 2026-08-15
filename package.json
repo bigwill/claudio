@@ -11,7 +11,8 @@
     "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit",
     "test:dsp": "node --experimental-strip-types scripts/dsp-selftest.ts",
-    "analyze": "node --experimental-strip-types scripts/analyze-samples.ts"
+    "analyze": "node --experimental-strip-types scripts/analyze-samples.ts",
+    "deploy:prod": "CLOUDFLARE_ENV=production vite build && wrangler deploy"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

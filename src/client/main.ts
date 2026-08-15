@@ -78,8 +78,7 @@ function shell(): void {
       <div class="brand">Claud<span>io</span></div>
       <p class="sub muted">FM sound design</p>
       <div class="spacer"></div>
-      <span class="tag">status</span>
-      <span id="status" class="muted">Waiting for a sample.</span>
+      <span id="sessionlabel" class="muted" style="font-size:12px"></span>
     </header>
 
     <div class="layout">
@@ -100,6 +99,11 @@ function shell(): void {
               <input id="file" type="file" accept="audio/*" class="hidden" />
             </div>
             <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
+          </div>
+
+          <div class="statusbar" id="statuspanel">
+            <span class="tag">status</span>
+            <span id="status" class="muted">Waiting for a sample.</span>
           </div>
 
           <div class="panel hidden" id="chatpanel">
