@@ -67,12 +67,34 @@ npm install
 npm run dev            # Vite + the Worker + the DO in the real workerd runtime
 ```
 
-Deploy:
+### Deploying
 
-```bash
-npx wrangler secret put ANTHROPIC_API_KEY   # once
-npm run deploy
-```
+Two environments, deliberately separate Workers — so a deploy from a
+half-finished branch can never reach the live domain, and dev iteration can't
+disturb live sessions. Separate Workers means **separate Durable Object
+namespaces and separate secrets**.
+
+| Env | Branch | Worker | URL | Command |
+|---|---|---|---|---|
+| default | `develop` | `claudio` | `claudio.<subdomain>.workers.dev` | `npm run deploy` |
+| production | `main` | `claudio-prod` | `claudio.humble.audio` | `npm run deploy:prod` |
+
+Each needs its own key: `npx wrangler secret put ANTHROPIC_API_KEY [--env production]`.
+
+> The environment is selected at **build** time via `CLOUDFLARE_ENV`, not by
+> `wrangler deploy --env`. The Vite plugin bakes a fully-resolved config into
+> `dist/`, so a deploy-time `--env` flag is silently ignored and you end up
+> deploying to the wrong Worker. `npm run deploy:prod` sets it correctly.
+
+**Custom domain prerequisite.** `custom_domain: true` requires Cloudflare to be
+authoritative for the zone — a CNAME from an external DNS provider to
+`*.workers.dev` will not route, since workers.dev doesn't dispatch on arbitrary
+Host headers. `humble.audio` currently uses 101domain nameservers and its apex
+serves a separate live site, so the low-risk path is to delegate only the
+subdomain: add `claudio.humble.audio` as its own zone in Cloudflare, then create
+NS records for host `claudio` at 101domain pointing to the nameservers Cloudflare
+issues. Everything else on the domain is untouched. Once it activates,
+`npm run deploy:prod` creates and manages the DNS record itself.
 
 `GET /api/ping` reports whether the key is visible to the Worker and exercises the Durable Object binding.
 
