@@ -1,5 +1,6 @@
 export { SessionDO } from "./session";
 
+import { newSessionId } from "../shared/protocol";
 import type {
   ChatRequest,
   CreateSessionResponse,
@@ -55,7 +56,7 @@ export default {
     // POST /api/session — mint a session id. The DO is created lazily on first use.
     if (url.pathname === "/api/session") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
-      const body: CreateSessionResponse = { sessionId: crypto.randomUUID() };
+      const body: CreateSessionResponse = { sessionId: newSessionId() };
       return json(body);
     }
 
@@ -69,7 +70,9 @@ export default {
       try {
         if (!action) {
           if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
-          return json(await session.snapshot());
+          // The DO reports its own internal hex id; the caller cares about the
+          // short id that's in the URL.
+          return json({ ...(await session.snapshot()), sessionId });
         }
 
         if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

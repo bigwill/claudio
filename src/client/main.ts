@@ -7,7 +7,7 @@
  */
 
 import type { ClaudioPreset } from "../shared/preset";
-import type { Step } from "../shared/protocol";
+import { looksLikeSessionId, type SessionSnapshot, type Step } from "../shared/protocol";
 import type { FeatureSummary } from "../shared/features";
 import * as apiClient from "./api";
 import {
@@ -28,6 +28,22 @@ export async function api(path: string, init: RequestInit = {}): Promise<Respons
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
   return fetch(path, { ...init, headers });
+}
+
+// --- session addressing ----------------------------------------------------
+
+/**
+ * Sessions live at /<SESSION_ID>, so a run is bookmarkable and shareable and
+ * survives a reload. The id is minted server-side on first upload; until then
+ * the app sits at / with no session at all.
+ */
+function sessionIdFromUrl(): string | null {
+  const seg = location.pathname.split("/").filter(Boolean)[0];
+  return seg && looksLikeSessionId(seg) ? seg : null;
+}
+
+function putSessionInUrl(id: string): void {
+  history.replaceState({}, "", `/${id}`);
 }
 
 // --- state -----------------------------------------------------------------
@@ -384,7 +400,9 @@ async function start(file: File): Promise<void> {
     });
 
     setStatus("Listening to your sample, sketching a patch", "working");
+    // A fresh upload is a fresh session, so the old URL keeps its own history.
     state.sessionId = await apiClient.createSession();
+    putSessionInUrl(state.sessionId);
     const step = await apiClient.setTarget(state.sessionId, target.features, target.info);
     await drain(step);
   } catch (err) {
@@ -470,6 +488,60 @@ async function sendChat(preset?: string): Promise<void> {
 
 // --- boot ------------------------------------------------------------------
 
+/**
+ * Rebuild the UI from a session's stored history.
+ *
+ * The uploaded AUDIO is not recoverable — we never persist it, only the feature
+ * vector it produced. That is enough to keep iterating (renders are specced
+ * from the features), but the target itself can no longer be auditioned, so we
+ * don't offer a button that would silently do nothing.
+ */
+async function restoreSession(id: string): Promise<void> {
+  let snap: SessionSnapshot;
+  try {
+    snap = await apiClient.snapshot(id);
+  } catch {
+    setStatus("Could not load that session — drop a sample to start a new one.");
+    return;
+  }
+  if (!snap?.target || !snap.history?.length) {
+    setStatus("That session is empty — drop a sample to begin.");
+    return;
+  }
+
+  state.sessionId = id;
+  state.target = {
+    features: snap.target,
+    info: snap.targetInfo ?? { filename: "restored", durationSec: 0, sampleRate: snap.target.sampleRate },
+    // No audio: reconstructed sessions can render and diff, but not play the target.
+    prepared: { data: new Float32Array(0), sampleRate: snap.target.sampleRate },
+  };
+  state.attempts = snap.history.map((a) => ({
+    presetId: a.presetId,
+    preset: a.preset,
+    rationale: a.rationale,
+    distance: a.distance,
+    features: a.features,
+  }));
+  renderAttempts();
+
+  const info = $("targetinfo");
+  if (info) {
+    info.classList.remove("hidden");
+    info.innerHTML =
+      `<span class="tag">target</span> ${escapeHtml(snap.targetInfo?.filename ?? "restored session")} · ` +
+      `${snap.target.f0Hz.toFixed(1)} Hz · ${snap.target.durationMs} ms ` +
+      `<span class="muted">(audio not stored — reload can't replay it)</span>`;
+  }
+
+  const best =
+    state.attempts.find((a) => a.presetId === snap.bestPresetId) ??
+    state.attempts[state.attempts.length - 1];
+  if (best) await loadPreset(best.preset, best.presetId);
+  $("chatpanel")?.classList.remove("hidden");
+  setStatus(`Restored ${state.attempts.length} iteration(s). Play it, or keep tweaking.`, "good");
+}
+
 async function boot(): Promise<void> {
   shell();
   bindTypingKeyboard();
@@ -478,7 +550,10 @@ async function boot(): Promise<void> {
     const info = (await res.json()) as { hasAnthropicKey?: boolean };
     if (!info.hasAnthropicKey) {
       setStatus("Worker has no ANTHROPIC_API_KEY set — the agent loop will fail until it's added.");
+      return;
     }
+    const existing = sessionIdFromUrl();
+    if (existing) await restoreSession(existing);
   } catch (err) {
     setStatus(`Could not reach the API: ${String(err)}`);
   }

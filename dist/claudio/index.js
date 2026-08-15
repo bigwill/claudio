@@ -208,6 +208,25 @@ var PRESET_JSON_SCHEMA = {
 	}
 };
 //#endregion
+//#region src/shared/protocol.ts
+/**
+* Session ids appear in the URL (claudio.../<id>), so they are short and
+* typeable rather than UUIDs. Crockford-style alphabet: no I, L, O or U, so
+* nothing is ambiguous read aloud or transcribed, and no accidental words.
+*
+* 12 chars over a 32-symbol alphabet is 60 bits. These are unguessable enough
+* that an unlisted session won't be stumbled into, but this is NOT auth — the
+* app is open, and anyone with the link has the session.
+*/
+var ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+function newSessionId() {
+	const bytes = /* @__PURE__ */ new Uint8Array(12);
+	crypto.getRandomValues(bytes);
+	let out = "";
+	for (const b of bytes) out += ID_ALPHABET[b % 32];
+	return out;
+}
+//#endregion
 //#region src/worker/agent.ts
 /**
 * The agent layer: system prompt, tool definitions, and the Anthropic call.
@@ -786,7 +805,7 @@ var worker_entry_default = { async fetch(request, env, _ctx) {
 	});
 	if (url.pathname === "/api/session") {
 		if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
-		return json({ sessionId: crypto.randomUUID() });
+		return json({ sessionId: newSessionId() });
 	}
 	const parts = url.pathname.split("/").filter(Boolean);
 	if (parts[0] === "api" && parts[1] === "session" && parts[2]) {
@@ -796,7 +815,10 @@ var worker_entry_default = { async fetch(request, env, _ctx) {
 		try {
 			if (!action) {
 				if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
-				return json(await session.snapshot());
+				return json({
+					...await session.snapshot(),
+					sessionId
+				});
 			}
 			if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
 			switch (action) {

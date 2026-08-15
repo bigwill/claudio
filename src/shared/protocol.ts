@@ -110,6 +110,31 @@ export interface ChatRequest {
 /** Default iteration budget for the closed refine loop. */
 export const MAX_ITERATIONS = 3;
 
+/**
+ * Session ids appear in the URL (claudio.../<id>), so they are short and
+ * typeable rather than UUIDs. Crockford-style alphabet: no I, L, O or U, so
+ * nothing is ambiguous read aloud or transcribed, and no accidental words.
+ *
+ * 12 chars over a 32-symbol alphabet is 60 bits. These are unguessable enough
+ * that an unlisted session won't be stumbled into, but this is NOT auth — the
+ * app is open, and anyone with the link has the session.
+ */
+const ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export const SESSION_ID_LENGTH = 12;
+
+export function newSessionId(): string {
+  const bytes = new Uint8Array(SESSION_ID_LENGTH);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (const b of bytes) out += ID_ALPHABET[b % ID_ALPHABET.length];
+  return out;
+}
+
+/** Is this path segment shaped like one of our session ids? */
+export function looksLikeSessionId(s: string): boolean {
+  return s.length === SESSION_ID_LENGTH && [...s].every((c) => ID_ALPHABET.includes(c));
+}
+
 export const API = {
   createSession: "/api/session",
   session: (id: string) => `/api/session/${id}`,
