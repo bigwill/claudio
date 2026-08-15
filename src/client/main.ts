@@ -77,7 +77,8 @@ function shell(): void {
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
         <span class="tag">play</span>
         <span class="muted" style="font-size:12px">
-          click the keys, or use <code>A S D F G H J K</code> · <code>Z</code>/<code>X</code> to shift octave
+          click the keys, or type — <code>A S D F&hellip;</code> naturals, <code>W E T Y U</code> sharps ·
+          <code>Z</code>/<code>X</code> shifts octave · chords work
         </span>
       </div>
       <div id="keyboard"></div>
@@ -204,12 +205,7 @@ function release(id: string): void {
   if (midi === undefined) return;
   held.delete(id);
   keyEl(midi)?.classList.remove("on");
-  // Monophonic: only release when nothing else is being held.
-  if (held.size === 0) noteOff();
-  else {
-    const last = [...held.values()].pop()!;
-    noteOn(last, 0.9);
-  }
+  noteOff(midi);
 }
 
 function bindTypingKeyboard(): void {
@@ -222,7 +218,7 @@ function bindTypingKeyboard(): void {
     if (k === "z" || k === "x") {
       octaveBase = Math.min(84, Math.max(24, octaveBase + (k === "x" ? 12 : -12)));
       held.clear();
-      noteOff();
+      noteOff(); // release everything — the old midi numbers are gone
       buildKeyboard();
       return;
     }

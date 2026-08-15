@@ -103,7 +103,16 @@ export function buildVoice(p: ClaudioPreset): Tone.FMSynth {
 // Live playback
 // ---------------------------------------------------------------------------
 
-let liveVoice: Tone.FMSynth | null = null;
+/**
+ * The LIVE voice is polyphonic; the OFFLINE render deliberately is not.
+ *
+ * `buildVoice()` above returns a bare FMSynth and is what `Tone.Offline` uses —
+ * the analysis renders exactly one note, and adding voices there would change
+ * the thing being measured (and its level). Polyphony is a playing affordance,
+ * not part of the measurement loop, so it lives only on this side.
+ */
+let liveVoice: Tone.PolySynth<Tone.FMSynth> | null = null;
+let liveLimiter: Tone.Limiter | null = null;
 let livePreset: ClaudioPreset | null = null;
 let started = false;
 
@@ -129,7 +138,14 @@ export function setLivePreset(p: ClaudioPreset): void {
     liveVoice.dispose();
     liveVoice = null;
   }
-  liveVoice = buildVoice(c).toDestination();
+  // Voices sum, so a six-note chord at gain 0.8 would clip hard on its own.
+  // A limiter is the difference between "playable instrument" and "distorted
+  // mess the moment you hold a chord" — the offline render path has no such
+  // node, deliberately, since it must measure the preset and not a limiter.
+  if (!liveLimiter) liveLimiter = new Tone.Limiter(-2).toDestination();
+  liveVoice = new Tone.PolySynth(Tone.FMSynth, presetToOptions(c)).connect(liveLimiter);
+  // Plenty for ten fingers; the cap only matters as a voice-stealing backstop.
+  liveVoice.maxPolyphony = 16;
 }
 
 export function getLivePreset(): ClaudioPreset | null {
@@ -151,11 +167,8 @@ export function playNote(midi = 60, velocity = 0.9, durSec = 1.2): void {
 }
 
 /**
- * Hold-to-sustain, for the on-screen keyboard.
- *
- * Tone.FMSynth is monophonic, so this is last-note-priority: a new noteOn
- * while one is held retriggers at the new pitch. Polyphony would mean
- * PolySynth and a voice pool, which is more than a playable octave needs.
+ * Hold-to-sustain, for the on-screen keyboard. Polyphonic — each held key gets
+ * its own voice, and `noteOff(midi)` releases only that one.
  */
 export function noteOn(midi: number, velocity = 0.9): void {
   if (!liveVoice) setLivePreset(livePreset ?? DEFAULT_PRESET);
@@ -164,13 +177,16 @@ export function noteOn(midi: number, velocity = 0.9): void {
   liveVoice!.triggerAttack(hz, undefined, v);
 }
 
-export function noteOff(): void {
-  if (liveVoice) liveVoice.triggerRelease();
+/** Release one note. Omit `midi` to release everything still sounding. */
+export function noteOff(midi?: number): void {
+  if (!liveVoice) return;
+  if (midi === undefined) liveVoice.releaseAll();
+  else liveVoice.triggerRelease(midiToHz(midi));
 }
 
-/** Release any sounding note without tearing the voice down. */
+/** Release every sounding note without tearing the voice down. */
 export function stopLive(): void {
-  if (liveVoice) liveVoice.triggerRelease();
+  if (liveVoice) liveVoice.releaseAll();
 }
 
 /** Tear the live voice down entirely. */
