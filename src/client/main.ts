@@ -74,53 +74,56 @@ const app = () => document.getElementById("app")!;
 
 function shell(): void {
   app().innerHTML = `
-    <h1>Claudio</h1>
-    <p class="sub">Upload a sound. An agent reverse-engineers it into an FM patch, then you talk to it.</p>
+    <header class="topbar">
+      <div class="brand">Claud<span>io</span></div>
+      <p class="sub muted">FM sound design</p>
+      <div class="spacer"></div>
+      <span class="tag">status</span>
+      <span id="status" class="muted">Waiting for a sample.</span>
+    </header>
 
     <div class="layout">
       <aside class="rail">
-        <div class="panel hidden" id="attemptspanel">
+        <div class="panel" id="attemptspanel">
           <div class="row" style="margin-bottom:6px;justify-content:space-between">
             <span class="tag">iterations</span>
-            <span class="muted" style="font-size:12px">click one to load it</span>
+            <span class="muted" style="font-size:12px">click to load</span>
           </div>
-          <div id="attempts"></div>
+          <div id="attempts"><p class="muted" style="font-size:13px">Nothing yet.</p></div>
         </div>
       </aside>
 
-      <section>
-        <div class="panel">
-          <div id="drop">Drop a WAV here, or click to choose
-            <input id="file" type="file" accept="audio/*" class="hidden" />
+      <section class="stage">
+        <div class="stage-scroll">
+          <div class="panel">
+            <div id="drop">Drop a WAV here, or click to choose
+              <input id="file" type="file" accept="audio/*" class="hidden" />
+            </div>
+            <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
           </div>
-          <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
+
+          <div class="panel hidden" id="chatpanel">
+            <div id="chips" class="row" style="margin-bottom:10px"></div>
+            <div class="row">
+              <input id="chat" type="text" placeholder="glassier · more punch · hollow it out" style="flex:1" />
+              <button id="send">Send</button>
+            </div>
+            <div id="chatlog" class="muted" style="margin-top:10px"></div>
+          </div>
         </div>
 
-        <div class="panel" id="statuspanel">
-          <div class="row"><span class="tag">status</span><span id="status" class="muted">Waiting for a sample.</span></div>
-        </div>
-
-        <div class="panel" id="kbpanel">
+        <div class="dock">
           <div class="row" style="justify-content:space-between;margin-bottom:8px">
             <span class="row" style="gap:8px">
-              <span class="tag">play</span>
-              <span id="nowplaying" class="muted" style="font-size:12px">init patch</span>
+              <span class="tag">playing</span>
+              <span id="nowplaying" style="font-size:13px">init patch</span>
             </span>
             <span class="muted" style="font-size:12px">
-              click the keys, or type — <code>A S D F&hellip;</code> naturals, <code>W E T Y U</code> sharps ·
-              <code>Z</code>/<code>X</code> shifts octave · chords work
+              <code>A S D F&hellip;</code> naturals · <code>W E T Y U</code> sharps ·
+              <code>Z</code>/<code>X</code> octave
             </span>
           </div>
           <div id="keyboard"></div>
-        </div>
-
-        <div class="panel hidden" id="chatpanel">
-          <div id="chips" class="row" style="margin-bottom:10px"></div>
-          <div class="row">
-            <input id="chat" type="text" placeholder="glassier · more punch · hollow it out" style="flex:1" />
-            <button id="send">Send</button>
-          </div>
-          <div id="chatlog" class="muted" style="margin-top:10px"></div>
         </div>
       </section>
     </div>`;
@@ -294,7 +297,6 @@ function renderChips(suggestions: string[] | undefined): void {
 
 function setStatus(text: string, tone: "muted" | "good" | "working" = "muted"): void {
   const el = $("status");
-  const panel = $("statuspanel");
   if (!el) return;
   // Animated dots, so waiting *feels* like waiting rather than reading as a
   // frozen sentence.
@@ -303,7 +305,6 @@ function setStatus(text: string, tone: "muted" | "good" | "working" = "muted"): 
   el.className = tone === "good" ? "" : "muted";
   if (tone === "good") el.style.color = "var(--good)";
   else el.style.removeProperty("color");
-  panel?.classList.toggle("working", tone === "working");
 }
 
 function renderAttempts(): void {
@@ -580,6 +581,6 @@ async function boot(): Promise<void> {
 }
 
 boot().catch((e) => {
-  const el = $("boot");
+  const el = $("status") ?? $("boot");
   if (el) el.textContent = `boot failed: ${String(e)}`;
 });
