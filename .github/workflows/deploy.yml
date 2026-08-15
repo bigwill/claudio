@@ -1,0 +1,76 @@
+name: Deploy
+
+# develop -> the default Worker (claudio, on workers.dev)
+# main    -> the production Worker (claudio-prod)
+#
+# Branch decides the environment, so a merge to main IS the production deploy.
+# This exists because doing it by hand drifted: production sat several features
+# behind develop without anything surfacing that fact.
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# Never let two deploys of the same branch race each other.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 24 for stable --experimental-strip-types, which the DSP self-test
+          # relies on to run TypeScript directly.
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: DSP self-test
+        # Cheap and load-bearing: asserts the extractor is self-consistent
+        # (diffFeatures(x, x) === 0). If this breaks, every agent iteration
+        # afterwards is chasing noise, so it gates the deploy.
+        run: npm run test:dsp
+
+      - name: Deploy
+        # The environment is selected at BUILD time via CLOUDFLARE_ENV (the Vite
+        # plugin bakes a resolved wrangler config into dist/), which is why this
+        # calls the npm scripts rather than passing `wrangler deploy --env`.
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            npm run deploy:prod
+          else
+            npm run deploy
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test
+        # A green deploy that serves a broken app is worse than a red one.
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            URL=https://claudio-prod.will-104.workers.dev
+          else
+            URL=https://claudio.will-104.workers.dev
+          fi
+          echo "checking $URL"
+          for i in 1 2 3 4 5; do
+            sleep 4
+            BODY=$(curl -fsS "$URL/api/ping" || true)
+            echo "$BODY" | grep -q '"ok":true' && \
+            echo "$BODY" | grep -q '"hasAnthropicKey":true' && \
+            echo "PASS $BODY" && exit 0
+          done
+          echo "FAILED: /api/ping did not come back healthy"
+          echo "$BODY"
+          exit 1
