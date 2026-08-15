@@ -93,6 +93,8 @@ const state = {
   busy: false,
   /** Auto-scroll the rail to the newest attempt — until the user scrolls up. */
   followLatest: true,
+  /** Newest first. Kept as data so the view can order and fade it. */
+  chat: [] as { role: "you" | "agent"; text: string }[],
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
@@ -452,10 +454,29 @@ function midiForTarget(): number {
   return Math.round(69 + 12 * Math.log2(f0 / 440));
 }
 
-function logChat(who: string, text: string): void {
+/**
+ * Newest turn on top. The conversation is a working surface, not a document —
+ * the thing you just asked for is what you want to read, and older turns fade
+ * out down the page rather than pushing the live one off screen.
+ */
+function logChat(who: "you" | "agent", text: string): void {
+  state.chat.unshift({ role: who, text });
+  renderChat();
+}
+
+function renderChat(): void {
   const el = $("chatlog");
   if (!el) return;
-  el.innerHTML += `<div><strong>${escapeHtml(who)}:</strong> ${escapeHtml(text)}</div>`;
+  el.innerHTML = state.chat
+    .map((m, i) => {
+      // Fade with age, to a floor — still legible if you go looking.
+      const opacity = Math.max(0.32, 1 - i * 0.17).toFixed(2);
+      return `<div class="turn ${m.role}" style="opacity:${opacity}">
+        <span class="who">${m.role}</span>
+        <p>${escapeHtml(m.text)}</p>
+      </div>`;
+    })
+    .join("");
 }
 
 // --- the loop --------------------------------------------------------------
