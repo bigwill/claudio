@@ -1,0 +1,30 @@
+{
+  "name": "claudio",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "npm run build && vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test:dsp": "node --experimental-strip-types scripts/dsp-selftest.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.52.1",
+    "@cloudflare/workers-types": "^5.20260815.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.1",
+    "wrangler": "^4.123.0"
+  },
+  "allowScripts": {
+    "workerd@1.20260811.1": true,
+    "esbuild@0.28.1": true
+  }
+}
