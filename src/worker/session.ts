@@ -330,6 +330,23 @@ export class SessionDO extends DurableObject<Env> {
       }
     }
 
+    // Truncation guard. max_tokens covers thinking + prose + the tool_use block
+    // together, so a long think can consume the budget and leave no complete
+    // tool call. Without this the turn falls through to the "message" branch
+    // and the loop stalls looking like the agent simply chose to chat — a
+    // silent, badly mislabelled failure. Surface it instead.
+    if (message.stop_reason === "max_tokens" && !call) {
+      this.meta.status = "idle";
+      this.saveMeta();
+      return {
+        kind: "error",
+        message:
+          "The agent hit its output limit before finishing a preset. Retry, or lower the effort level " +
+          "if this keeps happening.",
+        retryable: true,
+      };
+    }
+
     if (call && call.name === "propose_preset") {
       const { preset, rationale } = readToolInput(call.input);
       const presetId = crypto.randomUUID();

@@ -253,10 +253,14 @@ check(
   allHints.every((h) => PRESET_FIELDS.some((f) => h.includes(f))),
   `${allHints.filter((h) => !PRESET_FIELDS.some((f) => h.includes(f))).length} hint(s) without a field`,
 );
+// The engine has no operator feedback, so no hint may PRESCRIBE it. Saying
+// "there is no operator feedback here" is fine (and useful) — telling the agent
+// to raise it is the failure mode this guards against.
+const PRESCRIBES_FEEDBACK = /(raise|increase|add|more|use|apply|turn up|higher)[^.]{0,24}feedback/i;
 check(
-  "NO hint mentions operator feedback (this engine has none)",
-  !allHints.some((h) => /feedback/i.test(h)),
-  allHints.find((h) => /feedback/i.test(h)) ?? "",
+  "NO hint prescribes operator feedback (this engine has none)",
+  !allHints.some((h) => PRESCRIBES_FEEDBACK.test(h)),
+  allHints.find((h) => PRESCRIBES_FEEDBACK.test(h)) ?? "",
 );
 check(
   "the grit deficit prescribes the sawtooth/high-index substitution",
@@ -286,8 +290,10 @@ const featBytes = JSON.stringify(targetF).length;
 const diffBytes = JSON.stringify(d4).length;
 console.log(`   FeatureSummary ${featBytes} chars (~${Math.round(featBytes / 3.6)} tokens)`);
 console.log(`   FeatureDiff    ${diffBytes} chars (~${Math.round(diffBytes / 3.6)} tokens)`);
-check("FeatureSummary stays compact (< 1600 chars)", featBytes < 1600, `${featBytes} chars`);
-check("FeatureDiff stays compact (< 6000 chars)", diffBytes < 6000, `${diffBytes} chars`);
+// This is a worst case: every scalar and every harmonic slot filled, because
+// the candidate shares nothing with the target. Real iterations run smaller.
+check("FeatureSummary stays compact (< 1200 chars)", featBytes < 1200, `${featBytes} chars`);
+check("FeatureDiff stays compact (< 3300 chars)", diffBytes < 3300, `${diffBytes} chars`);
 
 // ---------------------------------------------------------------------------
 

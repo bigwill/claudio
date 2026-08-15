@@ -18,6 +18,25 @@ export type MessageParam = Anthropic.MessageParam;
 
 export const MODEL = "claude-opus-5";
 
+/**
+ * Ceiling on THIS TURN'S ENTIRE OUTPUT: adaptive thinking + any prose + the
+ * tool_use block, all counted together. Thinking is on by default on
+ * claude-opus-5, so the invisible half is what sizes this, not the preset.
+ *
+ * The preset itself is tiny — a full ClaudioPreset serializes to ~330 chars
+ * (~100 tokens) and the rationale adds ~40. So the visible output of a turn is
+ * ~150 tokens; there is no version of "the preset didn't fit".
+ *
+ * Sized generously on purpose. Output is billed on tokens ACTUALLY generated,
+ * so a high ceiling is free unless it's used, whereas hitting the ceiling
+ * truncates the turn mid-thought and usually costs us the tool call entirely
+ * (see the max_tokens guard in session.ts). The real constraint on the upper
+ * end is wall-clock, not cost — the browser's request has to survive
+ * Cloudflare's edge timeout — and that is bounded by `effort`, which is the
+ * knob doing the actual latency work here.
+ */
+export const MAX_TOKENS = 16000;
+
 // ---------------------------------------------------------------------------
 // Tools
 // ---------------------------------------------------------------------------
@@ -256,8 +275,7 @@ export async function runClaude(opts: RunClaudeOptions): Promise<Anthropic.Messa
 
   return await client.messages.create({
     model: MODEL,
-    // Thinking is on by default on claude-opus-5 and counts against max_tokens.
-    max_tokens: 8192,
+    max_tokens: MAX_TOKENS,
     thinking: { type: "adaptive" },
     output_config: { effort: opts.isFirstProposal ? "medium" : "low" },
     system: SYSTEM_BLOCKS,

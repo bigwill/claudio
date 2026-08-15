@@ -74,54 +74,45 @@ const AMP_STAGE: Record<FrameLabel, string> = {
   release: "ampEnv.release",
 };
 
-const GRIT_RECIPE =
-  "this engine has NO operator feedback, so density comes from modulatorWave: 'sawtooth', " +
-  "modulationIndex above 15, and a high non-integer harmonicity (7-11)";
-
+/**
+ * Hints are PRESCRIPTIONS, not descriptions. The ScalarDiff row already carries
+ * name / target / got / delta / direction, and `priorities` carries the
+ * narrative — restating the problem here would triple the tool-result size for
+ * no new information.
+ */
 function scalarHint(name: ScalarName, t: number, g: number, dir: Direction): string {
   const up = dir === "increase";
   switch (name) {
     case "attackMs":
       return up
-        ? `Attack is too fast (${r0(g)}ms vs ${r0(t)}ms) — lengthen ampEnv.attack to ~${secs(t)} and raise modEnv.attack with it so the brightness swells in rather than snapping.`
-        : `Attack is too slow (${r0(g)}ms vs ${r0(t)}ms) — shorten ampEnv.attack to ~${secs(t)}; for a struck or plucked target go to 0.001-0.005 and set modEnv.attack to 0.001.`;
+        ? `ampEnv.attack -> ${secs(t)} (+ modEnv.attack)`
+        : `ampEnv.attack -> ${secs(t)}; 0.001-0.005 if struck`;
     case "decayMs":
       return up
-        ? `The body dies away too quickly (${r0(g)}ms vs ${r0(t)}ms) — lengthen ampEnv.decay toward ${secs(t)} and/or raise ampEnv.sustain.`
-        : `The body hangs on too long (${r0(g)}ms vs ${r0(t)}ms) — shorten ampEnv.decay toward ${secs(t)} and lower ampEnv.sustain.`;
+        ? `ampEnv.decay -> ${secs(t)} or raise ampEnv.sustain`
+        : `ampEnv.decay -> ${secs(t)}, lower ampEnv.sustain`;
     case "sustainLevel":
-      return up
-        ? `Not enough sustain (${r2(g)} vs ${r2(t)}) — raise ampEnv.sustain toward ${r2(t)}.`
-        : `Too much sustain (${r2(g)} vs ${r2(t)}) — lower ampEnv.sustain toward ${r2(t)}; use 0 for a struck or plucked target.`;
+      return up ? `ampEnv.sustain -> ${r2(t)}` : `ampEnv.sustain -> ${r2(t)} (0 if struck)`;
     case "releaseMs":
-      return up
-        ? `The tail is too short (${r0(g)}ms vs ${r0(t)}ms) — lengthen ampEnv.release toward ${secs(t)}.`
-        : `The tail rings on too long (${r0(g)}ms vs ${r0(t)}ms) — shorten ampEnv.release toward ${secs(t)}.`;
+      return `ampEnv.release -> ${secs(t)}`;
     case "durationMs":
-      return up
-        ? `The note ends earlier than the target — lengthen ampEnv.decay and ampEnv.release.`
-        : `The note outlasts the target — shorten ampEnv.release, then ampEnv.decay.`;
+      return up ? "lengthen ampEnv.decay + ampEnv.release" : "shorten ampEnv.release, then ampEnv.decay";
     case "f0Cents": {
       const d = r0(g - t);
-      if (Math.abs(d) > 600) {
-        return `Pitch reads ${d} cents out (about an octave) — the true fundamental is being swamped by sidebands, so lower modulationIndex and pull carrierFm.index toward 0 until op1's own fundamental is the loudest partial.`;
-      }
-      return up
-        ? `Pitch is ${Math.abs(d)} cents flat — raise detune by about ${Math.abs(d)}.`
-        : `Pitch is ${Math.abs(d)} cents sharp — lower detune by about ${Math.abs(d)}.`;
+      return Math.abs(d) > 600
+        ? "octave out: lower modulationIndex, carrierFm.index -> 0"
+        : `detune ${-d}`;
     }
     case "inharmonicityCents":
       return up
-        ? `Target is inharmonic (${r0(t)} cents of stretch) and yours is clean — set harmonicity to a NON-integer (3.47, 5.63, 7.13) and make modulatorFm.ratio non-integer too.`
-        : `Yours is more clangorous than the target (${r0(g)} vs ${r0(t)} cents) — snap harmonicity to the nearest integer (1, 2 or 3) and set modulatorFm.ratio to an integer.`;
+        ? "harmonicity -> non-integer (3.47/7.13), modulatorFm.ratio too"
+        : "harmonicity -> nearest integer, modulatorFm.ratio integer";
     case "noiseRatio":
       return up
-        ? `Target has more broadband grit (${r2(t)} vs ${r2(g)}) — ${GRIT_RECIPE}; raising modulatorFm.index thickens the modulator further.`
-        : `Yours is noisier than the target (${r2(g)} vs ${r2(t)}) — set modulatorWave: 'sine', lower modulationIndex, use an INTEGER harmonicity, and pull modulatorFm.index toward 0.`;
+        ? "no operator feedback here: modulatorWave 'sawtooth', modulationIndex >15, harmonicity 7-11"
+        : "modulatorWave 'sine', lower modulationIndex, integer harmonicity";
     case "oddEvenBalance":
-      return up
-        ? `Target leans on odd harmonics (${r2(t)} vs ${r2(g)}) — use harmonicity: 2, which places sidebands on odd partials only (clarinet/square-like), or set carrierWave: 'square'.`
-        : `Target has a fuller harmonic series (${r2(t)} vs ${r2(g)}) — use harmonicity: 1 and keep carrierWave: 'sine'.`;
+      return up ? "harmonicity 2 (odd only), or carrierWave 'square'" : "harmonicity 1, carrierWave 'sine'";
     default:
       break;
   }
@@ -129,49 +120,47 @@ function scalarHint(name: ScalarName, t: number, g: number, dir: Direction): str
   if (name.startsWith("centroid.")) {
     const frame = name.slice("centroid.".length) as FrameLabel;
     const stage = MOD_STAGE[frame] ?? "modEnv.sustain";
-    if (up) {
-      if (frame === "attack") {
-        return `The ${frame} is ${r1(t - g)} harmonics too dark — raise modulationIndex and set modEnv.attack to ~0.001 so the modulator is at full level the instant the note starts.`;
-      }
-      return `Brightness at the ${frame} is ${r1(t - g)} harmonics too low — raise ${stage}${frame === "early" ? " (your modulator is collapsing too fast)" : ""}, and raise modulationIndex if it is still short.`;
-    }
     if (frame === "attack") {
-      return `The ${frame} is ${r1(g - t)} harmonics too bright — lower modulationIndex, or lengthen modEnv.attack so the modulator ramps in.`;
+      return up
+        ? "raise modulationIndex, modEnv.attack -> 0.001"
+        : "lower modulationIndex or lengthen modEnv.attack";
     }
-    return `Brightness at the ${frame} is ${r1(g - t)} harmonics too high — shorten modEnv.decay and lower ${stage} so the tone dulls the way the target does.`;
+    return up ? `raise ${stage}, modulationIndex` : `lower ${stage}, shorten modEnv.decay`;
   }
 
   if (name.startsWith("rms.")) {
     const frame = name.slice("rms.".length) as FrameLabel;
     const stage = AMP_STAGE[frame] ?? "ampEnv.sustain";
-    return up
-      ? `Level at the ${frame} is ${r0(t - g)} dB below the target — raise ampEnv.sustain and lengthen ${stage}.`
-      : `Level at the ${frame} is ${r0(g - t)} dB above the target — lower ampEnv.sustain and shorten ${stage}.`;
+    return up ? `raise ampEnv.sustain, lengthen ${stage}` : `lower ampEnv.sustain, shorten ${stage}`;
   }
 
-  return up ? "Increase this." : "Decrease this.";
+  return up ? "increase this" : "decrease this";
+}
+
+/** Coarse advice class for a harmonic miss — also the row de-dup key. */
+function harmonicClass(h: number, deltaDb: number): string {
+  const band = h === 1 ? "f" : h <= 4 ? "lo" : "hi";
+  return `${band}${deltaDb < 0 ? "-" : "+"}`;
 }
 
 function harmonicHint(frame: FrameLabel, h: number, deltaDb: number): string {
   const stage = MOD_STAGE[frame] ?? "modEnv.sustain";
-  const tooQuiet = deltaDb < 0;
-  const mag = Math.abs(r0(deltaDb));
-
-  // Kept short on purpose: up to 8 of these ship per diff, and the actionable
-  // summary already lives in `priorities`.
-  if (h === 1) {
-    return tooQuiet
-      ? `${mag} dB down: fundamental swamped — lower modulationIndex, carrierFm.index toward 0.`
-      : `${mag} dB over: too little sideband energy — raise modulationIndex and ${stage}.`;
+  // Terse on purpose: these ship in every tool result and the narrative already
+  // lives in `priorities`.
+  switch (harmonicClass(h, deltaDb)) {
+    case "f-":
+      return "lower modulationIndex, carrierFm.index -> 0";
+    case "f+":
+      return `raise modulationIndex, ${stage}`;
+    case "lo-":
+      return "modulationIndex -> 2-6, integer harmonicity";
+    case "lo+":
+      return `raise modulationIndex, ${stage}`;
+    case "hi-":
+      return `raise modulationIndex + modulatorFm.index, ${stage}`;
+    default:
+      return `lower modulationIndex, shorten ${stage}`;
   }
-  if (h <= 4) {
-    return tooQuiet
-      ? `${mag} dB down: spectrum too hollow — lower modulationIndex toward 2-6, integer harmonicity.`
-      : `${mag} dB over: low partials dominate — raise modulationIndex and ${stage}.`;
-  }
-  return tooQuiet
-    ? `${mag} dB down: extend sidebands — raise modulationIndex and modulatorFm.index, raise ${stage}.`
-    : `${mag} dB over: lower modulationIndex, reduce ${stage} or shorten modEnv.decay.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -428,10 +417,20 @@ export function diffFeatures(target: FeatureSummary, candidate: FeatureSummary):
   const scalars = scored.slice(0, DIFF_LIMITS.maxScalars).map((s) => s.row);
 
   // --- harmonics ------------------------------------------------------------
+  // Eight rows all saying "raise modulationIndex" at the same frame is eight
+  // times the tokens for one fact. Keep the worst row per (frame, advice class)
+  // so the list spans the note instead of repeating itself.
   harmonicRows.sort((a, b) => b.w - a.w);
-  const harmonics: HarmonicDiff[] = harmonicRows
-    .slice(0, DIFF_LIMITS.maxHarmonics)
-    .map(({ w: _w, ...row }) => row);
+  const seenHarm = new Set<string>();
+  const harmonics: HarmonicDiff[] = [];
+  for (const row of harmonicRows) {
+    if (harmonics.length >= DIFF_LIMITS.maxHarmonics) break;
+    const key = `${row.frame}:${harmonicClass(row.h, row.deltaDb)}`;
+    if (seenHarm.has(key)) continue;
+    seenHarm.add(key);
+    const { w: _w, ...clean } = row;
+    harmonics.push(clean);
+  }
 
   // --- priorities: ordered, actionable prose. The agent reads this first. ----
   const priorities = buildPriorities(distance, harmErr, upperTilt, scored, target, candidate);
@@ -463,12 +462,22 @@ function buildVerdict(distance: number, breakdown: FeatureDiff["breakdown"]): st
           ? "recognisably a different instrument"
           : "not the same sound yet";
   const where: Record<string, string> = {
-    spectrum: "the harmonic balance and brightness contour",
-    envelope: "the loudness shape over time",
+    spectrum: "harmonic balance / brightness",
+    envelope: "loudness shape over time",
     pitch: "pitch and harmonic stretch",
-    noise: "noisiness and odd/even harmonic balance",
+    noise: "noisiness and odd/even balance",
   };
-  return `Distance ${distance}/100 — ${quality}; most of the remaining error is in ${where[worst]} (${breakdown[worst]} of ${distance}).`;
+  return `${distance}/100 — ${quality}; worst is ${where[worst]} (${breakdown[worst]}).`;
+}
+
+/** Groups advice so two hints about the same control can't both be emitted. */
+function tagOf(name: ScalarName): string {
+  if (name.startsWith("centroid.")) return "brightness";
+  if (name.startsWith("rms.")) return "level";
+  if (name === "noiseRatio" || name === "oddEvenBalance") return "grit";
+  if (name === "inharmonicityCents") return "inharm";
+  if (name === "f0Cents") return "pitch";
+  return `env:${name}`;
 }
 
 function buildPriorities(
@@ -479,80 +488,66 @@ function buildPriorities(
   target: FeatureSummary,
   candidate: FeatureSummary,
 ): string[] {
-  const items: Array<{ points: number; text: string }> = [];
+  const items: Array<{ points: number; tag: string; text: string }> = [];
 
-  // The harmonic block is one idea, not 48 — collapse it into a single
+  // The harmonic block is ONE idea, not 48 — collapse it into a single
   // instruction about where the spectral energy needs to move.
-  const harmPoints = 100 * DISTANCE_WEIGHTS.spectrum * harmErr * 0.7;
   if (harmErr > 0.06) {
-    if (upperTilt < -2) {
-      items.push({
-        points: harmPoints,
-        text:
-          "Brighten the tone: the upper harmonics are too quiet across the note. Raise modulationIndex " +
-          "toward 10-20 and raise modEnv.sustain so the sidebands survive past the attack. If that still " +
-          "isn't enough, raise modulatorFm.index to 2-4 to enrich the modulator itself.",
-      });
-    } else if (upperTilt > 2) {
-      items.push({
-        points: harmPoints,
-        text:
-          "Tame the tone: the upper harmonics are too loud. Lower modulationIndex, and shorten modEnv.decay " +
-          "with a low modEnv.sustain so the brightness collapses shortly after the attack instead of ringing on.",
-      });
-    } else {
-      items.push({
-        points: harmPoints,
-        text:
-          "Re-shape which harmonics are loud rather than how many: adjust harmonicity (integer for a pitched, " +
-          "instrument-like series; non-integer for bell/metallic) before touching modulationIndex again.",
-      });
-    }
+    const text =
+      upperTilt < -2
+        ? "Brighten it: the upper harmonics are too quiet. Raise modulationIndex toward 10-20 and raise modEnv.sustain so the sidebands survive past the attack; modulatorFm.index 2-4 enriches the modulator further."
+        : upperTilt > 2
+          ? "Tame it: the upper harmonics are too loud. Lower modulationIndex, and shorten modEnv.decay with a low modEnv.sustain so brightness collapses after the attack instead of ringing on."
+          : "Re-shape WHICH harmonics are loud rather than how many: adjust harmonicity (integer = pitched and instrument-like, non-integer = bell/metallic) before touching modulationIndex again.";
+    items.push({ points: 100 * DISTANCE_WEIGHTS.spectrum * harmErr * 0.7, tag: "brightness", text });
   }
 
   // Inharmonicity and grit are the two things the agent most often forgets, so
-  // surface them even when they are not the largest raw error.
+  // surface them even when they aren't the largest raw error.
   if (target.inharmonicityCents - candidate.inharmonicityCents > 20) {
     items.push({
       points: 100 * DISTANCE_WEIGHTS.pitch * 0.9,
-      text: `The target is inharmonic (${target.inharmonicityCents} cents of stretch, yours is ${candidate.inharmonicityCents}) — switch harmonicity to a non-integer such as 3.47 or 7.13, which is what turns a pitched tone into a bell.`,
+      tag: "inharm",
+      text: `Target is inharmonic (${target.inharmonicityCents} cents vs your ${candidate.inharmonicityCents}) — set harmonicity to a non-integer such as 3.47 or 7.13; that is what turns a pitched tone into a bell.`,
     });
   }
   if (target.noiseRatio - candidate.noiseRatio > 0.12) {
     items.push({
       points: 100 * DISTANCE_WEIGHTS.noise * 0.9,
-      text: `The target is much grittier (noiseRatio ${target.noiseRatio} vs ${candidate.noiseRatio}) — remember there is no operator feedback here: set modulatorWave: 'sawtooth', push modulationIndex above 15, and use a high non-integer harmonicity around 7-11.`,
+      tag: "grit",
+      text: `Target is much grittier (noiseRatio ${target.noiseRatio} vs ${candidate.noiseRatio}) — there is no operator feedback in this engine, so use modulatorWave: 'sawtooth', modulationIndex above 15, and a high non-integer harmonicity (7-11).`,
     });
   }
 
-  for (const s of scored.slice(0, 4)) items.push({ points: s.points, text: s.row.hint });
+  for (const s of scored.slice(0, 5)) {
+    items.push({ points: s.points, tag: tagOf(s.row.name), text: s.row.hint });
+  }
 
   items.sort((a, b) => b.points - a.points);
 
-  // De-duplicate near-identical advice, keep 3-5.
+  const seen = new Set<string>();
   const out: string[] = [];
   for (const it of items) {
     if (out.length >= 5) break;
-    if (out.some((o) => o.slice(0, 28) === it.text.slice(0, 28))) continue;
+    if (seen.has(it.tag)) continue;
+    seen.add(it.tag);
     out.push(it.text);
   }
 
   if (out.length === 0) {
     out.push(
       distance <= DIFF_LIMITS.goodMatch
-        ? "This is already a good match — change one field at a time from here (modulationIndex first, then modEnv.decay) and keep whichever lowers the distance."
+        ? "Already a good match — from here change one field at a time (modulationIndex first, then modEnv.decay) and keep whichever lowers the distance."
         : "No single feature dominates — re-pick the archetype (struck metal / plucked string / brass / e-piano / bass / pad) and set harmonicity and modulationIndex to match it before fine-tuning.",
     );
   }
-  while (out.length < 3) {
-    const filler = [
-      "Change only one or two fields per iteration and state what you expect to happen — a controlled experiment converges faster than a shotgun.",
-      "Remember modEnv is the brightness contour and ampEnv is the loudness contour; a modEnv.decay shorter than ampEnv.decay gives the classic struck/plucked 'bright attack that mellows out'.",
-      "If a change moved a feature the wrong way, reverse it rather than compounding it.",
-    ];
-    const next = filler[out.length % filler.length];
-    if (out.includes(next)) break;
-    out.push(next);
+  const filler = [
+    "Change one or two fields per iteration and say what you expect — a controlled experiment converges faster than a shotgun; modulationIndex is the primary brightness control.",
+    "modEnv is the brightness contour, ampEnv the loudness contour: a modEnv.decay shorter than ampEnv.decay gives the struck/plucked 'bright attack that mellows out'.",
+    "If a change moved a feature the wrong way, reverse it rather than compounding it — try the opposite sign on modulationIndex or harmonicity.",
+  ];
+  for (let i = 0; out.length < 3 && i < filler.length; i++) {
+    if (!out.includes(filler[i])) out.push(filler[i]);
   }
 
   return out.slice(0, 5);

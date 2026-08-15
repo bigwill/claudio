@@ -91,17 +91,20 @@ export function detectF0(x: Float32Array, sr: number, offset: number): F0Estimat
   }
   if (best < 0) return { f0: 0, confidence: 0 };
 
-  // 3b. octave guard. YIN's classic failure is locking onto a sub-multiple of
-  // the true period (reporting 60 Hz for a 220 Hz clang). If a lag at best/k is
-  // nearly as good, prefer it — the shorter period is the real one.
-  for (let k = 4; k >= 2; k--) {
+  // 3b. octave guard. YIN's classic failure is locking onto a MULTIPLE of the
+  // true period — reporting 50 Hz for an electric piano, or 60 Hz for a 220 Hz
+  // clang. Prefer the SHORTEST period whose normalized difference is still
+  // within ~15% of the global minimum. Measured on samples/: without this,
+  // several samples pin at exactly F0_MIN, which is the tell.
+  const margin = cmnd[best] * 1.15 + 0.05;
+  for (let k = 8; k >= 2; k--) {
     const cand = Math.round(best / k);
     if (cand < tauMin || cand > tauMax) continue;
     let localBest = cand;
     for (let t = Math.max(tauMin, cand - 2); t <= Math.min(tauMax, cand + 2); t++) {
       if (cmnd[t] < cmnd[localBest]) localBest = t;
     }
-    if (cmnd[localBest] < cmnd[best] + 0.1) {
+    if (cmnd[localBest] <= margin) {
       best = localBest;
       break;
     }
@@ -121,7 +124,15 @@ export function detectF0(x: Float32Array, sr: number, offset: number): F0Estimat
   const f0 = refined > 0 ? sr / refined : 0;
   if (!Number.isFinite(f0) || f0 < F0_MIN * 0.5 || f0 > F0_MAX * 2) return { f0: 0, confidence: 0 };
 
-  return { f0, confidence: Math.max(0, Math.min(1, 1 - cmnd[best])) };
+  // A minimum sitting ON the edge of the search range is not a real dip — the
+  // difference function was still falling when we ran out of lags. That is what
+  // a chord or a noise burst looks like (samples/electric_piano_jd800_soft_ep
+  // pinned at exactly 50.0 Hz = tauMax). Halve the confidence so the caller can
+  // fall back rather than trusting a boundary artefact.
+  const atBoundary = best >= tauMax - 1 || best <= tauMin + 1;
+  const conf = Math.max(0, Math.min(1, 1 - cmnd[best])) * (atBoundary ? 0.5 : 1);
+
+  return { f0, confidence: conf };
 }
 
 function median(xs: number[]): number {

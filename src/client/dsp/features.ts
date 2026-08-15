@@ -28,8 +28,8 @@ const DB_FLOOR = -60;
 const TAIL_DB = -45;
 /** Bins searched either side of the predicted harmonic bin. */
 const HARMONIC_SEARCH_BINS = 2;
-/** Spectral peaks counted as "tonal" when measuring noiseRatio. */
-const NOISE_PEAKS = 30;
+/** Running-median width (bins) used to estimate the broadband noise floor. */
+const MEDIAN_BINS = 21;
 /** Fine amplitude envelope: 256-sample window, 64-sample hop (~1.5 ms at 44.1k). */
 const ENV_WIN = 256;
 const ENV_HOP = 64;
@@ -154,10 +154,10 @@ interface Peak {
  * recovers a Hann-windowed peak's true amplitude to ~0.1 dB, which is exactly
  * what harmonicsDb needs).
  */
-function findPeak(mags: Float64Array, targetHz: number, binHz: number): Peak {
+function findPeak(mags: Float64Array, targetHz: number, binHz: number, searchBins: number): Peak {
   const center = targetHz / binHz;
-  const lo = Math.max(1, Math.floor(center) - HARMONIC_SEARCH_BINS);
-  const hi = Math.min(mags.length - 2, Math.ceil(center) + HARMONIC_SEARCH_BINS);
+  const lo = Math.max(1, Math.floor(center) - searchBins);
+  const hi = Math.min(mags.length - 2, Math.ceil(center) + searchBins);
   if (hi <= lo) return { freq: targetHz, amp: 0 };
 
   let best = lo;
@@ -175,38 +175,51 @@ function findPeak(mags: Float64Array, targetHz: number, binHz: number): Peak {
 }
 
 /**
- * Fraction of frame energy that does NOT sit in a spectral peak.
+ * Fraction of frame energy sitting in the broadband noise floor rather than in
+ * spectral peaks.
  *
- * Deliberately f0-INDEPENDENT: it masks the strongest NOISE_PEAKS local maxima
- * rather than a grid of h*f0 bins. A harmonic grid derived from a bad f0 (which
- * is exactly what a clangorous or percussive sample produces) can end up masking
- * most of the spectrum and reporting a noisy hit as perfectly clean. The masked
- * bin count here is bounded no matter what the pitch detector says.
+ * Deliberately f0-INDEPENDENT. The obvious implementation — mask +/-2 bins
+ * around every h*f0 and call the rest noise — is measurably wrong on real
+ * material: at f0 = 65 Hz with 21.5 Hz bins the mask swallows the entire low
+ * spectrum, and a shaker (essentially pure noise) whose f0 estimate is garbage
+ * comes back as 0.00 "perfectly tonal". Verified against samples/.
+ *
+ * Instead: running-median filter the magnitude spectrum. Peaks stick far above
+ * the median of their neighbourhood; a noise floor IS its own median. The noise
+ * energy is then the floor's energy, and the tonal energy is what stands above
+ * it. Normalized so that ideal Rayleigh-distributed noise reads ~1.0.
  */
 function noiseRatioOf(mags: Float64Array): number {
   const bins = mags.length;
+  const half = MEDIAN_BINS >> 1;
+  let noise = 0;
   let total = 0;
-  for (let b = 1; b < bins; b++) total += mags[b] * mags[b];
+  const win: number[] = [];
+  for (let b = 1; b < bins; b++) {
+    const lo = Math.max(1, b - half);
+    const hi = Math.min(bins - 1, b + half);
+    win.length = 0;
+    for (let i = lo; i <= hi; i++) win.push(mags[i]);
+    win.sort((p, q) => p - q);
+    const med = win[win.length >> 1];
+    noise += med * med;
+    total += mags[b] * mags[b];
+  }
   if (total <= 0) return 0;
+  // For pure noise E[median^2] / E[|X|^2] ~= 0.69; divide it out so "all noise"
+  // reads 1.0 and a clean tone reads ~0.
+  return clamp(noise / total / 0.69, 0, 1);
+}
 
-  const peaks: number[] = [];
-  for (let b = 2; b < bins - 1; b++) {
-    if (mags[b] > mags[b - 1] && mags[b] >= mags[b + 1]) peaks.push(b);
+/** Magnitude-weighted spectral centroid in Hz. Needs no f0 — that's the point. */
+function centroidHzOf(mags: Float64Array, binHz: number): number {
+  let num = 0;
+  let den = 0;
+  for (let b = 1; b < mags.length; b++) {
+    num += mags[b] * b * binHz;
+    den += mags[b];
   }
-  peaks.sort((p, q) => mags[q] - mags[p]);
-
-  const mask = new Uint8Array(bins);
-  const k = Math.min(NOISE_PEAKS, peaks.length);
-  for (let i = 0; i < k; i++) {
-    const c = peaks[i];
-    for (let d = -HARMONIC_SEARCH_BINS; d <= HARMONIC_SEARCH_BINS; d++) {
-      const b = c + d;
-      if (b >= 1 && b < bins) mask[b] = 1;
-    }
-  }
-  let tonal = 0;
-  for (let b = 1; b < bins; b++) if (mask[b]) tonal += mags[b] * mags[b];
-  return clamp(1 - tonal / total, 0, 1);
+  return den > 0 ? num / den : 0;
 }
 
 export function extractFeatures(data: Float32Array, sampleRate: number): FeatureSummary {
@@ -224,9 +237,6 @@ export function extractFeatures(data: Float32Array, sampleRate: number): Feature
 
   const durationMs = r0((data.length / sr) * 1000);
   const pitch = analyzePitch(x, sr);
-  // Nothing periodic found (percussion, noise): fall back to a nominal 220 Hz so
-  // the harmonic grid is still well-defined and both sides use the same rule.
-  const f0 = pitch.f0Hz > 0 ? pitch.f0Hz : 220;
 
   // --- STFT -----------------------------------------------------------------
   const fft = new Fft(N);
@@ -265,8 +275,33 @@ export function extractFeatures(data: Float32Array, sampleRate: number): Feature
   let peakRms = 0;
   for (let f = 0; f < nFrames; f++) if (frameRms[f] > peakRms) peakRms = frameRms[f];
 
-  // --- per-frame features ----------------------------------------------------
+  // --- reference frequency ---------------------------------------------------
+  // Everything harmonic is expressed relative to f0. When the pitch detector is
+  // confident that is exactly right. When it ISN'T — a shaker, a vibraslap, any
+  // unpitched hit — the YIN answer is a meaningless sub-100 Hz number, and
+  // dividing the centroid by it produced brightness values like 152 "harmonics"
+  // (seen on samples/perc_shaker). Rather than emit nonsense, fall back to a
+  // spectral reference: a quarter of the loudest frame's centroid. That puts the
+  // sound's energy around harmonic 4 of the grid, so centroidRatio stays legible
+  // AND harmonicsDb degrades into a coarse 12-band spectral envelope instead of
+  // a column of -60s. f0Confidence tells the agent which regime it is in.
+  //
+  // NOTE (contract): FrameFeature has no absolute-Hz centroid field, so this is
+  // the best in-contract degradation available. See the report.
   const nyquist = sr / 2;
+  const peakCentroidHz = centroidHzOf(specs[fPeak], binHz);
+  const f0 =
+    pitch.f0Hz > 0 && pitch.confidence >= 0.5
+      ? pitch.f0Hz
+      : clamp(peakCentroidHz > 0 ? peakCentroidHz / 4 : 220, 50, 2000);
+
+  // At 2048/44.1k the bins are 21.5 Hz apart. For a 62 Hz bass the harmonics are
+  // under 3 bins apart, so a fixed +/-2 bin search grabs the NEIGHBOURING
+  // harmonic and reports 148 cents of inharmonicity on a perfectly harmonic
+  // upright bass (measured). Narrow the search when f0 is low, and don't claim
+  // to measure inharmonicity at all when the harmonics aren't resolvable.
+  const searchBins = clamp(Math.floor(0.35 * (f0 / binHz)), 1, HARMONIC_SEARCH_BINS);
+  const inharmonicityMeasurable = f0 / binHz >= 4;
 
   const frames: FrameFeature[] = [];
   let inharmNum = 0;
@@ -284,7 +319,7 @@ export function extractFeatures(data: Float32Array, sampleRate: number): Feature
     let loudest = 0;
     for (let h = 1; h <= N_HARMONICS; h++) {
       const hz = h * f0;
-      const p = hz < nyquist - binHz * 2 ? findPeak(mags, hz, binHz) : { freq: hz, amp: 0 };
+      const p = hz < nyquist - binHz * 2 ? findPeak(mags, hz, binHz, searchBins) : { freq: hz, amp: 0 };
       peaks.push(p);
       if (p.amp > loudest) loudest = p.amp;
     }
@@ -292,7 +327,7 @@ export function extractFeatures(data: Float32Array, sampleRate: number): Feature
     const harmonicsDb = peaks.map((p) => r0(toDb(p.amp, loudest)));
 
     // Inharmonicity: amplitude-weighted |cents| deviation of h>=2 from h*f0.
-    for (let h = 2; h <= N_HARMONICS; h++) {
+    for (let h = 2; inharmonicityMeasurable && h <= N_HARMONICS; h++) {
       const p = peaks[h - 1];
       if (p.amp <= 0 || loudest <= 0) continue;
       const w = p.amp / loudest;
@@ -313,19 +348,13 @@ export function extractFeatures(data: Float32Array, sampleRate: number): Feature
     noiseAcc += noiseRatioOf(mags);
 
     // Spectral centroid, expressed in harmonic numbers.
-    let cNum = 0;
-    let cDen = 0;
-    for (let b = 1; b < bins; b++) {
-      cNum += mags[b] * b * binHz;
-      cDen += mags[b];
-    }
-    const centroidHz = cDen > 0 ? cNum / cDen : f0;
+    const centroidHz = centroidHzOf(mags, binHz) || f0;
 
     frames.push({
       label: FRAME_LABELS[i],
       tMs: r0(((fi * hop + N / 2) / sr) * 1000),
       rmsDb: r0(toDb(frameRms[fi], peakRms)),
-      centroidRatio: r(clamp(centroidHz / f0, 0, 200), 2),
+      centroidRatio: r(clamp(centroidHz / f0, 0, 64), 2),
       harmonicsDb,
     });
   }
