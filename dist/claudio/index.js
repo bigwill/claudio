@@ -668,7 +668,31 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 	lastPreset() {
 		return this.meta.history.length > 0 ? this.meta.history[this.meta.history.length - 1].preset : null;
 	}
+	/**
+	* Heal a conversation whose tail is an unanswered tool_use.
+	*
+	* Sessions created before the finalize fix have a dangling tool_use persisted
+	* in their message log, and the API rejects the whole request rather than
+	* ignoring it — so without this those sessions are bricked forever and the
+	* user has to start over. Cheap to check, and it also covers any future path
+	* that returns early without closing a tool call.
+	*/
+	healDanglingToolUse() {
+		const last = this.messages[this.messages.length - 1];
+		if (!last || last.role !== "assistant" || !Array.isArray(last.content)) return;
+		const unanswered = last.content.filter((b) => typeof b === "object" && b !== null && b.type === "tool_use");
+		if (unanswered.length === 0) return;
+		this.appendMessage({
+			role: "user",
+			content: unanswered.map((b) => ({
+				type: "tool_result",
+				tool_use_id: b.id,
+				content: "Acknowledged."
+			}))
+		});
+	}
 	async turn(opts) {
+		this.healDanglingToolUse();
 		let message;
 		try {
 			message = await runClaude({
@@ -735,6 +759,14 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 		if (call && call.name === "finalize") {
 			const { preset, rationale, suggestions } = readToolInput(call.input);
 			const presetId = crypto.randomUUID();
+			this.appendMessage({
+				role: "user",
+				content: [{
+					type: "tool_result",
+					tool_use_id: call.id,
+					content: "Finalized and loaded into the synth. The user can now play it and ask for changes. From here the target sample no longer matters — follow what they ask for."
+				}]
+			});
 			this.meta.pendingToolUseId = null;
 			this.meta.pendingPresetId = null;
 			this.meta.status = "done";
@@ -755,6 +787,15 @@ You have ${this.meta.maxIterations} render iterations. Pick an archetype that ex
 				suggestions
 			};
 		}
+		if (call) this.appendMessage({
+			role: "user",
+			content: [{
+				type: "tool_result",
+				tool_use_id: call.id,
+				content: `Unknown tool "${call.name}". Use propose_preset or finalize.`,
+				is_error: true
+			}]
+		});
 		this.meta.status = "idle";
 		this.saveMeta();
 		return {

@@ -297,7 +297,38 @@ export class SessionDO extends DurableObject<Env> {
       : null;
   }
 
+  /**
+   * Heal a conversation whose tail is an unanswered tool_use.
+   *
+   * Sessions created before the finalize fix have a dangling tool_use persisted
+   * in their message log, and the API rejects the whole request rather than
+   * ignoring it — so without this those sessions are bricked forever and the
+   * user has to start over. Cheap to check, and it also covers any future path
+   * that returns early without closing a tool call.
+   */
+  private healDanglingToolUse(): void {
+    const last = this.messages[this.messages.length - 1];
+    if (!last || last.role !== "assistant" || !Array.isArray(last.content)) return;
+
+    const unanswered = last.content.filter(
+      (b): b is Anthropic.ToolUseBlockParam =>
+        typeof b === "object" && b !== null && (b as { type?: string }).type === "tool_use",
+    );
+    if (unanswered.length === 0) return;
+
+    this.appendMessage({
+      role: "user",
+      content: unanswered.map((b) => ({
+        type: "tool_result" as const,
+        tool_use_id: b.id,
+        content: "Acknowledged.",
+      })),
+    });
+  }
+
   private async turn(opts: { force: boolean; isFirstProposal: boolean }): Promise<Step> {
+    this.healDanglingToolUse();
+
     let message: Anthropic.Message;
     try {
       message = await runClaude({
@@ -374,6 +405,25 @@ export class SessionDO extends DurableObject<Env> {
       const { preset, rationale, suggestions } = readToolInput(call.input);
       const presetId = crypto.randomUUID();
 
+      // MUST close the tool_use. Unlike propose_preset — whose tool_result
+      // arrives later from the browser — finalize is resolved here and now, so
+      // if we don't answer it the block is left dangling and the NEXT request
+      // (the user's first chat turn) is rejected outright:
+      //   400 `tool_use` ids were found without `tool_result` blocks
+      // i.e. every conversation after a finalize would fail.
+      this.appendMessage({
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: call.id,
+            content:
+              "Finalized and loaded into the synth. The user can now play it and ask for changes. " +
+              "From here the target sample no longer matters — follow what they ask for.",
+          },
+        ],
+      });
+
       this.meta.pendingToolUseId = null;
       this.meta.pendingPresetId = null;
       this.meta.status = "done";
@@ -388,6 +438,23 @@ export class SessionDO extends DurableObject<Env> {
         distance: this.meta.bestDistance,
         suggestions,
       };
+    }
+
+    // Belt and braces: an unrecognized tool would otherwise fall through to the
+    // text branch and leave the same dangling tool_use that broke finalize.
+    // Answering it with an error lets the model correct itself next turn.
+    if (call) {
+      this.appendMessage({
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: `Unknown tool "${call.name}". Use propose_preset or finalize.`,
+            is_error: true,
+          },
+        ],
+      });
     }
 
     // Plain text answer (only reachable from chat, where tool_choice is "auto").
