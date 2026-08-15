@@ -154,8 +154,6 @@ function shell(): void {
 
 // --- keyboard --------------------------------------------------------------
 
-/** Two octaves, so a patch can be judged in more than one register. */
-const KB_SEMITONES = 24;
 const BLACK = new Set([1, 3, 6, 8, 10]);
 
 /**
@@ -176,6 +174,15 @@ const KEY_MAP: Record<string, number> = {
   // black
   w: 1, e: 3, t: 6, y: 8, u: 10, o: 13, p: 15,
 };
+
+/**
+ * Draw exactly the range QWERTY can reach — C up to the E an octave and a third
+ * above, `;` being the last usable key. Derived from KEY_MAP rather than
+ * hardcoded so the drawn keys and the playable ones cannot drift apart; keys
+ * you can see but not play are just a lie about the instrument.
+ * Z/X shift the whole span if you need another register.
+ */
+const KB_SEMITONES = Math.max(...Object.values(KEY_MAP)) + 1;
 
 /** Reverse lookup so each drawn key can print the letter that plays it. */
 const LABEL_FOR_SEMITONE = new Map<number, string>(
