@@ -30,7 +30,12 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm ci
+      # `npm install`, not `npm ci`: rolldown (via Vite 8) declares optional
+      # platform bindings that npm cannot resolve on any single host —
+      # @rolldown/binding-openharmony-arm64 never lands in the lockfile, and
+      # `npm ci` treats the gap as package.json/lock drift and refuses. install
+      # still honours the lockfile where it can, and tolerates that hole.
+      - run: npm install --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
