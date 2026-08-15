@@ -8,6 +8,16 @@ The product idea: a user uploads an audio sample. The browser analyzes it via ST
 
 The interesting claim being tested is the **closed render-compare loop** — the agent isn't guessing once, it's getting numeric feedback on its own output and correcting. That is the part worth protecting inside the timebox.
 
+### What this tool is actually for
+
+**The artifact is a preset, not a match.** The user uploads a sample as a *starting point for exploration*; what they keep and use is the patch. Success is "I like this sound and I'm going to play it", not "the distance went below 12".
+
+**The samples are usually not FM sounds.** The test corpus is Monopoly, JD-800, Juno-106, TR-808, upright bass DI, and hand percussion. A 4-op FM patch cannot become a PWM analog lead or a sampled shaker, and isn't meant to. The goal is to capture what makes a sound recognizable — brightness, movement, attack, harmonic character — in a patch that's worth playing on its own terms.
+
+**"If it sounds good, it is good."** The distance is a *compass, not a score*: it tells the agent which way to walk, not when to be satisfied. A distance of 30 on a sound FM can't natively make is a success. Chasing the last few points at the cost of musicality is the wrong trade, and the agent is explicitly instructed to prefer the sound over the number — including finalizing an earlier attempt that sounded more coherent than the numerically-best one.
+
+This shapes three things concretely: the system prompt (above), the `finalize` instruction (choose what you'd want to *play*), and chat mode (where the target is irrelevant and the user's ear is the only judge).
+
 ### Decisions already made (by the user)
 
 | Decision | Choice |

@@ -28,6 +28,8 @@ const DB_FLOOR = -60;
 const TAIL_DB = -45;
 /** Bins searched either side of the predicted harmonic bin. */
 const HARMONIC_SEARCH_BINS = 2;
+/** Spectral peaks counted as "tonal" when measuring noiseRatio. */
+const NOISE_PEAKS = 30;
 /** Fine amplitude envelope: 256-sample window, 64-sample hop (~1.5 ms at 44.1k). */
 const ENV_WIN = 256;
 const ENV_HOP = 64;
@@ -102,8 +104,13 @@ function ampEnvelope(x: Float32Array, sr: number): AmpEnvelope & { peakSample: n
   const { env, hop } = ampEnvelopeCurve(x);
   const msPerStep = (hop / sr) * 1000;
 
+  // The peak is the FIRST point that reaches (within 5% of) the maximum, not
+  // argmax. On a sustained tone the envelope is flat and argmax lands at a
+  // random ripple near the end, which would report a 1.4 s "attack".
+  let maxV = 0;
+  for (let k = 0; k < env.length; k++) if (env[k] > maxV) maxV = env[k];
   let kPeak = 0;
-  for (let k = 0; k < env.length; k++) if (env[k] > env[kPeak]) kPeak = k;
+  while (kPeak < env.length - 1 && env[kPeak] < 0.95 * maxV) kPeak++;
 
   const tailLevel = 10 ** (TAIL_DB / 20);
   let kLast = env.length - 1;
@@ -167,6 +174,41 @@ function findPeak(mags: Float64Array, targetHz: number, binHz: number): Peak {
   return { freq: (best + delta) * binHz, amp: Math.exp(ampLog) };
 }
 
+/**
+ * Fraction of frame energy that does NOT sit in a spectral peak.
+ *
+ * Deliberately f0-INDEPENDENT: it masks the strongest NOISE_PEAKS local maxima
+ * rather than a grid of h*f0 bins. A harmonic grid derived from a bad f0 (which
+ * is exactly what a clangorous or percussive sample produces) can end up masking
+ * most of the spectrum and reporting a noisy hit as perfectly clean. The masked
+ * bin count here is bounded no matter what the pitch detector says.
+ */
+function noiseRatioOf(mags: Float64Array): number {
+  const bins = mags.length;
+  let total = 0;
+  for (let b = 1; b < bins; b++) total += mags[b] * mags[b];
+  if (total <= 0) return 0;
+
+  const peaks: number[] = [];
+  for (let b = 2; b < bins - 1; b++) {
+    if (mags[b] > mags[b - 1] && mags[b] >= mags[b + 1]) peaks.push(b);
+  }
+  peaks.sort((p, q) => mags[q] - mags[p]);
+
+  const mask = new Uint8Array(bins);
+  const k = Math.min(NOISE_PEAKS, peaks.length);
+  for (let i = 0; i < k; i++) {
+    const c = peaks[i];
+    for (let d = -HARMONIC_SEARCH_BINS; d <= HARMONIC_SEARCH_BINS; d++) {
+      const b = c + d;
+      if (b >= 1 && b < bins) mask[b] = 1;
+    }
+  }
+  let tonal = 0;
+  for (let b = 1; b < bins; b++) if (mask[b]) tonal += mags[b] * mags[b];
+  return clamp(1 - tonal / total, 0, 1);
+}
+
 export function extractFeatures(data: Float32Array, sampleRate: number): FeatureSummary {
   const sr = sampleRate;
   const N = STFT.fftSize;
@@ -225,7 +267,6 @@ export function extractFeatures(data: Float32Array, sampleRate: number): Feature
 
   // --- per-frame features ----------------------------------------------------
   const nyquist = sr / 2;
-  const maxHarmonic = Math.max(1, Math.floor(nyquist / f0) - 1);
 
   const frames: FrameFeature[] = [];
   let inharmNum = 0;
@@ -269,21 +310,7 @@ export function extractFeatures(data: Float32Array, sampleRate: number): Feature
       else evenAcc += a;
     }
 
-    // Noise ratio: energy outside +/-2 bins of ANY harmonic (up to Nyquist),
-    // over total energy.
-    let total = 0;
-    for (let b = 1; b < bins; b++) total += mags[b] * mags[b];
-    const harmonicMask = new Uint8Array(bins);
-    for (let h = 1; h <= maxHarmonic; h++) {
-      const c = Math.round((h * f0) / binHz);
-      for (let d = -HARMONIC_SEARCH_BINS; d <= HARMONIC_SEARCH_BINS; d++) {
-        const b = c + d;
-        if (b >= 1 && b < bins) harmonicMask[b] = 1;
-      }
-    }
-    let harmonic = 0;
-    for (let b = 1; b < bins; b++) if (harmonicMask[b]) harmonic += mags[b] * mags[b];
-    noiseAcc += total > 0 ? clamp(1 - harmonic / total, 0, 1) : 0;
+    noiseAcc += noiseRatioOf(mags);
 
     // Spectral centroid, expressed in harmonic numbers.
     let cNum = 0;

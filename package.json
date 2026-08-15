@@ -10,7 +10,8 @@
     "deploy": "npm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit",
-    "test:dsp": "node --experimental-strip-types scripts/dsp-selftest.ts"
+    "test:dsp": "node --experimental-strip-types scripts/dsp-selftest.ts",
+    "analyze": "node --experimental-strip-types scripts/analyze-samples.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

@@ -91,6 +91,22 @@ export function detectF0(x: Float32Array, sr: number, offset: number): F0Estimat
   }
   if (best < 0) return { f0: 0, confidence: 0 };
 
+  // 3b. octave guard. YIN's classic failure is locking onto a sub-multiple of
+  // the true period (reporting 60 Hz for a 220 Hz clang). If a lag at best/k is
+  // nearly as good, prefer it — the shorter period is the real one.
+  for (let k = 4; k >= 2; k--) {
+    const cand = Math.round(best / k);
+    if (cand < tauMin || cand > tauMax) continue;
+    let localBest = cand;
+    for (let t = Math.max(tauMin, cand - 2); t <= Math.min(tauMax, cand + 2); t++) {
+      if (cmnd[t] < cmnd[localBest]) localBest = t;
+    }
+    if (cmnd[localBest] < cmnd[best] + 0.1) {
+      best = localBest;
+      break;
+    }
+  }
+
   // 4. parabolic interpolation around the dip — this is what turns an integer
   //    lag into sub-0.5% pitch accuracy.
   let refined = best;
