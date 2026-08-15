@@ -25,10 +25,31 @@
 
       /* Two columns: iterations live in the rail, the instrument stays centre stage. */
       .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
-      .rail { position: sticky; top: 24px; }
+
+      /* The rail scrolls independently so the drop zone and keyboard never move,
+         however many iterations pile up. min-height:0 is what actually lets a
+         grid/flex child shrink enough for the inner list to scroll. */
+      .rail {
+        position: sticky; top: 24px;
+        max-height: calc(100vh - 48px);
+        display: flex; flex-direction: column; min-height: 0;
+      }
+      .rail > .panel {
+        display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+        margin-bottom: 0;
+      }
+      #attempts {
+        overflow-y: auto; min-height: 0; flex: 1;
+        margin: 0 -18px -18px; padding: 0 18px 18px;  /* let rows bleed to the panel edge */
+        scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+      }
+      #attempts::-webkit-scrollbar { width: 8px; }
+      #attempts::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+      #attempts::-webkit-scrollbar-track { background: transparent; }
+
       @media (max-width: 860px) {
         .layout { grid-template-columns: minmax(0, 1fr); }
-        .rail { position: static; order: 2; }
+        .rail { position: static; order: 2; max-height: 46vh; }
       }
 
       /* "working" indicator */
@@ -126,7 +147,7 @@
       }
       .chip:hover:not(:disabled) { background: #2f2b42; border-color: var(--accent); }
     </style>
-    <script type="module" crossorigin src="/assets/index-Co0nH00f.js"></script>
+    <script type="module" crossorigin src="/assets/index-Ws2UZ7x-.js"></script>
   </head>
   <body>
     <main id="app">

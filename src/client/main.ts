@@ -63,6 +63,8 @@ const state = {
   current: null as ClaudioPreset | null,
   loadedPresetId: null as string | null,
   busy: false,
+  /** Auto-scroll the rail to the newest attempt — until the user scrolls up. */
+  followLatest: true,
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
@@ -136,6 +138,12 @@ function shell(): void {
     drop.classList.remove("over");
     const f = e.dataTransfer?.files?.[0];
     if (f) start(f);
+  });
+
+  const attempts = $("attempts");
+  attempts?.addEventListener("scroll", () => {
+    const atBottom = attempts.scrollHeight - attempts.scrollTop - attempts.clientHeight < 24;
+    state.followLatest = atBottom;
   });
 
   $("send")?.addEventListener("click", () => sendChat());
@@ -333,6 +341,11 @@ function renderAttempts(): void {
       if (a) await loadPreset(a.preset, a.presetId, { audition: true });
     });
   });
+
+  // Follow the newest row. scrollTop rather than scrollIntoView: the latter
+  // would scroll the PAGE to bring the rail into view, which is exactly the
+  // main-view movement this pane exists to prevent.
+  if (state.followLatest) list.scrollTop = list.scrollHeight;
 }
 
 /**
