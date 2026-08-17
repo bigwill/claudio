@@ -86,32 +86,19 @@ Each needs its own key: `npx wrangler secret put ANTHROPIC_API_KEY [--env produc
 > `dist/`, so a deploy-time `--env` flag is silently ignored and you end up
 > deploying to the wrong Worker. `npm run deploy:prod` sets it correctly.
 
-### CI
+### Releasing
 
-`.github/workflows/deploy.yml` deploys on push:
-
-| Branch pushed | Deploys to |
-|---|---|
-| `develop` | `claudio` (workers.dev) |
-| `main` | `claudio-prod` |
-
-**Merging to `main` and pushing is the production deploy** — there is no separate
-release step. Each run typechecks, runs the DSP self-test, deploys, then smoke-tests
-`/api/ping` and fails if the app doesn't come back healthy (a green deploy serving a
-broken app is worse than a red one).
-
-This exists because hand-deploying drifted: production once sat five features behind
-develop with nothing surfacing that fact.
-
-Requires two repo secrets. `CLOUDFLARE_ACCOUNT_ID` is already set; create the token at
-**Cloudflare → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers"**, then:
+Deploys are run locally with wrangler; there's no CI. Production is a separate
+Worker, so it does **not** update when you deploy develop — merging to `main`
+and deploying are two steps:
 
 ```bash
-gh secret set CLOUDFLARE_API_TOKEN --repo bigwill/claudio
+git -C /path/to/main-worktree merge develop && git push origin main
+npm run deploy:prod
 ```
 
-`ANTHROPIC_API_KEY` is *not* managed here — it lives on each Worker via
-`wrangler secret put`, and deploys don't touch it.
+Production drifted five features behind develop once by skipping the second
+line, so it's worth checking `/api/ping` on `claudio-prod` after a release.
 
 **Custom domain prerequisite.** `custom_domain: true` requires **Cloudflare to be
 authoritative for the hostname's zone**. The route is currently commented out in
