@@ -113,8 +113,37 @@ export function buildVoice(p: ClaudioPreset): Tone.FMSynth {
  */
 let liveVoice: Tone.PolySynth<Tone.FMSynth> | null = null;
 let liveLimiter: Tone.Limiter | null = null;
+let liveSpace: { send: Tone.Filter; reverb: Tone.Freeverb; level: Tone.Gain } | null = null;
 let livePreset: ClaudioPreset | null = null;
 let started = false;
+
+/**
+ * A little room on the live output — and ONLY the live output.
+ *
+ * Dry oscillators sound dead to anyone whose reference is finished records, so
+ * a bare patch gets judged against a mix it was never going to be. Every
+ * hardware synth ships onboard FX for this reason. The preset is still the
+ * artifact; this is the instrument it gets played through.
+ *
+ * Wired as a parallel SEND, not inline, and highpassed before the tank:
+ * a wet sub-bass just smears, so the fundamental stays dry and tight while the
+ * upper partials get air. Freeverb rather than Tone.Reverb because it is
+ * algorithmic and needs no async `generate()` — setLivePreset is synchronous.
+ *
+ * renderPreset() must never see any of this. It measures the preset, and a
+ * reverb tail would corrupt decay, release and noiseRatio alike, which would
+ * quietly poison every distance in the agent loop.
+ *
+ * Measured, not guessed (offline renders of this exact chain):
+ *   roomSize 0.72 -> 0.90s tail (too dry to help), 0.92 -> 2.85s (washes out).
+ *   0.85 gives 1.65s, a real room.
+ * At these values a bell sits -7.4 dB below dry and a 55 Hz bass -31 dB, with
+ * only 2% of its sub energy reaching the tank. The send self-balances by
+ * register — bright content gets air, low content stays tight — which is what a
+ * mix engineer would do by hand. `send` is the one number to turn if it wants
+ * to be drier.
+ */
+const SPACE = { send: 0.15, roomSize: 0.85, dampening: 2600, highpassHz: 320 };
 
 /**
  * Resume the live AudioContext. MUST be called from a user gesture handler
@@ -143,7 +172,21 @@ export function setLivePreset(p: ClaudioPreset): void {
   // mess the moment you hold a chord" — the offline render path has no such
   // node, deliberately, since it must measure the preset and not a limiter.
   if (!liveLimiter) liveLimiter = new Tone.Limiter(-2).toDestination();
-  liveVoice = new Tone.PolySynth(Tone.FMSynth, presetToOptions(c)).connect(liveLimiter);
+  if (!liveSpace) {
+    const level = new Tone.Gain(SPACE.send).connect(liveLimiter);
+    // wet: 1 — the tank runs fully wet and `level` sets how much returns,
+    // which is what makes this a send rather than an insert.
+    const reverb = new Tone.Freeverb({
+      roomSize: SPACE.roomSize,
+      dampening: SPACE.dampening,
+      wet: 1,
+    }).connect(level);
+    const send = new Tone.Filter(SPACE.highpassHz, "highpass").connect(reverb);
+    liveSpace = { send, reverb, level };
+  }
+  liveVoice = new Tone.PolySynth(Tone.FMSynth, presetToOptions(c));
+  liveVoice.connect(liveLimiter); // dry
+  liveVoice.connect(liveSpace.send); // send
   // Plenty for ten fingers; the cap only matters as a voice-stealing backstop.
   liveVoice.maxPolyphony = 16;
 }
