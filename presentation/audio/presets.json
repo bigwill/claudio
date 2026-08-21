@@ -1,0 +1,142 @@
+[
+  {
+    "cat": "bell",
+    "prompt": "a glassy bell, bright and ringing",
+    "preset": {
+      "name": "Glass Tine Bell",
+      "harmonicity": 3.47,
+      "modulationIndex": 9,
+      "carrierWave": "sine",
+      "modulatorWave": "sine",
+      "carrierFm": {
+        "ratio": 7.02,
+        "index": 2
+      },
+      "modulatorFm": {
+        "ratio": 1,
+        "index": 0
+      },
+      "ampEnv": {
+        "attack": 0.002,
+        "decay": 2.6,
+        "sustain": 0,
+        "release": 1.8
+      },
+      "modEnv": {
+        "attack": 0.001,
+        "decay": 0.7,
+        "sustain": 0.12,
+        "release": 0.9
+      },
+      "detune": 3,
+      "gain": 0.75
+    },
+    "rationale": "A struck glass bell: instant ping, bright shimmering attack (centroid 6.4) mellowing into a clean inharmonic ring that decays away. Sparkle sits in the upper partials from the high-ratio inner FM.",
+    "sessionId": "J35NH26BECWS"
+  },
+  {
+    "cat": "bass",
+    "prompt": "a dark rubbery bass with a short percussive thump",
+    "preset": {
+      "name": "Rubber Thumb Bass",
+      "harmonicity": 1,
+      "modulationIndex": 4,
+      "carrierWave": "sine",
+      "modulatorWave": "sine",
+      "carrierFm": {
+        "ratio": 0.5,
+        "index": 1.2
+      },
+      "modulatorFm": {
+        "ratio": 1,
+        "index": 0
+      },
+      "ampEnv": {
+        "attack": 0.003,
+        "decay": 0.13,
+        "sustain": 0.08,
+        "release": 0.08
+      },
+      "modEnv": {
+        "attack": 0.001,
+        "decay": 0.035,
+        "sustain": 0,
+        "release": 0.04
+      },
+      "detune": 0,
+      "gain": 0.85
+    },
+    "rationale": "Sub-heavy sine bass with a 1 ms thump: the brightness lives only in the first 35 ms, then the tone collapses to a dark, rubbery near-sine with a slight sub-octave wobble from the inner operator.",
+    "sessionId": "5734ADAT6SQN"
+  },
+  {
+    "cat": "lead",
+    "prompt": "an acid lead with grit and bite",
+    "preset": {
+      "name": "Acid Fang",
+      "harmonicity": 2,
+      "modulationIndex": 14,
+      "carrierWave": "sawtooth",
+      "modulatorWave": "square",
+      "carrierFm": {
+        "ratio": 1,
+        "index": 2
+      },
+      "modulatorFm": {
+        "ratio": 3.01,
+        "index": 3
+      },
+      "ampEnv": {
+        "attack": 0.004,
+        "decay": 0.16,
+        "sustain": 0.5,
+        "release": 0.1
+      },
+      "modEnv": {
+        "attack": 0.002,
+        "decay": 0.1,
+        "sustain": 0.25,
+        "release": 0.08
+      },
+      "detune": 6,
+      "gain": 0.8
+    },
+    "rationale": "A snarling 303-style lead: sawtooth carrier buzz, square modulator for gritty odd-harmonic bite, and a fast modEnv blip that mimics a resonant filter snapping shut on every note. Slightly tamed index and shorter modEnv decay so the bite reads as a squelch rather than constant fizz.",
+    "sessionId": "Z3W72D0EQ5ZE"
+  },
+  {
+    "cat": "pad",
+    "prompt": "a slow glacial pad that swells in",
+    "preset": {
+      "name": "Glacier Swell",
+      "harmonicity": 2,
+      "modulationIndex": 6,
+      "carrierWave": "triangle",
+      "modulatorWave": "sine",
+      "carrierFm": {
+        "ratio": 1,
+        "index": 1.5
+      },
+      "modulatorFm": {
+        "ratio": 3.01,
+        "index": 2
+      },
+      "ampEnv": {
+        "attack": 2.2,
+        "decay": 1.5,
+        "sustain": 0.85,
+        "release": 3.5
+      },
+      "modEnv": {
+        "attack": 3.5,
+        "decay": 2,
+        "sustain": 0.7,
+        "release": 3.5
+      },
+      "detune": 7,
+      "gain": 0.7
+    },
+    "rationale": "A slow-blooming hollow pad: ~0.9s measured fade-in with brightness still rising after the volume arrives, long tail, cold clarinet-ish harmonics with a faint shimmer. Glacial and patient — hold notes and it keeps opening.",
+    "sessionId": "J9JER2PSDDKZ"
+  }
+]
