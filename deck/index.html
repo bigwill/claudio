@@ -1,4 +1,4 @@
-<title>Stay in the Music</title>
+<title>Sound Design Without Ears</title>
 <style>
   :root {
     --ground: #14131a;
@@ -83,23 +83,6 @@
     color: var(--dim); letter-spacing: .05em; margin-top: 12px; max-width: 52ch;
   }
 
-  /* Two figures side by side — the module you love, and the patch you dread.
-     Both viewBoxes share an aspect ratio so the pair sits on one baseline. */
-  .pair {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: clamp(16px, 2.4vw, 40px); align-items: start;
-    margin-top: clamp(14px, 2vw, 30px);
-  }
-  /* Both viewBoxes letterbox inside a capped height (preserveAspectRatio meet),
-     which is what keeps this slide — the only one carrying two figures plus a
-     headline and a lede — inside 16:9. Without the cap the pair runs off-stage. */
-  .pair figure svg { max-height: 30vh; }
-  .pair figcaption { margin-top: 9px; }
-
-  /* One slide carries more than the rest; dial the headline back so it fits. */
-  .slide[data-tight] h1 { font-size: clamp(26px, 3.1vw, 50px); max-width: 30ch; }
-  .slide[data-tight] .lede { font-size: clamp(13px, 1.15vw, 18px); max-width: 62ch; }
-
   /* --- real output blocks ---------------------------------------------- */
   .code {
     font-family: var(--mono);
@@ -145,22 +128,13 @@
   ol.shots b { color: var(--ink); font-weight: 600; }
   ol.shots::marker, ol.shots li::marker { color: var(--accent); font-family: var(--mono); }
 
-  /* Adjective chips — a preset browser's search field, quoted back at it. */
-  .chips { display: flex; flex-wrap: wrap; gap: .55em; margin-top: 1.1em; }
-  .chips span {
-    font-family: var(--mono); font-size: clamp(11px, 1.05vw, 17px);
-    border: 1px solid var(--line); border-radius: 999px;
-    padding: .42em 1em; color: var(--dim); background: var(--panel);
+  .slot {
+    border: 1px dashed var(--line); border-radius: 10px; background: var(--panel);
+    aspect-ratio: 16 / 10; display: grid; place-content: center; gap: 8px; text-align: center; padding: 20px;
   }
-  .chips span.hot { color: var(--ground); background: var(--accent); border-color: var(--accent); }
-
-  /* A live-keyboard callout: the claim the whole deck rests on. */
-  .flag {
-    margin-top: 1.1em; padding: .8em 1.1em;
-    border: 1px solid var(--accent); border-radius: 8px;
-    font-size: clamp(12px, 1.15vw, 18px); color: var(--ink); max-width: 44ch;
-  }
-  .flag b { color: var(--accent); font-weight: 600; }
+  .slot .k { font-family: var(--mono); font-size: clamp(11px, .95vw, 14px); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  .slot .h { font-size: clamp(12px, 1vw, 15px); color: var(--dim); max-width: 34ch; }
+  .slot img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
 
   /* --- demo hand-off ---------------------------------------------------- */
   .slide[data-demo] { background:
@@ -210,49 +184,28 @@
 
 <div class="stage" id="stage">
 
-  <!-- 1 · TITLE ---------------------------------------------------------- -->
+  <!-- 1 ------------------------------------------------------------------ -->
   <section class="slide on" data-era="now"
-    data-notes="Sound design is the part of making music where you stop making music. I built Claudio: an agent that programs an FM synth while you keep playing."
-    data-tc="0:00 – 0:14" data-cue="Open cold on the claim. Don't explain it yet — slide 2 does that.">
+    data-notes="Sound design is a job. You have a sound in your head, the instrument has a few dozen parameters, and the work is getting from one to the other. In FM that job has been unreasonably hard for forty years. This is about handing it to an agent — one that cannot hear a thing."
+    data-tc="0:00 – 0:15" data-cue="Open cold. 'Cannot hear a thing' is the hook — let it land.">
     <div class="eyebrow"><span>Claudio</span><span class="yr">Humble Audio</span></div>
     <div class="body">
       <div>
-        <h1>Sound design is the part of making music where you <em>stop making music</em>.</h1>
-        <p class="lede">An agent that programs an FM synthesizer from a sentence — while the keyboard stays under your hands.</p>
+        <h1>Sound design, done by something that can't <em>hear</em>.</h1>
+        <p class="lede">An agent that programs an FM synthesizer from a sample or a sentence — and checks its own work with a spectrum analyser instead of ears.</p>
       </div>
     </div>
   </section>
 
-  <!-- 2 · THE INGREDIENTS ------------------------------------------------ -->
+  <!-- 2 ------------------------------------------------------------------ -->
   <section class="slide"
-    data-notes="A band walks in with its instruments. A guitar sounds like a guitar. If you make electronic music you start from nothing, and every ingredient in the track is a decision you have to make. Not the famous ones. The ordinary ones: the bell is too bright, the bass has no thumb, the kick doesn't hit. Hundreds of those, every session, and all of them yours."
-    data-tc="0:14 – 0:44" data-cue="Keep it at working scale. These are Tuesday problems, not history.">
-    <div class="eyebrow"><span>The work</span><span class="yr">Ingredients</span></div>
-    <div class="body split">
-      <div>
-        <h1>A band brings instruments. You have to <em>build</em> yours.</h1>
-        <p class="lede">In electronic music the palette isn't bought, it's authored. Before a note gets written, somebody decides what the thing even sounds like.</p>
-      </div>
-      <div>
-        <ul class="beats">
-          <li><b>too bright</b><span>the bell you wanted <i>glassy</i>, not glaring</span></li>
-          <li><b>no thumb</b><span>the bass has body but no <i>attack</i></span></li>
-          <li><b>won't hit</b><span>the kick is loud and still doesn't <i>land</i></span></li>
-        </ul>
-        <p class="lede" style="margin-top:1.2em">Hundreds of these a session. Every one of them yours.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 3 · FM, BRIEFLY ---------------------------------------------------- -->
-  <section class="slide"
-    data-notes="Claudio drives an FM synth, so here's FM in one breath. Take vibrato and speed it up. Past about twenty wobbles a second your ear stops following it, and it stops being movement — it collapses into a new tone with a cluster of new partials around it. Enormous range, almost no computation. That's why Yamaha bought it."
-    data-tc="0:44 – 1:10" data-cue="One breath. Point at the sidebands on the right and move on.">
-    <div class="eyebrow"><span>The engine</span><span class="yr">FM, in one breath</span></div>
+    data-notes="Quick context. In 1967 John Chowning was experimenting with vibrato at Stanford, pushing the wobble faster and faster. Past about twenty times a second the ear stops tracking it, and the vibrato doesn't speed up — it disappears, and a completely new tone takes its place. That's FM. Enormous timbral range from almost no computation, which is why Yamaha licensed it."
+    data-tc="0:15 – 0:45" data-cue="Brisk. This is setup, not the story.">
+    <div class="eyebrow"><span>Where it comes from</span><span class="yr">1967 · Stanford</span></div>
     <div class="body split">
       <div>
         <h1>Vibrato, pushed past hearing, becomes <em>timbre</em>.</h1>
-        <p class="lede">Past roughly 20&nbsp;Hz the ear stops following the wobble and it collapses into a new tone. Huge range, almost no computation.</p>
+        <p class="lede">Past roughly 20&nbsp;Hz the ear stops following the wobble, and it collapses into a new tone. Huge range, almost no computation.</p>
       </div>
       <figure>
         <svg viewBox="0 0 620 260" role="img" aria-label="A slow vibrato shown as a single wobbling spectral peak; a fast vibrato shown as a peak surrounded by discrete sidebands.">
@@ -278,172 +231,99 @@
     </div>
   </section>
 
-  <!-- 4 · THE PANEL ISN'T THE PROBLEM ------------------------------------ -->
-  <section class="slide" data-tight
-    data-notes="Here's a module I designed. Four operators. I'm proud of it. Here's it in use. The panel isn't the problem — it's lovely. The problem is the distance between wanting a woodier bass and knowing which of these to turn. This engine has no brightness parameter. Where a synth gives you one, somebody hand-built it. I build these, and even I have to sit down and think."
-    data-tc="1:10 – 1:40" data-cue="Warmth on the left image, rueful on the right. Never disparage the module.">
-    <div class="eyebrow"><span>The gap</span><span class="yr">Intention → parameters</span></div>
-    <div class="body">
+  <!-- 3 ------------------------------------------------------------------ -->
+  <section class="slide"
+    data-notes="Sixteen years later it became the DX7 — two hundred thousand units, on basically every record of the eighties. And here's the tell: almost nobody programmed one. The presets were good, and they became the ceiling. The best-selling synth in history turned into a preset machine, because the sound design job was too hard."
+    data-tc="0:45 – 1:15" data-cue="Land 'preset machine'. This is the evidence the task is hard.">
+    <div class="eyebrow"><span>The tell</span><span class="yr">1983 · Yamaha DX7</span></div>
+    <div class="body split">
       <div>
-        <h1>The panel isn't the problem. The <em>translation</em> is.</h1>
-        <p class="lede">There's no brightness parameter in an FM engine. Where a synth offers you one, a human hand-built it — a macro over modulation levels, tuned for that patch.</p>
-        <div class="pair">
-          <figure>
-            <svg viewBox="0 0 460 280" role="img" aria-label="A single Eurorack module panel with a clean grid of knobs and a row of jacks.">
-              <rect x="150" y="14" width="160" height="252" rx="6" fill="#1c1a24" stroke="#e0a35c" stroke-width="1.5"/>
-              <text x="230" y="40" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" fill="#e0a35c" letter-spacing="2">QUAD OP</text>
-              <g stroke="#948fa8" stroke-width="1.4" fill="none">
-                <circle cx="192" cy="72" r="13"/><circle cx="230" cy="72" r="13"/><circle cx="268" cy="72" r="13"/>
-                <circle cx="192" cy="116" r="13"/><circle cx="230" cy="116" r="13"/><circle cx="268" cy="116" r="13"/>
-                <circle cx="192" cy="160" r="13"/><circle cx="230" cy="160" r="13"/><circle cx="268" cy="160" r="13"/>
-              </g>
-              <g stroke="#ece9f5" stroke-width="1.4">
-                <path d="M192 72 L186 62"/><path d="M230 72 L238 63"/><path d="M268 72 L268 59"/>
-                <path d="M192 116 L200 107"/><path d="M230 116 L222 107"/><path d="M268 116 L276 124"/>
-                <path d="M192 160 L192 147"/><path d="M230 160 L239 152"/><path d="M268 160 L260 151"/>
-              </g>
-              <g fill="none" stroke="#948fa8" stroke-width="1.2">
-                <circle cx="185" cy="208" r="7"/><circle cx="215" cy="208" r="7"/>
-                <circle cx="245" cy="208" r="7"/><circle cx="275" cy="208" r="7"/>
-                <circle cx="185" cy="240" r="7"/><circle cx="215" cy="240" r="7"/>
-                <circle cx="245" cy="240" r="7"/><circle cx="275" cy="240" r="7"/>
-              </g>
-            </svg>
-            <figcaption>One module. Legible, and I'm proud of it.</figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="0 0 460 280" role="img" aria-label="A three-row modular rack densely covered in patch cables crossing at every angle.">
-              <g fill="#1c1a24" stroke="#302d3d" stroke-width="1.2">
-                <rect x="8" y="14" width="52" height="76" rx="3"/><rect x="66" y="14" width="72" height="76" rx="3"/>
-                <rect x="144" y="14" width="44" height="76" rx="3"/><rect x="194" y="14" width="86" height="76" rx="3"/>
-                <rect x="286" y="14" width="56" height="76" rx="3"/><rect x="348" y="14" width="104" height="76" rx="3"/>
-                <rect x="8" y="98" width="84" height="76" rx="3"/><rect x="98" y="98" width="48" height="76" rx="3"/>
-                <rect x="152" y="98" width="96" height="76" rx="3"/><rect x="254" y="98" width="52" height="76" rx="3"/>
-                <rect x="312" y="98" width="68" height="76" rx="3"/><rect x="386" y="98" width="66" height="76" rx="3"/>
-                <rect x="8" y="182" width="66" height="76" rx="3"/><rect x="80" y="182" width="92" height="76" rx="3"/>
-                <rect x="178" y="182" width="50" height="76" rx="3"/><rect x="234" y="182" width="78" height="76" rx="3"/>
-                <rect x="318" y="182" width="60" height="76" rx="3"/><rect x="384" y="182" width="68" height="76" rx="3"/>
-              </g>
-              <!-- knobs: enough panel detail that the grid reads as modules, not tiles -->
-              <g fill="none" stroke="#4a4560" stroke-width="1.1">
-                <circle cx="26" cy="36" r="5"/><circle cx="44" cy="36" r="5"/>
-                <circle cx="88" cy="34" r="5"/><circle cx="108" cy="34" r="5"/><circle cx="128" cy="34" r="5"/>
-                <circle cx="88" cy="52" r="5"/><circle cx="108" cy="52" r="5"/><circle cx="128" cy="52" r="5"/>
-                <circle cx="166" cy="40" r="6"/>
-                <circle cx="212" cy="36" r="5"/><circle cx="240" cy="36" r="5"/><circle cx="268" cy="36" r="5"/>
-                <circle cx="212" cy="56" r="5"/><circle cx="240" cy="56" r="5"/><circle cx="268" cy="56" r="5"/>
-                <circle cx="314" cy="40" r="6"/><circle cx="376" cy="36" r="5"/><circle cx="404" cy="36" r="5"/>
-                <circle cx="432" cy="36" r="5"/><circle cx="376" cy="56" r="5"/><circle cx="404" cy="56" r="5"/>
-                <circle cx="30" cy="120" r="5"/><circle cx="52" cy="120" r="5"/><circle cx="74" cy="120" r="5"/>
-                <circle cx="122" cy="122" r="6"/><circle cx="176" cy="120" r="5"/><circle cx="200" cy="120" r="5"/>
-                <circle cx="224" cy="120" r="5"/><circle cx="278" cy="122" r="6"/><circle cx="336" cy="120" r="5"/>
-                <circle cx="358" cy="120" r="5"/><circle cx="410" cy="120" r="5"/><circle cx="432" cy="120" r="5"/>
-                <circle cx="30" cy="204" r="5"/><circle cx="52" cy="204" r="5"/>
-                <circle cx="104" cy="204" r="5"/><circle cx="128" cy="204" r="5"/><circle cx="152" cy="204" r="5"/>
-                <circle cx="202" cy="206" r="6"/><circle cx="260" cy="204" r="5"/><circle cx="284" cy="204" r="5"/>
-                <circle cx="342" cy="206" r="6"/><circle cx="408" cy="204" r="5"/><circle cx="430" cy="204" r="5"/>
-              </g>
-              <g fill="#413c56">
-                <circle cx="26" cy="76" r="3"/><circle cx="44" cy="76" r="3"/><circle cx="90" cy="76" r="3"/><circle cx="114" cy="76" r="3"/>
-                <circle cx="164" cy="76" r="3"/><circle cx="216" cy="76" r="3"/><circle cx="248" cy="76" r="3"/><circle cx="308" cy="76" r="3"/>
-                <circle cx="370" cy="76" r="3"/><circle cx="410" cy="76" r="3"/><circle cx="30" cy="160" r="3"/><circle cx="66" cy="160" r="3"/>
-                <circle cx="120" cy="160" r="3"/><circle cx="180" cy="160" r="3"/><circle cx="222" cy="160" r="3"/><circle cx="276" cy="160" r="3"/>
-                <circle cx="340" cy="160" r="3"/><circle cx="412" cy="160" r="3"/><circle cx="34" cy="244" r="3"/><circle cx="110" cy="244" r="3"/>
-                <circle cx="200" cy="244" r="3"/><circle cx="266" cy="244" r="3"/><circle cx="344" cy="244" r="3"/><circle cx="418" cy="244" r="3"/>
-              </g>
-              <g fill="none" stroke="#e0a35c" stroke-width="1.6" stroke-linecap="round">
-                <path d="M26 76 C 60 130, 90 118, 120 160" opacity=".75"/>
-                <path d="M44 76 C 120 118, 210 132, 276 160" opacity=".6"/>
-                <path d="M90 76 C 130 140, 30 190, 34 244" opacity=".7"/>
-                <path d="M114 76 C 200 100, 300 120, 340 160" opacity=".5"/>
-                <path d="M164 76 C 190 130, 240 140, 222 160" opacity=".8"/>
-                <path d="M216 76 C 260 120, 380 110, 412 160" opacity=".55"/>
-                <path d="M248 76 C 300 150, 150 210, 110 244" opacity=".65"/>
-                <path d="M308 76 C 330 130, 260 200, 200 244" opacity=".5"/>
-                <path d="M370 76 C 400 130, 420 190, 418 244" opacity=".7"/>
-                <path d="M410 76 C 360 120, 330 140, 340 160" opacity=".45"/>
-                <path d="M30 160 C 70 200, 140 210, 200 244" opacity=".6"/>
-                <path d="M66 160 C 120 210, 220 230, 266 244" opacity=".5"/>
-                <path d="M180 160 C 240 190, 300 220, 344 244" opacity=".7"/>
-                <path d="M120 160 C 60 190, 20 210, 34 244" opacity=".55"/>
-              </g>
-            </svg>
-            <figcaption>And this is what using it looks like.</figcaption>
-          </figure>
-        </div>
+        <div class="stat">200,000+<small>units · and almost nobody programmed one</small></div>
+        <p class="lede">The presets were good, so the presets became the ceiling. The best-selling synth ever made turned into a <strong>preset machine</strong>.</p>
+      </div>
+      <div class="slot" data-slot="dx7">
+        <div class="k">Image · DX7</div>
+        <div class="h">Photo of the DX7 — front panel and that two-line display.</div>
       </div>
     </div>
   </section>
 
-  <!-- 5 · PATCHING IS NOT PLAYING ---------------------------------------- -->
+  <!-- 4 ------------------------------------------------------------------ -->
   <section class="slide"
-    data-notes="But look at where the time goes. You had an idea. Twenty minutes later you're three menus deep asking whether that helped, and the idea is gone. Playing is fast, physical, in time. Patching is slow, analytical, out of time. You cannot be in both at once."
-    data-tc="1:40 – 2:02" data-cue="The emotional centre of the problem half. Say 'the idea is gone' plainly.">
-    <div class="eyebrow"><span>The cost</span><span class="yr">Two modes, one session</span></div>
+    data-notes="So why is it hard? On a subtractive synth there's a knob called filter cutoff. Turn it up, it gets brighter — same direction, every time. You can steer by ear. FM has no such knob. Brightness comes from the modulation index, but which partials you get comes from the frequency ratio, and how it all moves comes from the modulator's envelope. Shift one and the other two change meaning. No straight line from what you want to what you turn."
+    data-tc="1:15 – 1:50" data-cue="Most important explanatory slide. If this doesn't land, nothing after it does.">
+    <div class="eyebrow"><span>The task</span><span class="yr">Intention → parameters</span></div>
     <div class="body split">
       <div>
-        <h1>Patching is not <em>playing</em>.</h1>
-        <p class="lede">Playing is fast, physical, in time. Patching is slow, analytical, out of time. Nobody is in both at once — and the session is mostly the second one.</p>
+        <h1>There is no knob marked <em>brighter</em>.</h1>
+        <p class="lede">Subtractive gives you a monotonic dial you can steer by ear. FM gives you three coupled parameters where moving one changes what the others mean.</p>
       </div>
       <figure>
-        <svg viewBox="0 0 620 250" role="img" aria-label="Two timelines. The intended session is one continuous block of playing. The real session is a few short bursts of playing separated by long stretches of parameter hunting.">
-          <text x="0" y="14" font-family="ui-monospace, monospace" font-size="11" fill="#948fa8" letter-spacing="1.4">WHAT YOU SAT DOWN TO DO</text>
-          <rect x="0" y="30" width="620" height="30" rx="4" fill="#e0a35c" opacity=".85"/>
-          <text x="310" y="50" text-anchor="middle" font-family="ui-monospace, monospace" font-size="12" fill="#14131a">playing</text>
-
-          <text x="0" y="112" font-family="ui-monospace, monospace" font-size="11" fill="#948fa8" letter-spacing="1.4">WHERE THE HOUR WENT</text>
-          <rect x="0" y="128" width="46" height="30" rx="4" fill="#e0a35c" opacity=".85"/>
-          <rect x="52" y="128" width="168" height="30" rx="4" fill="#1c1a24" stroke="#302d3d" stroke-dasharray="3 4"/>
-          <rect x="226" y="128" width="28" height="30" rx="4" fill="#e0a35c" opacity=".85"/>
-          <rect x="260" y="128" width="132" height="30" rx="4" fill="#1c1a24" stroke="#302d3d" stroke-dasharray="3 4"/>
-          <rect x="398" y="128" width="20" height="30" rx="4" fill="#e0a35c" opacity=".85"/>
-          <rect x="424" y="128" width="196" height="30" rx="4" fill="#1c1a24" stroke="#302d3d" stroke-dasharray="3 4"/>
-
-          <g font-family="ui-monospace, monospace" font-size="10.5" fill="#948fa8">
-            <text x="136" y="180" text-anchor="middle">which parameter?</text>
-            <text x="326" y="180" text-anchor="middle">did that help?</text>
-            <text x="522" y="180" text-anchor="middle">undo. try again.</text>
+        <svg viewBox="0 0 620 280" role="img" aria-label="Left: a straight line from filter cutoff to brightness. Right: three coupled FM parameters feeding into which partials, how many, and how they change over time.">
+          <text x="0" y="14" font-family="ui-monospace, monospace" font-size="12" fill="#948fa8" letter-spacing="1">SUBTRACTIVE</text>
+          <line x1="8" y1="150" x2="240" y2="150" stroke="#302d3d"/>
+          <path d="M8 150 L240 62" stroke="#e0a35c" stroke-width="2.5"/>
+          <circle cx="240" cy="62" r="4" fill="#e0a35c"/>
+          <g font-family="ui-monospace, monospace" font-size="11" fill="#948fa8">
+            <text x="8" y="172">cutoff →</text>
+            <text x="150" y="172">brighter</text>
+            <text x="8" y="196" fill="#e0a35c">steer by ear</text>
           </g>
-          <line x1="0" y1="212" x2="620" y2="212" stroke="#302d3d"/>
-          <text x="0" y="234" font-family="ui-monospace, monospace" font-size="11" fill="#e0a35c">the idea you had at the start is gone by the second gap</text>
+
+          <line x1="290" y1="16" x2="290" y2="220" stroke="#302d3d"/>
+
+          <text x="330" y="14" font-family="ui-monospace, monospace" font-size="12" fill="#948fa8" letter-spacing="1">FM</text>
+          <g font-family="ui-monospace, monospace" font-size="11.5" fill="#ece9f5">
+            <text x="330" y="56">harmonicity</text>
+            <text x="330" y="106">modIndex</text>
+            <text x="330" y="156">modEnv</text>
+          </g>
+          <g font-family="ui-monospace, monospace" font-size="11.5" fill="#948fa8">
+            <text x="500" y="56">which partials</text>
+            <text x="500" y="106">how many</text>
+            <text x="500" y="156">how they move</text>
+          </g>
+          <g stroke="#e0a35c" stroke-width="1.5" opacity=".95">
+            <path d="M424 52 L494 52"/><path d="M424 102 L494 102"/><path d="M424 152 L494 152"/>
+          </g>
+          <g stroke="#e0a35c" stroke-width="1.2" opacity=".45" stroke-dasharray="3 4">
+            <path d="M424 56 L494 100"/><path d="M424 106 L494 54"/>
+            <path d="M424 106 L494 150"/><path d="M424 156 L494 104"/>
+          </g>
+          <text x="330" y="212" font-family="ui-monospace, monospace" font-size="11" fill="#e0a35c">every line changes the others</text>
         </svg>
+        <figcaption>Solid lines are the direct effect. Dashed lines are why you can't move just one thing.</figcaption>
       </figure>
     </div>
   </section>
 
-  <!-- 6 · SO: PRESETS, AND THE TELL -------------------------------------- -->
-  <section class="slide"
-    data-notes="So mostly they don't. Two hundred thousand DX7s sold, and most owners used the presets. Fifty years of friendlier interfaces later, here's where it ended up: in Ableton you now find sounds by typing gritty bass. People want to ask for a sound in words. That browser can only hand you one somebody else made."
-    data-tc="2:02 – 2:26" data-cue="Land on the chips. This is the hinge into Claudio — don't rush the last line.">
-    <div class="eyebrow"><span>The tell</span><span class="yr">1983 → now</span></div>
-    <div class="body split">
+  <!-- 5 ------------------------------------------------------------------ -->
+  <section class="slide" data-era="now"
+    data-notes="So take the job apart. Sound design is four moves: you form an intention, you translate it into parameter changes, you evaluate what came out, and you iterate. Claudio does all four — and the third one is where it gets strange, because it has no ears."
+    data-tc="1:50 – 2:10" data-cue="This is the map. Point at it; the next four slides walk it.">
+    <div class="eyebrow"><span>The job, taken apart</span><span class="yr">Four moves</span></div>
+    <div class="body">
       <div>
-        <div class="stat">200,000<small>DX7s · and most owners used the presets</small></div>
-        <p class="lede">The best-selling synth of the 1980s became a <strong>preset machine</strong>. Fifty years of friendlier interfaces later, you can read where it all ended up:</p>
-      </div>
-      <div>
-        <div class="code">Ableton Live 12 · browser
-
-  <u>gritty bass</u>
-  <u>airy strings</u></div>
-        <div class="chips">
-          <span class="hot">warm</span><span>plucky</span><span>metallic</span><span>dark</span><span>glassy</span>
-        </div>
-        <p class="lede" style="margin-top:1.3em"><strong>People already want to ask in words.</strong> A browser can only hand you a sound somebody else made.</p>
+        <h1>Four moves, and an agent that makes all of them.</h1>
+        <ul class="beats">
+          <li><b>1 · intend</b><span><i>know what you want</i> — a sample, or a sentence</span></li>
+          <li><b>2 · translate</b><span><i>know the engine</i> — which parameter moves which quality</span></li>
+          <li><b>3 · evaluate</b><span><i>hear what came out</i> — except it can't</span></li>
+          <li><b>4 · iterate</b><span><i>attribute the change, adjust</i></span></li>
+        </ul>
       </div>
     </div>
   </section>
 
-  <!-- 7 · SO JUST ASK ---------------------------------------------------- -->
+  <!-- 6 ------------------------------------------------------------------ -->
   <section class="slide" data-era="now"
-    data-notes="So ask, and let it build one. Drop in a sound you love, or just say it. I typed 'a dark rubbery bass with a short percussive thump' and got this back. And here's the part that matters: the keyboard stays live the whole time it's working. You play through it."
-    data-tc="2:26 – 2:48" data-cue="Read the prompt verbatim. Then hit the flag — that's the promise.">
-    <div class="eyebrow"><span>Claudio</span><span class="yr">Ask, don't turn</span></div>
+    data-notes="Move one is yours. Drop in a sound — any sound, it doesn't need to be an FM sound — or just type what you're after. Here's a real one: I typed a dark rubbery bass with a short percussive thump, and got back a patch called Rubber Thumb Bass. That's the whole input."
+    data-tc="2:10 – 2:30" data-cue="Read the prompt aloud verbatim — it shows how little you have to know.">
+    <div class="eyebrow"><span>1 · intend</span><span class="yr">A sample, or a sentence</span></div>
     <div class="body split">
       <div>
-        <h1>So ask — and let it <em>build</em> one.</h1>
-        <p class="lede">A sound you love, or a sentence. Nothing about operators, ratios or envelopes.</p>
-        <div class="flag"><b>The keyboard stays live while it works.</b> Twenty minutes of patching becomes forty-five seconds you can play through.</div>
+        <h1>The input is <em>what you want</em>, not what to turn.</h1>
+        <p class="lede">Drop in any audio — it needn't be an FM sound — or describe it. Nothing about operators, ratios, or envelopes.</p>
       </div>
       <div>
         <div class="code">“<u>a dark rubbery bass with a short
@@ -461,11 +341,51 @@ percussive thump</u>”
     </div>
   </section>
 
-  <!-- 8 · IT CHECKS ITS OWN WORK ----------------------------------------- -->
+  <!-- 7 ------------------------------------------------------------------ -->
   <section class="slide" data-era="now"
-    data-notes="And it isn't guessing. It renders each patch, measures it the same way it measured your sample, and gets told exactly what's wrong. Harmonic seven is thirty-two decibels too quiet at the attack. Every pass is an experiment, not a re-roll."
-    data-tc="2:48 – 3:06" data-cue="18 seconds, before the demo. Without this the falling number means nothing.">
-    <div class="eyebrow"><span>Why it isn't guessing</span><span class="yr">Closed measurement loop</span></div>
+    data-notes="Move two is the expertise, and it's the part that used to require you. The agent is given a causal model of this specific engine: modulation index is the brightness control, integer ratios give you harmonic tones and non-integer ratios give you bells, and — the one that matters most — the modulator's envelope IS the brightness contour over time. That last fact is why it can turn a phrase like short percussive thump into a number. Listen to it explain its own patch."
+    data-tc="2:30 – 3:00" data-cue="Read the agent's quote aloud. It's doing real synthesis reasoning.">
+    <div class="eyebrow"><span>2 · translate</span><span class="yr">The causal model</span></div>
+    <div class="body split">
+      <div>
+        <h1>Someone has to know that <em>modEnv is brightness over time</em>.</h1>
+        <p class="lede">The agent is handed the engine's causal model — index is brightness, integer ratios are harmonic, non-integer ratios ring like metal — and reasons from it.</p>
+      </div>
+      <div>
+        <blockquote>“…a very short modEnv decay to sustain 0.05, so the brightness is only a percussive thump at the front. Sub-ish carrierFm at ratio 0.5 adds rubbery body.”
+          <cite>the agent, explaining Rubber Thumb Bass</cite></blockquote>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 ------------------------------------------------------------------ -->
+  <section class="slide" data-era="now"
+    data-notes="Move three. A human evaluates by listening. The agent can't, so it measures instead. Every sample gets an STFT and comes back as a compact feature vector: pitch, how noisy it is, and twelve harmonic amplitudes captured at four points in time. Look at the real numbers from a chime here — the second harmonic is louder than the fundamental. The agent read exactly that and set the frequency ratio to 2. That's not a guess, it's a reading."
+    data-tc="3:00 – 3:30" data-cue="Point at the -12 and the 0. That's the inference, visible.">
+    <div class="eyebrow"><span>3 · evaluate</span><span class="yr">No ears · so, measurement</span></div>
+    <div class="body split">
+      <div>
+        <h1>It can't listen. So it <em>measures</em>.</h1>
+        <p class="lede">An STFT reduces any sound to twelve harmonics at four moments in time, plus pitch, noisiness and brightness. Small enough to reason about.</p>
+      </div>
+      <div>
+        <div class="code">f0            <b>991.9 Hz</b>  conf <b>0.99</b>
+inharmonicity <b>9 cents</b>   noise <b>0.00</b>
+brightness    <b>2.12 → 2.39 → 2.95 → 4.65</b>
+
+harmonics, at the attack (dB)
+  h1 <b>-12</b>   <u>h2 0</u>   h3 -60   h4 -60
+  h5 -60   h6 -39   h7 -60   h8 -60</div>
+        <div class="src">a real chime, as the agent receives it</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 ------------------------------------------------------------------ -->
+  <section class="slide" data-era="now"
+    data-notes="Move four closes the loop. The agent proposes a patch, the browser renders it offline and measures it with the exact same analysis, and the difference comes back as instructions: harmonic seven is thirty-two decibels too quiet at the attack. Your brightness decays too slowly. So every pass is an experiment with an attributable result, not a re-roll. That's the difference between a sound designer and a random patch generator."
+    data-tc="3:30 – 4:00" data-cue="The technical heart. Don't rush the diff line.">
+    <div class="eyebrow"><span>4 · iterate</span><span class="yr">Closed measurement loop</span></div>
     <div class="body split">
       <div>
         <h1>Every pass is an <em>experiment</em>, not a re-roll.</h1>
@@ -503,11 +423,11 @@ percussive thump</u>”
     </div>
   </section>
 
-  <!-- 9 · DEMO ----------------------------------------------------------- -->
+  <!-- 10 · DEMO ---------------------------------------------------------- -->
   <section class="slide" data-era="now" data-demo="1"
-    data-notes="I'll type 'glassy bell'. While it works — I can keep playing. Now a suggestion chip, no typing. Listen: it changes under my hands."
-    data-tc="3:06 – 4:06" data-cue="Shot 2 is the whole thesis. Keep both hands down while it thinks, and stop talking.">
-    <div class="eyebrow"><span class="rec"><span class="dot"></span>Demo</span><span class="yr">~60 seconds of screen capture</span></div>
+    data-notes="DEMO — roughly 45 seconds of screen capture. Talk over the first two shots, then stop talking and let the instrument be heard. The suggestion chip is the moment that sells it: one click, no typing, and the sound visibly changes."
+    data-tc="4:00 – 4:45" data-cue="Let the audio breathe. Silence is fine here.">
+    <div class="eyebrow"><span class="rec"><span class="dot"></span>Demo</span><span class="yr">~45 seconds of screen capture</span></div>
     <div class="body split">
       <div>
         <h1>Cut to the thing itself.</h1>
@@ -516,23 +436,24 @@ percussive thump</u>”
       <div>
         <ol class="shots">
           <li>Type <b>“glassy bell”</b> — iterations land in the rail</li>
-          <li><b>Play through the wait.</b> Both hands down while it thinks</li>
-          <li>Click a chip — <b>“more metallic and clangy”</b>. No typing</li>
-          <li><b>Keep playing.</b> It changes under your hands. Let it ring</li>
+          <li><b>Play the keyboard.</b> Let it ring; don't talk over it</li>
+          <li>Click a suggestion chip — <b>“more metallic and clangy”</b></li>
+          <li>Play again — the difference should be audible</li>
+          <li>Drop a real chime sample — watch the distance fall</li>
         </ol>
       </div>
     </div>
   </section>
 
-  <!-- 10 · COMPASS, NOT SCORE -------------------------------------------- -->
+  <!-- 11 ----------------------------------------------------------------- -->
   <section class="slide" data-era="now"
-    data-notes="The distance is a compass, not a score. FM will never be an upright bass, and chasing the last points makes it worse. So it prefers the sound. I asked for more thumb-pluck bite: now there's a real thumb snap — attack brightness jumps to 3.7 times and collapses within 45 milliseconds onto the same rubbery body."
-    data-tc="4:06 – 4:31" data-cue="Read the agent's reply aloud, all of it. It's doing real synthesis reasoning.">
+    data-notes="And that distance is a compass, not a score. FM will never become a sampled upright bass, and chasing the last few points makes the sound worse. So it's told to prefer the sound — and to finalise the patch it would rather play, even when an earlier one scored better."
+    data-tc="4:45 – 4:55" data-cue="This is the philosophy. Say it plainly.">
     <div class="eyebrow"><span>The rule</span><span class="yr">Compass, not score</span></div>
     <div class="body split">
       <div>
-        <h1>The number says which way to walk. Not when to be <em>happy</em>.</h1>
-        <p class="lede">FM will never be a real upright bass, and chasing the last few points makes the sound worse. So it's told to prefer the sound.</p>
+        <h1>The number tells it which way to walk. Not when to be <em>happy</em>.</h1>
+        <p class="lede">FM will never become a sampled upright bass, and chasing the last few points makes the sound worse. So it's told to prefer the sound — and to finalise the patch it would rather <strong>play</strong>.</p>
       </div>
       <div>
         <blockquote>“more thumb-pluck bite”
@@ -543,24 +464,24 @@ percussive thump</u>”
     </div>
   </section>
 
-  <!-- 11 · CLOSE --------------------------------------------------------- -->
+  <!-- 12 ----------------------------------------------------------------- -->
   <section class="slide" data-era="now"
-    data-notes="You get the minute back. That's the whole point. And the rule it works by is the one I'd want anyway: if it sounds good, it is good."
-    data-tc="4:31 – 4:45" data-cue="Land it, then two seconds of silence before you stop recording.">
+    data-notes="Forty years of instruments nobody could program, and the fix wasn't a better interface. It was moving the expertise."
+    data-tc="4:55 – 5:00" data-cue="Land it and stop.">
     <div class="eyebrow"><span>Claudio</span><span class="yr">Humble Audio</span></div>
     <div class="body">
       <div>
-        <h1>You get the <em>minute</em> back.</h1>
-        <p class="lede">The analytical work still happens. You're just not the one doing it — and the rule it works by is the one you'd want anyway: <strong>if it sounds good, it is good.</strong></p>
+        <h1>“If it sounds good, it is <em>good</em>.”</h1>
+        <p class="lede">The fix for forty years of unprogrammable synthesizers wasn't a better interface. It was moving the expertise.</p>
       </div>
     </div>
   </section>
 
   <div class="spine">
-    <span>patching</span>
+    <span>intent</span>
     <span class="track"><span class="fill" id="fill"></span><span class="tick" id="tick"></span></span>
-    <span>playing</span>
-    <span id="counter" style="min-width:5ch;text-align:right">1/11</span>
+    <span>sound</span>
+    <span id="counter" style="min-width:5ch;text-align:right">1/12</span>
   </div>
 
   <div class="help"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>F</kbd> fullscreen · <kbd>S</kbd> notes</div>
