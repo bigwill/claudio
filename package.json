@@ -4,29 +4,30 @@
   "type": "module",
   "version": "0.1.0",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "convex dev --start 'vite dev'",
+    "dev:web": "vite dev",
+    "dev:convex": "convex dev",
     "build": "vite build",
     "preview": "npm run build && vite preview",
-    "deploy": "npm run build && wrangler deploy",
-    "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit",
     "test:dsp": "node --experimental-strip-types scripts/dsp-selftest.ts",
     "analyze": "node --experimental-strip-types scripts/analyze-samples.ts",
-    "deploy:prod": "CLOUDFLARE_ENV=production vite build && wrangler deploy"
+    "deploy": "vite build && wrangler deploy",
+    "deploy:prod": "convex deploy --cmd 'vite build' && wrangler deploy --env production",
+    "verify:loop": "node scripts/verify-loop.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
+    "convex": "^1.44.0",
     "tone": "^15.1.22"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.52.1",
-    "@cloudflare/workers-types": "^5.20260815.1",
+    "@anthropic-ai/sdk": "^0.117.1",
+    "playwright": "^1.62.1",
     "typescript": "^5.9.3",
     "vite": "^8.2.1",
     "wrangler": "^4.123.0"
   },
   "allowScripts": {
-    "workerd@1.20260811.1": true,
     "esbuild@0.28.1": true
   }
 }
