@@ -80,9 +80,12 @@ export function fakeClaudeMessage(plan: FakePlan): { content: unknown; stop_reas
   const turn = Array.isArray(plan.messages) ? plan.messages.length : 0;
   const idx = turn % NOTES.length;
 
+  // Deliberately NOT the same string as the rationale below: the UI renders
+  // both, so reusing one string makes every turn look duplicated and reads as
+  // a rendering bug rather than a stub artifact.
   const text = {
     type: "text",
-    text: `[fake-llm] ${NOTES[idx]}`,
+    text: `[fake-llm] turn ${turn} — offline stub, no model was called.`,
   };
 
   if (!plan.force && turn % 4 === 3) {
