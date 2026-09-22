@@ -1,0 +1,351 @@
+<title>Claudio Band Data Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #14131a; --panel: #1d1c26; --panel2: #191821; --line: #322f40;
+    --text: #e8e6f0; --dim: #9a95b0; --accent: #b9a4ff; --good: #7ee0a8;
+    --warn: #ffcf6b; --bad: #ff7a8a;
+    --drums: #ffb86b; --bass: #6fc3ff; --keys: #ff8fc7; --you: #b9a4ff;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 var(--sans);
+    padding-inline: 16px; padding-block: 28px 64px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+  header { display: flex; flex-direction: column; gap: 6px; }
+  .eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  h1 { font-size: 26px; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 18px; margin: 0 0 4px; letter-spacing: -0.01em; text-wrap: balance; }
+  .lede { color: var(--dim); margin: 0; max-width: 68ch; }
+  p { margin: 0; }
+  code, .mono { font-family: var(--mono); font-size: .88em; }
+  code { color: var(--accent); }
+  section { display: flex; flex-direction: column; gap: 14px; }
+
+  .rules { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .rules li { background: var(--panel); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .rules b { font-weight: 600; }
+  .rules span { color: var(--dim); font-size: 14px; }
+
+  .diagram { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  pre.mermaid { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+
+  .tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; align-items: start; }
+  .tcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .tcard h3 { margin: 0; font: 600 15px/1.3 var(--mono); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .tcard h3 small { font: 400 12px var(--sans); color: var(--dim); }
+  .fields { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 3px 12px; font-size: 13px; }
+  .fields dt { font-family: var(--mono); color: var(--text); white-space: nowrap; }
+  .fields dd { margin: 0; color: var(--dim); }
+  .w2 { font: 500 10px/1 var(--mono); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); border-radius: 4px; padding: 2px 4px; margin-left: 4px; vertical-align: 1px; white-space: nowrap; }
+  .idx { font: 12px/1.5 var(--mono); color: var(--dim); border-top: 1px solid var(--line); padding-top: 8px; }
+  .idx b { color: var(--good); font-weight: 500; }
+
+  .tscroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; min-width: 960px; font-size: 13px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { font: 500 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); background: var(--panel2); position: sticky; top: 0; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tr.group td { background: var(--panel2); font: 600 12px var(--mono); color: var(--accent); letter-spacing: .04em; padding-block: 6px; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  td .f { font-family: var(--mono); font-size: 12px; color: var(--dim); display: block; }
+  .client { font: 500 11px var(--mono); color: var(--good); border: 1px solid color-mix(in srgb, var(--good) 40%, transparent); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+  .none { color: var(--dim); opacity: .6; }
+  .gap-ref { font: 500 11px var(--mono); color: var(--bad); white-space: nowrap; }
+
+  .gaps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .gaps li { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--bad); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; max-width: 90ch; }
+  .gaps li b { font-weight: 600; }
+  .gaps li span { color: var(--dim); font-size: 14px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  @media (max-width: 480px) { h1 { font-size: 22px; } .tables { grid-template-columns: minmax(0,1fr); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Step 1 · design review gate · feature/band</div>
+    <h1>Claudio Band <span>data model</span></h1>
+    <p class="lede">The Convex schema from <code>docs/plans/claudio-band.md</code> §1, and which part of the producer's screen reads and writes each table. For review alongside the UX mockup; nothing here is built yet.</p>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--you)"></i>you</span>
+      <span><i class="dot" style="background:var(--drums)"></i>drums</span>
+      <span><i class="dot" style="background:var(--bass)"></i>bass</span>
+      <span><i class="dot" style="background:var(--keys)"></i>keys</span>
+      <span><span class="w2">W2</span> used from wave 2</span>
+      <span><span class="client">client-only</span> never touches Convex</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Rules the model obeys</h2>
+    <ul class="rules">
+      <li><b>Parts are append-only; the newest row plays.</b><span>Agent turns, picks, history steps, scene recalls and undos all insert. No “current” pointer, so a history step after a scene recall is never ambiguous.</span></li>
+      <li><b>Content versions vs copies.</b><span>Starter, agent, pick and design rows are content: they get a rail pip and <code>basedOn</code> = their own version. History, scene and undo rows are copies that restate a content version's <code>basedOn</code>.</span></li>
+      <li><b>One commit, one part row.</b><span>A multi-tool turn merges into a single version. Mute is not history: <code>muted</code> lives on <code>musicians</code>; solo is client-only.</span></li>
+      <li><b>One write rhythm per document.</b><span>Hot counters live in <code>jamCounters</code>; <code>jams</code> changes only when you edit settings.</span></li>
+      <li><b>One conversation = one log, one model, one tool list.</b><span>Band turns on Sonnet 5 with band tools; design jobs on Opus 5.5 with design tools. <code>messages.convoId</code> is a musician or a design.</span></li>
+      <li><b>Library rows are immutable; no presence, no heartbeat.</b><span>Parts and scenes point at library rows. Turns fire only on your notes and the budget they grant, so an empty room can't loop and cost money.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Entity relationships</h2>
+    <div class="diagram">
+<pre class="mermaid">
+erDiagram
+  jams ||--|{ musicians : "3 agents + 1 human"
+  jams ||--|| jamCounters : "hot counters"
+  jams ||--o{ chat : "band chat"
+  musicians ||--o{ parts : "versions; newest plays"
+  musicians ||--o{ designs : "design jobs"
+  musicians ||--o{ messages : "band log (convoId)"
+  designs ||--o{ messages : "design log (convoId)"
+  designs ||--o{ attempts : "measured proposals"
+  library ||--o| designs : "library.designId"
+  parts }o--o| library : "parts.libraryId (null = kit)"
+  chat }o--o{ musicians : "to[] ids, reactor, chatCursor"
+
+  jams { string slug  string producerClientId  string phase  bool reactive  number bpm  number keyPc  string scale  number bars  array progression  object scenes }
+  jamCounters { id jamId  number chatSeq  number reactionBudget  number lastProducerSeq }
+  musicians { id jamId  string kind  string role  string name  bool muted  number liveOctave  string status  string turnCause  number statusSince  number turnSeq  number turnDeadline  id turnJobId  number msgSeq  number chatCursor  id activeDesignId  string lastError }
+  parts { id musicianId  id jamId  number version  number basedOn  number prev  bool prevMuted  string txn  string undoes  string source  string label  number lengthBars  array notes  id libraryId }
+  designs { id musicianId  id jamId  string status  string origin  object target  string prompt  object renderSpec  number iteration  string pendingToolUseId  string pendingPresetId  string renderOwnerClientId  number renderLeaseUntil  number renderAttemptNo  number turnSeq  number turnDeadline  number msgSeq  number noToolStrikes  string lastError }
+  messages { id convoId  number seq  string role  any content }
+  attempts { id designId  string presetId  number iteration  object preset  string rationale  object features  number distance  bool isFinal }
+  chat { id jamId  number seq  string kind  id fromMusicianId  array to  id reactor  number replyToSeq  string text }
+  library { string name  string role  object preset  object features  string origin  string source  id designId  id fromJamId  string starterKey }
+  fakeScripts { string match  number turnIndex  any response }
+</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>Tables</h2>
+    <p class="lede">Every field, what it's for, and its indexes. <code>txn</code>, <code>prev</code> and <code>prevMuted</code> ship in wave 1 so wave 2 needs no migration.</p>
+    <div class="tables">
+
+      <article class="tcard">
+        <h3>jams <small>settings; changes only when you edit them</small></h3>
+        <dl class="fields">
+          <dt>slug</dt><dd>URL id, e.g. <span class="mono">6ZQQ59Y8</span></dd>
+          <dt>producerClientId</dt><dd>your browser; also the design render owner</dd>
+          <dt>phase</dt><dd><span class="mono">soundcheck | jam</span>. Play/stop is client-only</dd>
+          <dt>reactive</dt><dd>“band reacts” toggle <span class="w2">W2</span></dd>
+          <dt>bpm</dt><dd>tempo</dd>
+          <dt>keyPc, scale</dt><dd>key pitch class and scale (D minor)</dd>
+          <dt>bars</dt><dd>loop length in bars</dd>
+          <dt>progression</dt><dd>chord roots as scale degrees per bar (i–VI–III–VII)</dd>
+          <dt>scenes</dt><dd><span class="mono">{A?, B?}</span>: per musician <span class="mono">{basedOn, muted}</span>. Active = every part's basedOn and mute match</dd>
+        </dl>
+        <div class="idx"><b>by_slug</b></div>
+      </article>
+
+      <article class="tcard">
+        <h3>jamCounters <small>hot, one per jam</small></h3>
+        <dl class="fields">
+          <dt>jamId</dt><dd>owner</dd>
+          <dt>chatSeq</dt><dd>read+written by every chat insert, so chat order is commit order</dd>
+          <dt>reactionBudget</dt><dd>1 after a note to one musician, 0 for @all/several <span class="w2">W2</span></dd>
+          <dt>lastProducerSeq</dt><dd>nudges older than this can't trigger</dd>
+        </dl>
+      </article>
+
+      <article class="tcard">
+        <h3>musicians <small>4 per jam: 3 agents + you</small></h3>
+        <dl class="fields">
+          <dt>jamId</dt><dd>owner</dd>
+          <dt>kind</dt><dd><span class="mono">agent | human</span></dd>
+          <dt>role</dt><dd><span class="mono">drums | bass | keys | producer</span></dd>
+          <dt>name</dt><dd>@mention target; you are <span class="mono">you</span></dd>
+          <dt>muted</dt><dd>mute (not history; solo is client-only)</dd>
+          <dt>liveOctave</dt><dd>your octave, reported in the agents' snapshot (human only)</dd>
+          <dt>status</dt><dd><span class="mono">idle | thinking</span></dd>
+          <dt>turnCause</dt><dd><span class="mono">producer | nudge</span></dd>
+          <dt>statusSince</dt><dd>when status last changed</dd>
+          <dt>turnSeq</dt><dd>fence: a stale turn result is dropped</dd>
+          <dt>turnDeadline</dt><dd>band watchdog sweep key</dd>
+          <dt>turnJobId</dt><dd>scheduled LLM action</dd>
+          <dt>msgSeq</dt><dd>next seq in this musician's band log</dd>
+          <dt>chatCursor</dt><dd>last chat seq folded into a turn</dd>
+          <dt>activeDesignId</dt><dd>while set, the band inbox is held</dd>
+          <dt>lastError</dt><dd>shown on the strip after a failed turn</dd>
+        </dl>
+        <div class="idx"><b>by_jam</b> · <b>by_status_deadline</b></div>
+      </article>
+
+      <article class="tcard">
+        <h3>parts <small>append-only versions; newest plays</small></h3>
+        <dl class="fields">
+          <dt>musicianId, jamId</dt><dd>owner</dd>
+          <dt>version</dt><dd>newest-first from the index, plus one</dd>
+          <dt>basedOn</dt><dd>content version this row sounds like</dd>
+          <dt>prev</dt><dd>the basedOn it replaced (for undo) <span class="w2">W2</span></dd>
+          <dt>prevMuted</dt><dd>mute before a scene recall <span class="w2">W2</span></dd>
+          <dt>txn</dt><dd>one id per mutation <span class="w2">W2</span></dd>
+          <dt>undoes</dt><dd>the txn this undo row reverses <span class="w2">W2</span></dd>
+          <dt>source</dt><dd><span class="mono">starter | agent | pick | design | history | scene | undo</span></dd>
+          <dt>label</dt><dd>rail caption: the agent's <span class="mono">say</span> or the pick name</dd>
+          <dt>lengthBars</dt><dd>1, 2 or 4; repeats</dd>
+          <dt>notes</dt><dd>pitched <span class="mono">{step,deg,len,vel,accent,tie}</span> or drum <span class="mono">{step,voice,vel,accent}</span>; empty for you</dd>
+          <dt>libraryId</dt><dd>the sound; null = drum kit</dd>
+        </dl>
+        <div class="idx"><b>by_musician_version</b> · <b>by_jam</b> (newest first)</div>
+      </article>
+
+      <article class="tcard">
+        <h3>designs <small>one Opus 5.5 design job</small></h3>
+        <dl class="fields">
+          <dt>musicianId, jamId</dt><dd>owner</dd>
+          <dt>status</dt><dd><span class="mono">thinking | awaiting_render | done | failed</span></dd>
+          <dt>origin</dt><dd><span class="mono">wav | prompt</span></dd>
+          <dt>target</dt><dd>features measured from the dropped WAV</dd>
+          <dt>prompt</dt><dd>the description, for prompt origin</dd>
+          <dt>renderSpec</dt><dd>what your browser must render next</dd>
+          <dt>iteration</dt><dd>current proposal number</dd>
+          <dt>pendingToolUseId</dt><dd>tool_use awaiting the measured result</dd>
+          <dt>pendingPresetId</dt><dd>preset being rendered</dd>
+          <dt>renderOwnerClientId</dt><dd>= <span class="mono">jam.producerClientId</span></dd>
+          <dt>renderLeaseUntil</dt><dd>re-grant after expiry</dd>
+          <dt>renderAttemptNo</dt><dd>fail at MAX_RENDER_ATTEMPTS</dd>
+          <dt>turnSeq, turnDeadline</dt><dd>fence and design watchdog key</dd>
+          <dt>msgSeq</dt><dd>next seq in the design log</dd>
+          <dt>noToolStrikes</dt><dd>second strike fails the design</dd>
+          <dt>lastError</dt><dd>reason shown on failure</dd>
+        </dl>
+        <div class="idx"><b>by_musician</b> · <b>by_status_deadline</b> · <b>by_render_lease</b></div>
+      </article>
+
+      <article class="tcard">
+        <h3>attempts <small>measured proposals</small></h3>
+        <dl class="fields">
+          <dt>designId</dt><dd>owner</dd>
+          <dt>presetId</dt><dd>the proposal's id</dd>
+          <dt>iteration</dt><dd>design rail position</dd>
+          <dt>preset</dt><dd>the FM patch</dd>
+          <dt>rationale</dt><dd>why Claude proposed it</dd>
+          <dt>features</dt><dd>measured from your render</dd>
+          <dt>distance</dt><dd>to the target: the number on the rail</dd>
+          <dt>isFinal</dt><dd>the finalized proposal</dd>
+        </dl>
+        <div class="idx"><b>by_design_iteration</b> · <b>by_design_preset</b></div>
+      </article>
+
+      <article class="tcard">
+        <h3>chat <small>the one band chat</small></h3>
+        <dl class="fields">
+          <dt>jamId</dt><dd>owner</dd>
+          <dt>seq</dt><dd>from <span class="mono">jamCounters.chatSeq</span></dd>
+          <dt>kind</dt><dd><span class="mono">producer | musician | system | nudge</span></dd>
+          <dt>fromMusicianId</dt><dd>author (musician rows)</dd>
+          <dt>to</dt><dd>musician ids; empty = every agent</dd>
+          <dt>reactor</dt><dd>the one musician a nudge may trigger <span class="w2">W2</span></dd>
+          <dt>replyToSeq</dt><dd>threads a reply under your note</dd>
+          <dt>text</dt><dd>body</dd>
+        </dl>
+        <div class="idx"><b>by_jam_seq</b></div>
+      </article>
+
+      <article class="tcard">
+        <h3>messages <small>Claude conversation logs</small></h3>
+        <dl class="fields">
+          <dt>convoId</dt><dd>a musician (band log) or a design (design log)</dd>
+          <dt>seq</dt><dd>order</dd>
+          <dt>role</dt><dd>user | assistant</dd>
+          <dt>content</dt><dd>exactly as returned; never edited</dd>
+        </dl>
+        <div class="idx"><b>by_convo_seq</b></div>
+      </article>
+
+      <article class="tcard">
+        <h3>library <small>global, immutable</small></h3>
+        <dl class="fields">
+          <dt>name</dt><dd>“Glass EP”</dd>
+          <dt>role</dt><dd><span class="mono">bass | keys</span>; you pick any pitched sound</dd>
+          <dt>preset</dt><dd>the FM patch</dd>
+          <dt>features</dt><dd>nullable</dd>
+          <dt>origin</dt><dd><span class="mono">starter | designed | tweak</span></dd>
+          <dt>source</dt><dd>WAV filename, prompt, or “tweak of X”</dd>
+          <dt>designId</dt><dd>the job that made it</dd>
+          <dt>fromJamId</dt><dd>jam it was made in</dd>
+          <dt>starterKey</dt><dd>upsert key from <span class="mono">starters.ts</span></dd>
+        </dl>
+        <div class="idx"><b>by_role</b> (newest first) · <b>by_starterKey</b></div>
+      </article>
+
+      <article class="tcard">
+        <h3>fakeScripts <small>testing only</small></h3>
+        <dl class="fields">
+          <dt>match</dt><dd>role or design + cue</dd>
+          <dt>turnIndex</dt><dd>which turn it answers</dd>
+          <dt>response</dt><dd>tool calls, stay, refusal, max_tokens, delay…</dd>
+        </dl>
+        <div class="idx">refused unless <b>CLAUDIO_FAKE_LLM=1</b></div>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>UI element → reads / writes</h2>
+    <p class="lede">Four queries feed the whole screen: <code>jams.state(slug)</code>, <code>parts.rail(musicianId)</code>, <code>jams.chat(jamId)</code>, <code>library.list(role | "pitched")</code>. <span class="gap-ref">G1…</span> marks a cell the plan doesn't pin down; see the gaps below.</p>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>UI element</th><th>Reads (query → fields)</th><th>Calls (mutation)</th><th>Writes</th></tr></thead>
+        <tbody>
+          <tr class="group"><td colspan="4">Top bar</td></tr>
+          <tr><td>Phase badge</td><td>jams.state <span class="f">jams.phase</span></td><td class="none">—</td><td class="none">—</td></tr>
+          <tr><td>Space ▶ (start / stop)</td><td>jams.state <span class="f">jams.phase, musicians.activeDesignId</span></td><td><code>jams.start</code> on the first press only; refused while any design runs</td><td>jams.phase. Play/stop itself <span class="client">client-only</span></td></tr>
+          <tr><td>bpm (<span class="mono">,</span> <span class="mono">.</span>)</td><td>jams.state <span class="f">jams.bpm</span></td><td>direct settings mutation <span class="gap-ref">G4</span></td><td>jams.bpm</td></tr>
+          <tr><td>Key, progression, bars</td><td>jams.state <span class="f">jams.keyPc, scale, progression, bars</span></td><td>direct settings mutation <span class="gap-ref">G4</span></td><td>jams.*; applied at the next loop line by the sequencer</td></tr>
+          <tr><td>Scenes [A] [B]</td><td>jams.state <span class="f">jams.scenes, each newest part's basedOn, musicians.muted</span> (active = all match)</td><td>scene save / recall <span class="gap-ref">G4</span>; recall refused while a design runs</td><td>save: jams.scenes · recall: 4 parts rows (source scene, one txn, prevMuted) + musicians.muted</td></tr>
+          <tr><td>reacts ● (<span class="mono">\</span>)</td><td>jams.state <span class="f">jams.reactive</span></td><td>direct settings mutation <span class="gap-ref">G4</span> <span class="w2">W2</span></td><td>jams.reactive</td></tr>
+
+          <tr class="group"><td colspan="4">Strip (× 4)</td></tr>
+          <tr><td>Header: number, name, sound ▾</td><td>jams.state <span class="f">musicians.name, role; newest part's libraryId → library.name</span></td><td class="none">—</td><td class="none">—</td></tr>
+          <tr><td>Step grid</td><td>jams.state <span class="f">newest part: notes, lengthBars; jams.progression for degree rows</span></td><td class="none">— (agents write parts; you never edit notes)</td><td class="none">—</td></tr>
+          <tr><td>Playhead column</td><td>engine <span class="f">__band.g → step</span></td><td class="none">—</td><td><span class="client">client-only</span></td></tr>
+          <tr><td>History rail (pips, labels)</td><td>parts.rail <span class="f">content versions: version, label, source</span>; filled pip = newest part's basedOn</td><td><code>parts.step(m, back|forward)</code>, <code>parts.jumpTo(m, v)</code>; cancels a thinking turn (bumps turnSeq)</td><td>parts (source history, copy of basedOn); musicians.turnSeq if thinking</td></tr>
+          <tr><td>Staged pip + “lands in N beats”</td><td>engine <span class="f">sequencer landsAtG − g</span></td><td class="none">—</td><td><span class="client">client-only</span></td></tr>
+          <tr><td>Status pill: thinking</td><td>jams.state <span class="f">musicians.status, statusSince</span></td><td class="none">—</td><td class="none">—</td></tr>
+          <tr><td>Status pill: reacting to @bass</td><td>jams.state <span class="f">musicians.turnCause = nudge</span>; <em>who</em> it reacts to <span class="gap-ref">G5</span></td><td class="none">—</td><td class="none">— <span class="w2">W2</span></td></tr>
+          <tr><td>Status pill: designing / queued</td><td>jams.state <span class="f">musicians.activeDesignId, designs.status</span>; queued = jams.chat rows after chatCursor addressed to m</td><td class="none">—</td><td class="none">—</td></tr>
+          <tr><td>Status pill: failed</td><td>jams.state <span class="f">musicians.lastError</span></td><td class="none">—</td><td class="none">—</td></tr>
+          <tr><td>Design rail (iter, distances)</td><td>jams.state <span class="f">active designs → attempts.iteration, distance, isFinal; designs.iteration</span> <span class="gap-ref">G3 G6</span></td><td>cancel <span class="gap-ref">G1</span></td><td class="none">—</td></tr>
+          <tr><td>Drop WAV / describe input</td><td>jams.state <span class="f">musicians.activeDesignId</span> (disabled while set)</td><td><code>designs.start({musicianId, wav | prompt})</code></td><td>designs, musicians.activeDesignId; on finalize: library (designed) + parts (design) + chat (system)</td></tr>
+          <tr><td>Mute (<span class="mono">M</span>)</td><td>jams.state <span class="f">musicians.muted</span></td><td>mute mutation <span class="gap-ref">G4</span>; channel mutes instantly</td><td>musicians.muted (no part row)</td></tr>
+          <tr><td>Solo (<span class="mono">N</span>)</td><td class="none">—</td><td class="none">—</td><td><span class="client">client-only</span></td></tr>
+
+          <tr class="group"><td colspan="4">Chat</td></tr>
+          <tr><td>Band chat list</td><td>jams.chat <span class="f">chat.seq, kind, fromMusicianId, to, replyToSeq, text</span>; nudge rows dim</td><td class="none">—</td><td class="none">—</td></tr>
+          <tr><td>Chat input (<span class="mono">Enter</span> / <span class="mono">/</span>)</td><td>jams.state <span class="f">musicians.name, role</span> for @mentions</td><td><code>chat.send</code> → <code>postChat</code> → <code>drainInbox</code></td><td>chat, jamCounters (chatSeq, lastProducerSeq, reactionBudget), messages, musicians (cursor, status, turnSeq)</td></tr>
+
+          <tr class="group"><td colspan="4">Library &amp; keyboard</td></tr>
+          <tr><td>Library drawer / picker (<span class="mono">B</span>)</td><td>library.list <span class="f">role (bass/keys) or "pitched" for you: name, origin, source</span>; none for drums</td><td>library pick <span class="gap-ref">G4</span>; refused while designing; cancels a thinking turn</td><td>parts (source pick, new libraryId)</td></tr>
+          <tr><td>Keyboard dock (key, octave)</td><td>jams.state <span class="f">jams.keyPc, scale; musicians(you).liveOctave</span></td><td><span class="mono">Z</span>/<span class="mono">X</span> → <span class="gap-ref">G2</span></td><td>musicians.liveOctave (?); notes themselves <span class="client">client-only</span></td></tr>
+          <tr><td><span class="mono">?</span> overlay</td><td class="none">—</td><td class="none">—</td><td><span class="client">client-only</span></td></tr>
+          <tr><td>Backspace undo</td><td>jams.state <span class="f">parts.txn, prev, prevMuted, undoes</span></td><td><code>parts.undo(jamId)</code>; refused while a design runs</td><td>parts (source undo, undoes = txn), musicians.muted <span class="w2">W2</span></td></tr>
+          <tr><td><span class="mono">C</span> cancel</td><td>jams.state <span class="f">musicians.status</span></td><td><code>cancelTurn(m)</code> <span class="gap-ref">G4</span></td><td>musicians (turnSeq, status), messages (ignore note) <span class="w2">W2</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Gaps / questions for Will</h2>
+    <ol class="gaps">
+      <li><b>G1 · No way to cancel a design.</b><span>The headline fallback says “cancel, then pick Glass EP”, but §4 names only <code>designs.start</code>; <code>endDesign</code> is internal, and a pick is refused while the musician is designing. The demo's fallback path needs a public <code>designs.cancel</code> (→ <code>endDesign("cancelled")</code>, which also needs a status value).</span></li>
+      <li><b>G2 · Who writes <code>liveOctave</code>?</b><span>It's on <code>musicians</code> and goes into the snapshot, but no mutation writes it. Z/X is instant client-side; does every press write to Convex, or only a debounced value?</span></li>
+      <li><b>G3 · The design cutoff has no home.</b><span>The strip mock reads “iter 2/3” and the headline has a cutoff set by the 1b p50, but <code>designs</code> has no max-iteration or deadline-for-the-whole-job field; <code>turnDeadline</code> is per turn.</span></li>
+      <li><b>G4 · Direct mutations are unnamed.</b><span>Settings (bpm, key, progression, bars, reactive), mute, scene save/recall, library pick, and the public entry point for <code>C</code> (<code>cancelTurn</code> is described as an internal helper) have no function names. Needed before the convex-test files can be written first.</span></li>
+      <li><b>G5 · “reacting to @bass” can't be read directly.</b><span><code>turnCause = nudge</code> says <em>that</em> it's reacting, not <em>to whom</em>. The client would have to find the triggering nudge row in chat; a <code>turnFromMusicianId</code> (or the nudge seq) on <code>musicians</code> would make it a field read.</span></li>
+      <li><b>G6 · The design rail vanishes on finalize.</b><span><code>jams.state</code> returns only <em>active</em> designs with attempts. Once a design ends, its distances disappear from the strip; if the soundcheck frame should keep showing “d=18.4 → 11.2” after it lands, the query needs the newest design per musician too.</span></li>
+    </ol>
+  </section>
+</div>

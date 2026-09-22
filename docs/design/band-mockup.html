@@ -1,0 +1,834 @@
+<title>Claudio Band Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#14131a; --panel:#1d1c26; --chrome:#191821; --line:#322f40; --line2:#2a2836;
+  --text:#e8e6f0; --dim:#9a95b0; --faint:#6b6680; --accent:#b9a4ff; --good:#7ee0a8;
+  --warn:#ffcf6b; --bad:#ff7a8a;
+  --you:#b9a4ff; --drums:#ffb86b; --bass:#6fc3ff; --keys:#ff8fc7;
+  --review:#0f0e14; --paper:#f1eff8;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--review);color:var(--text);font:14px/1.5 var(--sans);padding-inline:16px;padding-block:0 48px}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+
+/* ---------- review chrome (not the product) ---------- */
+.rv{max-width:1400px;margin:0 auto}
+.rvhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;padding-block:22px 12px}
+.rvhead h1{margin:0;font-size:20px;letter-spacing:-.01em;font-weight:650}
+.rvhead h1 span{color:var(--accent)}
+.rvhead p{margin:0;color:var(--dim);font-size:13px}
+.rvbar{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;padding-block:10px;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)}
+.lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-right:6px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.tab{background:transparent;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-family:var(--mono);font-size:12px;color:var(--dim);cursor:pointer}
+.tab:hover{color:var(--text);border-color:var(--faint)}
+.tab[aria-pressed="true"]{background:var(--accent);color:#17131f;border-color:var(--accent);font-weight:600}
+.tab.w2{border-style:dashed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:3px 9px;font-size:12px;color:var(--dim);cursor:pointer}
+.seg button[aria-pressed="true"]{background:#2b2839;color:var(--text)}
+.seg button .rec{color:var(--good);font-size:10px;margin-left:4px}
+.opt{display:flex;align-items:center;gap:6px}
+
+.rvgrid{display:flex;flex-direction:column;gap:14px;padding-block:16px}
+.framewrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px;font-size:13.5px;align-items:start}
+.notes>h2{grid-column:1/-1}
+.notes h2{margin:0;font-size:17px;text-wrap:balance}
+.notes .id{font-family:var(--mono);color:var(--accent);margin-right:6px}
+.wave{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--dim);margin-left:4px;vertical-align:2px}
+.notes ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.notes .sub{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:0 0 4px}
+.notes .scen{color:var(--dim);border-left:2px solid var(--line);padding-left:10px}
+.notes .ask{border:1px solid #4a3f6e;background:#1c1828;border-radius:8px;padding:10px 12px}
+.notes .ask b{color:var(--accent)}
+.replay{align-self:flex-start;background:#2b2839;border:1px solid var(--line);border-radius:7px;padding:5px 11px;cursor:pointer}
+.replay:hover{border-color:var(--accent)}
+.chapters{display:flex;flex-wrap:wrap;gap:4px}
+
+/* ---------- the app frame ---------- */
+.app{width:100%;min-width:1240px;min-height:720px;display:grid;grid-template-rows:auto minmax(0,1fr);font-size:13px;position:relative}
+.topbar{display:flex;align-items:center;gap:14px;height:46px;padding:0 14px;background:var(--chrome);border-bottom:1px solid var(--line);white-space:nowrap}
+.brand{font-weight:650}.brand span{color:var(--accent)}
+.slug{font-family:var(--mono);color:var(--faint);font-size:12px}
+.chip{font-size:11px;letter-spacing:.07em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.chip.sc{border-color:var(--warn);color:var(--warn)}
+.chip.jam{border-color:var(--good);color:var(--good)}
+.tp{display:flex;align-items:center;gap:6px;color:var(--dim)}
+.tp kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--text);background:#23212e}
+.tp .play{color:var(--good)}
+.ctl{display:flex;align-items:center;gap:4px;font-family:var(--mono);font-size:12px;color:var(--text)}
+.ctl small{font-family:var(--sans);color:var(--faint);font-size:11px}
+.ctl .box{border:1px solid var(--line);border-radius:5px;padding:1px 6px;background:#1f1d29}
+.prog{display:flex;gap:2px}
+.prog span{border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--dim);font-family:var(--mono);font-size:12px}
+.prog span.on{border-color:var(--accent);color:var(--text);background:#2a2440}
+.pos{font-family:var(--mono);color:var(--text);min-width:34px}
+.spacer{flex:1}
+.scene{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:5px;padding:1px 8px;color:var(--faint)}
+.scene.saved{color:var(--text);border-color:#4a4560}
+.scene.active{background:var(--accent);color:#17131f;border-color:var(--accent);font-weight:600}
+.scene.pending{border-color:var(--accent);border-style:dashed;color:var(--accent)}
+.reacts{font-size:12px;color:var(--dim)}.reacts i{font-style:normal;color:var(--good)}.reacts.off i{color:var(--faint)}
+
+.body{display:grid;grid-template-columns:minmax(0,1fr) auto 300px;min-height:0}
+.app.chat-bottom .body{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(0,1fr) 210px}
+.app.chat-bottom .chat{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);flex-direction:row}
+.app.chat-bottom .chat .rows{flex:1}
+.app.chat-bottom .chat .cin{width:340px;border-top:0;border-left:1px solid var(--line);align-self:stretch;display:flex;align-items:flex-end}
+.main{display:flex;flex-direction:column;min-width:0}
+.strips{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.app.across .strips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-content:start}
+.app.across .strip.you{grid-column:1/-1}
+
+/* strip */
+.strip{--c:var(--accent);display:grid;grid-template-columns:230px minmax(0,1fr);border:1px solid var(--line);border-radius:8px;background:var(--panel);position:relative}
+.app.across .strip{grid-template-columns:minmax(0,1fr)}
+.strip.drums{--c:var(--drums)}.strip.bass{--c:var(--bass)}.strip.keys{--c:var(--keys)}.strip.you{--c:var(--you)}
+.strip.focus{border-color:var(--c);box-shadow:0 0 0 1px var(--c)}
+.strip.muted .grid{opacity:.35}
+.strip.spot::after{content:"";position:absolute;inset:-5px;border:1.5px dashed var(--warn);border-radius:11px;pointer-events:none}
+.shead{padding:9px 10px;border-right:1px solid var(--line2);display:flex;flex-direction:column;gap:6px;min-width:0}
+.app.across .shead{border-right:0;border-bottom:1px solid var(--line2)}
+.nm{display:flex;align-items:center;gap:7px;min-width:0}
+.num{font-family:var(--mono);font-size:11px;width:17px;height:17px;display:grid;place-items:center;border:1px solid var(--c);color:var(--c);border-radius:4px;flex:none}
+.who{font-weight:600;color:var(--c)}
+.snd{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px dotted var(--faint);cursor:pointer}
+.snd.swap{color:var(--accent)}
+.orig{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ms{margin-left:auto;display:flex;gap:3px;flex:none}
+.orow{display:flex;align-items:center;gap:6px;min-width:0}
+.ms span{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:3px;padding:0 4px;color:var(--faint)}
+.ms span.on{background:var(--warn);color:#1b1608;border-color:var(--warn)}
+.pill{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:11.5px;border-radius:999px;padding:1px 9px;border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.pill.thinking,.pill.reacting{border-color:var(--c);color:var(--text)}
+.pill.staged{border-color:var(--accent);color:var(--accent)}
+.pill.designing{border-color:var(--c);color:var(--text)}
+.pill.queued{border-color:var(--warn);color:var(--warn)}
+.pill.failed{border-color:var(--bad);color:var(--bad)}
+.pill.live{border-color:var(--you);color:var(--you)}
+.dots{display:inline-flex;gap:3px}.dots i{width:4px;height:4px;border-radius:50%;background:var(--c);animation:pulse 1.1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes pulse{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.rail{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+.pip{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--faint);cursor:default}
+.pip.cur{background:var(--c);border-color:var(--c);color:#16141d;font-weight:600}
+.pip.stg{border:1.5px dashed var(--accent);color:var(--accent)}
+.rlabel{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rlabel b{font-weight:500;color:var(--text)}
+
+/* grid */
+.gwrap{padding:8px 10px;min-width:0;display:flex;flex-direction:column;gap:6px;justify-content:center}
+.grid{--lw:28px;position:relative;display:grid;grid-template-columns:var(--lw) repeat(64,minmax(0,1fr));row-gap:2px;width:100%}
+.app.across .grid{--lw:22px}
+.rl{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:12px;height:12px;padding-right:4px;text-align:right}
+.c{height:12px;border-left:1px solid transparent;background:#24222f}
+.c.b4{border-left-color:#3a3650}.c.b16{border-left-color:#5a5478}
+.c.on{background:var(--c);opacity:.72}
+.c.on.acc{opacity:1;box-shadow:inset 0 0 0 1px #fff6}
+.c.on.sus{opacity:.38}
+.c.gh{opacity:.28}
+.c.st{box-shadow:inset 0 0 0 1.5px var(--accent);background:transparent}
+.c.on.st{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.c.tie{position:relative}
+.c.tie::after{content:"";position:absolute;right:-3px;top:5px;width:6px;height:2px;background:var(--text);z-index:1}
+.app.across .c{height:9px}.app.across .rl{height:9px;line-height:9px;font-size:8px}
+.ph{position:absolute;top:-3px;bottom:-3px;left:calc(var(--lw) + (100% - var(--lw)) * var(--s) / 64);width:calc((100% - var(--lw)) / 64);background:#fff2;border-left:1.5px solid #fffc;pointer-events:none}
+.app.stopped .ph{display:none}
+.hint{font-size:11.5px;color:var(--faint)}
+.hint b{color:var(--dim);font-weight:500}
+.live{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.live .k{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--faint)}
+.live .k.dn{background:var(--you);border-color:var(--you);color:#16141d}
+
+/* design rail (inline) */
+.drail{display:flex;flex-direction:column;gap:5px;border-top:1px dashed var(--line);padding-top:6px}
+.drow{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap}
+.dist{display:flex;align-items:flex-end;gap:3px;height:22px}
+.dist i{width:9px;background:var(--c);opacity:.55;border-radius:2px 2px 0 0}
+.dist i.fin{opacity:1}
+.dnum{font-family:var(--mono);font-size:11.5px;color:var(--text)}
+.dnum em{font-style:normal;color:var(--good)}
+.why{font-size:11.5px;color:var(--dim);font-style:italic}
+.mini{font-size:11px;border:1px solid var(--line);border-radius:5px;padding:0 6px;color:var(--dim);background:transparent}
+.drop{border:1.5px dashed var(--c);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;background:#ffffff08}
+.describe{border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:#16151d}
+
+/* side design panel */
+.dpanel{width:0;overflow:hidden;border-left:1px solid var(--line);background:var(--chrome)}
+.app.dside .dpanel.has{width:300px}
+.dp{padding:12px;display:flex;flex-direction:column;gap:10px;width:300px}
+.dp h3{margin:0;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.att{border:1px solid var(--line);border-radius:7px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;background:var(--panel)}
+.att.fin{border-color:var(--good)}
+.att .t{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px}
+.att .t em{font-style:normal;color:var(--good)}
+
+/* loop bar + dock */
+.loopbar{display:flex;align-items:center;gap:10px;padding:0 14px 8px;font-size:11.5px;color:var(--faint)}
+.lb{flex:1;height:5px;background:#24222f;border-radius:3px;position:relative;overflow:hidden}
+.lb i{position:absolute;inset:0 auto 0 0;background:var(--accent);opacity:.7;width:calc(var(--s) / 64 * 100%)}
+.lb b{position:absolute;top:0;bottom:0;width:1px;background:#5a5478}
+.dock{border-top:1px solid var(--line);background:var(--chrome);padding:9px 14px 11px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mode{font-size:11px;font-weight:600;letter-spacing:.08em;padding:2px 8px;border-radius:4px;background:#2b2839;color:var(--dim)}
+.mode.play{color:var(--good)}.mode.chat{color:var(--accent);background:#2a2440}.mode.picker{color:var(--warn)}
+.keys{display:flex;gap:3px}
+.key{width:34px;border:1px solid var(--line);border-bottom-width:3px;border-radius:5px;background:#201e2a;display:flex;flex-direction:column;align-items:center;padding:2px 0 1px;font-family:var(--mono)}
+.key b{font-size:11px;color:var(--text)}.key small{font-size:10px;color:var(--faint)}
+.key.root small{color:var(--accent)}
+.key.dn{background:var(--you);border-color:var(--you)}.key.dn b,.key.dn small{color:#16141d}
+.dockinfo{font-size:12px;color:var(--dim)}
+.dockinfo b{color:var(--text);font-weight:500}
+.dock .r{margin-left:auto;font-size:12px;color:var(--faint);display:flex;gap:12px}
+.dock .r kbd,.kc kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--text);background:#23212e}
+
+/* chat */
+.chat{border-left:1px solid var(--line);background:var(--chrome);display:flex;flex-direction:column;min-height:0}
+.chat .h{padding:9px 12px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--line2)}
+.rows{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.app.chat-bottom .rows{max-height:210px}
+.msg{font-size:12.5px;line-height:1.45}
+.msg .a{font-weight:600;margin-right:4px}
+.msg .to{color:var(--dim)}
+.msg.reply{margin-left:14px;padding-left:9px;border-left:2px solid var(--line)}
+.msg.reply .a::before{content:"↳ ";color:var(--faint)}
+.msg.system{color:var(--dim);font-size:12px;padding:5px 8px;border-radius:6px;background:#ffffff08}
+.msg.system.bad{color:var(--bad);background:#ff7a8a12}
+.msg.nudge{color:var(--faint);font-size:11.5px;font-style:italic}
+.msg .tag{font-size:10.5px;border:1px solid var(--warn);color:var(--warn);border-radius:999px;padding:0 6px;margin-left:4px;font-style:normal}
+.msg .tag.ok{border-color:var(--good);color:var(--good)}
+.msg.new{animation:arrive .5s ease-out}
+@keyframes arrive{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.cin{border-top:1px solid var(--line);padding:9px 12px}
+.inp{border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12.5px;color:var(--faint);display:flex;justify-content:space-between;background:#16151d}
+.inp.active{border-color:var(--accent);color:var(--text)}
+.caret{display:inline-block;width:1px;height:13px;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.c-you{color:var(--you)}.c-drums{color:var(--drums)}.c-bass{color:var(--bass)}.c-keys{color:var(--keys)}
+
+/* overlays */
+.toast{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);background:#2b2839;border:1px solid var(--accent);border-radius:8px;padding:7px 14px;font-size:12.5px;white-space:nowrap;z-index:5;animation:arrive .3s}
+.toast.bad{border-color:var(--bad)}.toast.good{border-color:var(--good)}
+.kc{position:absolute;right:316px;bottom:92px;display:flex;gap:4px;align-items:center;z-index:5;font-size:11px;color:var(--dim);background:#14131ae6;padding:5px 8px;border-radius:7px;border:1px solid var(--line)}
+.app.chat-bottom .kc{right:14px;bottom:300px}
+.kc kbd{font-size:13px;padding:1px 7px}
+.help{position:absolute;inset:46px 0 0 0;background:#0d0c12e8;z-index:6;display:grid;place-items:center}
+.helpbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;width:760px;columns:2;column-gap:28px}
+.helpbox h3{column-span:all;margin:0 0 10px;font-size:14px}
+.helpbox div{break-inside:avoid;display:flex;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px solid var(--line2)}
+.helpbox kbd{font-family:var(--mono);font-size:11px;min-width:84px;color:var(--accent)}
+.helpbox .w2{color:var(--faint)}
+.hud{position:absolute;top:54px;right:312px;z-index:4;font-family:var(--mono);font-size:11px;background:#0b0a10ee;border:1px solid var(--good);border-radius:6px;padding:6px 9px;color:var(--good);line-height:1.5}
+.hud span{color:var(--faint)}
+
+/* checklist */
+.check{border-top:1px solid var(--line2);padding-block:22px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px 32px}
+.check section{min-width:0}
+.check h2{font-size:15px;margin:0 0 8px}
+.check h2 small{font-weight:400;color:var(--faint);font-size:12px;margin-left:6px}
+.check table{border-collapse:collapse;width:100%;font-size:12.5px}
+.check td{border-top:1px solid var(--line2);padding:5px 8px 5px 0;vertical-align:top}
+.check td:first-child{color:var(--dim);white-space:nowrap;width:1%}
+.check td kbd{font-family:var(--mono);font-size:11.5px;color:var(--accent)}
+.check q{color:var(--text);quotes:"“" "”"}
+.check ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.decide{grid-column:1/-1;border:1px solid #4a3f6e;background:#1c1828;border-radius:10px;padding:14px 18px}
+.decide ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.decide b{color:var(--accent)}
+</style>
+
+<div class="rv">
+  <div class="rvhead">
+    <h1>Claudio Band <span>· design review</span></h1>
+    <p>Step 1 mockup. One frame per scenario. Not the product: no audio, fake data, only the animated parts move.</p>
+  </div>
+  <div class="rvbar">
+    <div class="tabs" id="tabs"><span class="lbl">Scenario</span></div>
+  </div>
+  <div class="rvbar">
+    <div class="opt"><span class="lbl">Strips</span><div class="seg" data-opt="strips"><button data-v="down">down (lanes)<span class="rec">rec</span></button><button data-v="across">across</button></div></div>
+    <div class="opt"><span class="lbl">Design iterations</span><div class="seg" data-opt="design"><button data-v="inline">in the strip<span class="rec">rec</span></button><button data-v="side">side panel</button></div></div>
+    <div class="opt"><span class="lbl">Chat</span><div class="seg" data-opt="chat"><button data-v="right">right column<span class="rec">rec</span></button><button data-v="bottom">bottom</button></div></div>
+    <div class="opt"><span class="lbl">Overlay</span><div class="seg" data-opt="help"><button data-v="off">off</button><button data-v="on">? keys</button></div></div>
+  </div>
+
+  <div class="rvgrid">
+    <aside class="notes" id="notes"></aside>
+    <div class="framewrap"><div class="app" id="app"></div></div>
+  </div>
+
+  <div class="check">
+    <div class="decide">
+      <h2 style="margin:0 0 8px;font-size:15px">What I recommend on the three layout questions</h2>
+      <ol>
+        <li><b>Strips down, as lanes.</b> Every grid shares one x axis, so the playhead is a single column running through all four strips, which shows "one clock" on screen. A 4-bar loop is 64 steps: about 12px per step as lanes, 4px across (switch the toggle and look at S4). This differs from the ASCII sketch in the plan.</li>
+        <li><b>Design iterations in the strip</b>, as a compact rail: distance bars, the newest distance, the latest rationale on one line, Cancel. The side panel gives Opus's reasoning more space, but it covers the other strips during soundcheck, when you are also picking bass and your own sound. Proposed fallback: clicking the rail opens the side panel for that one design.</li>
+        <li><b>Chat in the right column.</b> Threads need height, lanes need width, and a bottom chat squeezes both. When chat is at the bottom, the reply you are waiting for sits further from the strip it changes.</li>
+      </ol>
+      <p style="margin:10px 0 0;color:var(--dim);font-size:13px">Additions the mockup makes beyond the plan, for you to accept or strike: the staged pattern is drawn as outlined cells on the grid (not only as the rail pip); in soundcheck, the top bar shows which design is blocking Space; the playhead also lights the current chord in the top bar; the <code>you</code> lane lights the keys you are holding. None of these needs a schema change.</p>
+    </div>
+
+    <section>
+      <h2>Failure states <small>checklist, not frames</small></h2>
+      <table>
+        <tr><td>Band turn: refusal / max_tokens</td><td>Pill clears to idle. System row to you: <q>bass couldn't answer that (the request was refused). Still on v4. Try rewording.</q></td></tr>
+        <tr><td>Band turn: invalid tool call</td><td>Musician row carries its <code>say</code> if any. System row: <q>bass's change didn't validate (step 40 is outside the 2-bar part). Still on v4.</q> The next note works (S9).</td></tr>
+        <tr><td>Band watchdog (30s)</td><td>Pill shows elapsed seconds from 10s on (<q>thinking… 24s</q>). At the deadline: <q>drums didn't answer in 30s. Still on v1. Ask again.</q></td></tr>
+        <tr><td>Rollback while thinking</td><td><code>←</code> on a thinking strip: the pill switches to <q>cancelled, you took it back</q> for one loop; the late result is dropped, with no row.</td></tr>
+        <tr><td>Design: refusal / 2 no-tool strikes / render abandoned</td><td>Design rail turns red, one line: <q>design stopped: Claude didn't propose a sound twice.</q> Buttons: <q>Try again</q>, <q>Pick from library (B)</q>. Held notes are then delivered (S8).</td></tr>
+        <tr><td>Design over the headline cutoff</td><td>Rail shows elapsed time against the cutoff (<q>2:40 / 3:00</q>). Past it, nothing is automatic: you press Cancel, then <code>B</code>. Glass EP is in the library with its provenance.</td></tr>
+        <tr><td>Space refused</td><td>Toast: <q>Space waits for keys' design (iter 2/3). Cancel it or let it finish.</q> The top-bar hint says the same thing ahead of time.</td></tr>
+        <tr><td>Scene recall / undo refused</td><td>Toast: <q>Scenes wait until keys' design finishes.</q></td></tr>
+        <tr><td>History on a designing strip</td><td>Toast: <q>keys is designing. ← works when it's done.</q></td></tr>
+        <tr><td>No strip focused</td><td><code>←</code> <code>→</code> <code>M</code> <code>B</code> show a hint in the dock: <q>press 1–4 to pick a strip</q>.</td></tr>
+        <tr><td>Convex disconnected</td><td>Top-bar chip <q>offline, still playing</q>. The loop keeps playing the last parts; chat input is disabled.</td></tr>
+        <tr><td>Audio blocked before first gesture</td><td>First keypress or click unlocks audio; until then, the dock reads <q>press any key to wake audio</q>.</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Library drawer <small><kbd>B</kbd> on a strip</small></h2>
+      <ul>
+        <li>Opens on the right, over chat, filtered to the strip: bass shows bass sounds, keys shows keys sounds, and <b>you</b> shows every pitched sound. Drums never open it (kit only; <code>B</code> shows <q>drums use the kit</q>).</li>
+        <li>Three groups, newest first: <b>Starters</b>, <b>Designed</b>, <b>Tweaks</b>.</li>
+        <li>Row: name, role hue, provenance on a second line: <q>designed from electric_piano.wav · this jam</q>, <q>described: "round rubbery sub…" · jam 4KQ2</q>, <q>tweak of Glass EP by keys</q>, <q>starter</q>. The current sound is marked.</li>
+        <li>Keys: <kbd>↑</kbd><kbd>↓</kbd> move, <b>moving auditions it</b> on the keyboard (your keys play the highlighted sound), <kbd>Enter</kbd> picks (lands at the next loop line in the jam, instantly in soundcheck), <kbd>Esc</kbd> closes. The dock's mode reads PICKER.</li>
+        <li>Picking on a thinking musician cancels its turn first; a toast says so.</li>
+        <li>The last row is always <q>Design a new one: drop a WAV or describe it</q>, which is mouse-only.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Direct controls <small>everything besides chat</small></h2>
+      <table>
+        <tr><td>Transport</td><td><kbd>Space</kbd>, the ▶ button. First press starts the jam (phase → jam).</td></tr>
+        <tr><td>Focus / arm</td><td><kbd>1</kbd>–<kbd>4</kbd>, or click a strip header. In soundcheck, focus arms the strip for your keyboard.</td></tr>
+        <tr><td>History</td><td><kbd>←</kbd> <kbd>→</kbd> <kbd>⇧←</kbd> <kbd>⇧→</kbd>; clicking a pip = jumpTo.</td></tr>
+        <tr><td>Sound</td><td><kbd>B</kbd>, or click the sound name ▾.</td></tr>
+        <tr><td>Design</td><td>Drop a WAV on the strip, or the <q>describe…</q> field (mouse). Cancel button on the rail.</td></tr>
+        <tr><td>Mute / solo</td><td><kbd>M</kbd> <kbd>N</kbd>, or the M/S chips in the strip header.</td></tr>
+        <tr><td>Scenes</td><td><kbd>[</kbd> <kbd>]</kbd> recall, <kbd>⇧[</kbd> <kbd>⇧]</kbd> save; click A/B (shift-click saves).</td></tr>
+        <tr><td>Tempo</td><td><kbd>,</kbd> <kbd>.</kbd> ±2; click-drag the bpm box.</td></tr>
+        <tr><td>Key / progression / bars</td><td>Click only: dropdowns in the top bar. Land at the next loop line.</td></tr>
+        <tr><td>Band reacts</td><td><kbd>\</kbd> or the ● (wave 2).</td></tr>
+        <tr><td>Undo / cancel</td><td><kbd>⌫</kbd>, <kbd>C</kbd> (wave 2).</td></tr>
+      </table>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+const STEP = 60 / 96 / 4;            // 16th at 96 bpm
+const LOOP_STEPS = 64;               // 4 bars
+const LOOP = STEP * LOOP_STEPS;      // 10 s
+const CHORDS = ["Dm", "B♭", "F", "C"];
+const DEG = ["D","E","F","G","A","B♭","C","D","E","F"];
+const KEYROW = ["A","S","D","F","G","H","J","K","L",";"];
+
+// ---------- patterns ----------
+const N = (step, deg, len = 2, acc = false, tie = false) => ({ step, deg, len, acc, tie });
+const H = (step, voice, acc = false) => ({ step, voice, acc });
+const drumsV1 = { kind: "drums", bars: 1, notes: [H(0,"kick",1),H(6,"kick"),H(8,"kick",1),H(11,"kick"),H(4,"snare"),H(12,"snare",1),H(2,"hat"),H(6,"hat"),H(10,"hat"),H(14,"ohat")] };
+const drumsV2 = { kind: "drums", bars: 1, notes: [H(0,"kick",1),H(3,"kick"),H(8,"kick",1),H(10,"kick"),H(4,"snare",1),H(12,"snare",1),H(15,"snare"),...[0,2,4,6,8,10,12].map(s=>H(s,"hat",s%4===2)),H(14,"ohat")] };
+const bassV = [
+  null,
+  { kind:"pitched", bars:2, notes:[N(0,0,4,1),N(8,0,2),N(12,4,2),N(16,0,4,1),N(24,0,2),N(28,4,2)] },
+  { kind:"pitched", bars:2, notes:[N(0,0,4,1),N(6,0,2),N(8,0,2),N(12,4,2),N(16,0,4,1),N(22,0,2),N(24,0,2),N(28,4,2)] },
+  { kind:"pitched", bars:2, notes:[N(0,0,3,1),N(3,0,2),N(6,4,2),N(8,0,2),N(11,0,2),N(14,2,2),N(16,0,3,1),N(19,0,2),N(22,4,2),N(24,0,2),N(27,0,2),N(30,-3,2)] },
+  { kind:"pitched", bars:2, notes:[N(0,0,3,1),N(3,0,2),N(6,4,2),N(10,0,2),N(12,2,2),N(16,0,3,1),N(19,0,2),N(22,4,2),N(26,0,2),N(28,2,2)] },
+  { kind:"pitched", bars:2, notes:Array.from({length:16},(_,i)=>N(i*2,[6,14,22,30].includes(i*2)?4:0,2,i%4===0)) },
+];
+const bassTie = { kind:"pitched", bars:2, notes:[N(0,0,4,1,true),N(4,2,2),N(6,4,2),N(8,0,4,1,true),N(12,4,2,0,false),N(16,0,4,1,true),N(20,2,2),N(24,0,4),N(28,4,2,0,true),N(30,0,2)] };
+const chord = (s, len, acc) => [N(s,0,len,acc),N(s,2,len,acc),N(s,4,len,acc)];
+const keysV = [
+  null,
+  { kind:"pitched", bars:2, notes:[...chord(0,6,1),...chord(8,4),...chord(16,6,1),...chord(26,4)] },
+  { kind:"pitched", bars:2, notes:[...chord(2,2,1),...chord(6,2),...chord(10,2),...chord(14,2),N(18,7,2,1),N(18,4,2,1),...chord(22,2),...chord(26,2),...chord(30,2)] },
+];
+const keysReact = { kind:"pitched", bars:2, notes:[...chord(3,2,1),...chord(7,2),...chord(11,2),N(15,7,1),...chord(19,2,1),...chord(23,2),...chord(27,2)] };
+const keysTie = { kind:"pitched", bars:2, notes:[N(0,0,8,1,true),N(8,0,8),N(0,4,6,1),N(8,2,8,0,true),N(16,2,8),N(0,2,16,0,true),N(16,4,8,1),N(24,7,8)] };
+
+// ---------- base state ----------
+const rail = (n, labels) => Array.from({length:n},(_,i)=>({ v:i+1, label: labels[i] || "" }));
+const BASS_LABELS = ["starter: root pulse","push the & of 2","walk up in bar 2","syncopated, leave space for kick","busier: straight eighths, accents on the 1"];
+const KEYS_LABELS = ["starter: held triads","offbeat stabs","sound: Glassier EP (tweak)","sound: Shimmer Wash (tweak)"];
+function base(over = {}) {
+  return deepMerge({
+    phase: "jam", playing: true, bpm: 96, scenes: { A: null, B: null }, reacts: null,
+    focus: null, mode: "play", draft: "", toast: null, keysPressed: [], keychips: null, hud: null, help: false,
+    armed: "you", spaceHint: null,
+    strips: {
+      you:   { sound: "Soft Pad", orig: "starter", status: { k: "live", t: "LIVE" }, pattern: null, rail: rail(1,["Soft Pad"]), cur: 1, liveKeys: [] },
+      drums: { sound: "Kit (808 kick)", orig: "kit", status: null, pattern: drumsV1, rail: rail(1,["starter: four on the floor-ish"]), cur: 1 },
+      bass:  { sound: "Rubber Bass", orig: "starter", status: null, pattern: bassV[4], rail: rail(4,BASS_LABELS), cur: 4 },
+      keys:  { sound: "Glass EP", orig: "designed from electric_piano.wav", status: null, pattern: keysV[2], rail: rail(2,KEYS_LABELS), cur: 2 },
+    },
+    chat: [], spot: [],
+  }, over);
+}
+function deepMerge(a, b) {
+  if (Array.isArray(b) || typeof b !== "object" || b === null) return b === undefined ? a : b;
+  const out = { ...a };
+  for (const k of Object.keys(b)) out[k] = (a && typeof a[k] === "object" && !Array.isArray(a[k]) && a[k] !== null) ? deepMerge(a[k], b[k]) : b[k];
+  return out;
+}
+const P = (text, to) => ({ k:"producer", to, text });
+const M = (who, text) => ({ k:"musician", who, text, reply:true });
+const SYS = (text, bad) => ({ k:"system", text, bad });
+const NUDGE = (text) => ({ k:"nudge", text });
+const beatsLeft = (s) => Math.max(1, Math.ceil((LOOP_STEPS - s) / 4));
+const nextLine = (t) => Math.ceil(t / LOOP + 1e-9) * LOOP;
+
+// ---------- scenarios ----------
+// frame(t, s) returns the state at scenario time t (seconds), playhead step s.
+const SC = {};
+SC.S1 = {
+  title:"Create a jam", wave:1,
+  scen:"Soundcheck phase, 4 strips, starter parts, starters seeded; the transport stays stopped.",
+  look:["Top bar says SOUNDCHECK and what Space will do.","Every strip shows its starter pattern at rest; no playhead.","Strip 1 (you) is armed: your keyboard auditions it.","Chat opens with one system row, not an agent turn (there is no automatic first turn)."],
+  frame:()=>base({ phase:"soundcheck", playing:false, focus:"you", spaceHint:"Space starts the jam",
+    strips:{ keys:{ pattern:keysV[1], rail:rail(1,["starter: held triads"]), cur:1, sound:"Warm EP", orig:"starter" }, bass:{ pattern:bassV[1], rail:rail(1,BASS_LABELS), cur:1 } },
+    chat:[SYS("Jam 6ZQQ59Y8 is open. Build your sounds: drop a WAV or describe one on any strip, or press B to pick. Then Space starts the jam.")] })
+};
+SC.S2 = {
+  title:"Soundcheck: design from a WAV on keys", wave:1, anim:true, period:16,
+  scen:"Drop a WAV on keys: at least 2 measured iterations, then finalize → a designed library row and a design part; the sound swaps. Start is refused while it runs.",
+  look:["Drop target appears on the strip you drag over.","Design rail: iteration count, distance bars shrinking, latest rationale.","Meanwhile you pick bass from the library; the design doesn't block that.","Space is refused while designing; the top bar says why in advance.","At finalize: sound name swaps, library toast, system row in chat."],
+  frame:(t)=>{
+    const d = { origin:"wav", src:"electric_piano.wav", iter:0, of:3, dists:[], why:"", status:"thinking", elapsed: Math.max(0, t-1.5) };
+    const at = [[3.5,18.4,"FM 1:2 ratio, fast modEnv decay for the tine"],[7,11.2,"raise mod index 2 → 3.4; shorten amp decay"],[10.5,7.9,"brighter attack, slight detune on op 3; finalize"]];
+    for (const [tt,dd,w] of at) if (t>=tt){ d.iter++; d.dists.push(dd); d.why=w; }
+    d.iter = Math.min(3, d.iter + (t>=1.5?1:0)); if (t < 1.5) d.iter = 0;
+    const done = t >= 11.5;
+    const st = base({ phase:"soundcheck", playing:false, focus: t>5 && t<9 ? "bass" : "keys", mode: t>5 && t<9 ? "picker":"play",
+      spaceHint: done ? "Space starts the jam" : "Space waits for keys' design",
+      strips:{ keys:{ pattern:keysV[1], rail: done? rail(2,["starter: held triads","sound: Glass EP (designed)"]) : rail(1,["starter: held triads"]), cur: done?2:1,
+        sound: done ? "Glass EP" : "Warm EP", orig: done ? "designed from electric_piano.wav" : "starter", swap: done && t<13,
+        status: done? null : (t<1.5 ? null : { k:"designing", t:`designing · iter ${Math.max(1,d.iter)}/3` }),
+        design: t<1.5 ? { drop:true } : (done ? null : d) },
+        bass:{ pattern:bassV[1], rail:rail(1,BASS_LABELS), cur:1, sound: t>=8.5 ? "Rubber Bass" : "Sub Pluck", swap: t>=8.5 && t<10 } },
+      chat:[SYS("Jam 6ZQQ59Y8 is open. Build your sounds, then Space starts the jam."),
+        ...(t>=1.5?[SYS("keys is designing a sound from electric_piano.wav (Opus 5.5).")]:[]),
+        ...(done?[SYS("keys: your sound is now Glass EP (3 iterations, distance 7.9). Added to the library.")]:[])],
+      toast: t>=4.5&&t<6 ? { k:"bad", t:"Space waits for keys' design (iter 2/3). Cancel it or let it finish." } : (done && t<14 ? { k:"good", t:"Library + Glass EP · designed from electric_piano.wav" } : null),
+      keychips: t>=4.5&&t<6 ? ["Space"] : (t>=5&&t<9 ? (t<6.2?["2","B"]:(t<8.5?["↓"]:["Enter"])) : null) });
+    if (t>=5&&t<9) st.picker = true;
+    return st;
+  }
+};
+SC.S2b = {
+  title:"Soundcheck: design from a description", wave:1, anim:true, period:13,
+  scen:"Design from a description (prompt origin) → finalize → library.",
+  look:["The describe field sits in the strip, next to the drop target.","Rail shows the prompt as its source, not a filename.","Finalized sound lands in the library as designed, with the prompt as provenance."],
+  frame:(t)=>{
+    const typed = "round rubbery sub, short pluck, no buzz".slice(0, Math.floor(t*14));
+    const d = { origin:"prompt", src:"“round rubbery sub, short pluck, no buzz”", iter:1, of:3, dists:[], why:"sine carrier, low index, 40ms pluck on modEnv", status:"thinking", elapsed:Math.max(0,t-3) };
+    if (t>=5.5){ d.dists=[14.1]; } if (t>=8){ d.iter=2; d.dists=[14.1,9.6]; d.why="drop op 2 feedback to kill the buzz; finalize"; }
+    const done = t>=9.5;
+    return base({ phase:"soundcheck", playing:false, focus:"bass",
+      spaceHint: done?"Space starts the jam":"Space waits for bass's design",
+      strips:{ keys:{pattern:keysV[1],rail:rail(1,KEYS_LABELS),cur:1,sound:"Warm EP",orig:"starter"},
+        bass:{ pattern:bassV[1], rail: done?rail(2,["starter: root pulse","sound: Round Sub (designed)"]):rail(1,BASS_LABELS), cur: done?2:1,
+          sound: done?"Round Sub":"Sub Pluck", orig: done?"described: round rubbery sub…":"starter", swap:done,
+          status: t<3||done ? null : { k:"designing", t:`designing · iter ${d.iter}/3` },
+          design: t<3 ? { describe: typed + (t<2.9?"|":"") } : (done?null:d) } },
+      chat:[SYS("Jam 6ZQQ59Y8 is open. Build your sounds, then Space starts the jam."),
+        ...(t>=3?[SYS("bass is designing a sound from your description (Opus 5.5).")]:[]),
+        ...(done?[SYS("bass: your sound is now Round Sub (2 iterations). Added to the library.")]:[])],
+      toast: done ? { k:"good", t:"Library + Round Sub · described: “round rubbery sub, short pluck, no buzz”" } : null });
+  }
+};
+SC.S3 = {
+  title:"Start: the jam begins", wave:1, anim:true, period:20,
+  scen:"Start: every part promotes at s=0; your keys sound immediately and in key; 0 missed steps; spy instruments receive the expected calls.",
+  look:["Phase chip flips to JAM; one playhead column through all lanes.","The current chord lights in the top bar as the playhead crosses bars.","Your lane lights the degrees you hold; dock shows key → note names in D minor.","Keyboard now always plays your strip (no arming in the jam)."],
+  frame:(t,s)=>{
+    const seq=[[0.6,["A"]],[1.0,[]],[1.3,["D"]],[1.6,[]],[1.9,["G"]],[2.6,[]],[5,["A","D","G"]],[6.2,[]],[10.4,["H"]],[10.9,["G"]],[11.4,[]]];
+    let keys=[]; for (const [tt,k] of seq) if (t>=tt) keys=k;
+    return base({ keysPressed:keys, strips:{ you:{ liveKeys:keys } }, keychips: t<0.5?["Space"]:null,
+      chat:[SYS("Jam started. Parts land on the loop line."),] });
+  }
+};
+SC.S3s = {
+  title:"Stress: nothing skews while the page is busy", wave:1, anim:true, period:20,
+  scen:"While the band plays: 30 chat rows, 3 parallel part changes per loop, rail and grid redraws, a live-key burst, one design render. missedSteps stays 0; all tracks' spy-call times per step are identical.",
+  look:["This frame is for the E2E test, not the demo. The HUD is window.__band, drawn here only to show what the test reads.","Three strips staged at once all land on the same loop line.","Chat flood scrolls; the grid and playhead don't stutter."],
+  frame:(t,s)=>{
+    const n = Math.min(30, Math.floor(t*3));
+    const rows = Array.from({length:n},(_,i)=> i%3===0 ? P(`@all test row ${i+1}`) : M(["drums","bass","keys"][i%3], `ack ${i+1}`));
+    const staged = (t%LOOP) > 2;
+    return base({ keysPressed: Math.floor(t*6)%2? ["A","S","D","F"]:["G"], strips:{ you:{liveKeys:["A","S"], status:{k:"designing",t:"design render · iter 1"}},
+      drums:{ staged: staged?drumsV2:null, landsIn: staged?beatsLeft(s):null, status: staged?{k:"staged"}:null },
+      bass:{ staged: staged?bassV[5]:null, landsIn: staged?beatsLeft(s):null, status: staged?{k:"staged"}:null },
+      keys:{ staged: staged?keysReact:null, landsIn: staged?beatsLeft(s):null, status: staged?{k:"staged"}:null } },
+      chat: rows, hud:{ g: Math.floor(t/STEP), missed:0, promotions: Math.floor(t/LOOP)*3 } });
+  }
+};
+SC.S4 = {
+  title:"“@bass busier, eighth notes”", wave:1, anim:true, period:20, animated:true,
+  scen:"Note → thinking → threaded reply → bass v+1 lands at s=0, and the countdown matched. The summary shows X.",
+  look:["The animated strip. Watch bass: thinking pill → reply arrives in chat → outlined v5 pip and outlined cells → “lands in N beats” counts down → swaps exactly at the loop line.","The reply arrives when the turn commits, before the part lands. The countdown covers the gap.","Everything keeps playing the whole time."],
+  frame:(t,s)=>{
+    const posted = t>=1.4, committed = t>=5.2, landed = t>=nextLine(5.2);
+    const draft = t<1.4 ? "@bass busier, eighth notes".slice(0, Math.floor(t*22)) : "";
+    const bass = { };
+    if (posted && !committed) bass.status = { k:"thinking", t:`thinking… ${Math.floor(t-1.4)}s` };
+    if (committed && !landed){ bass.staged = bassV[5]; bass.landsIn = beatsLeft(s); bass.status={k:"staged"}; bass.rail = rail(5,BASS_LABELS); }
+    if (landed){ bass.pattern = bassV[5]; bass.rail = rail(5,BASS_LABELS); bass.cur = 5; }
+    return base({ focus:"bass", mode: t<1.4 ? "chat":"play", draft, strips:{ bass },
+      chat:[ SYS("Jam started."), ...(posted?[{...P("busier, eighth notes","bass"), fresh:t<2.2}]:[]),
+        ...(committed?[{...M("bass","Eighths on the root, accents on each downbeat, fifth on the & of 2 and 4. Lands at the loop line."), fresh:t<6}]:[]) ],
+      keychips: t<0.3?["2","Enter"]:null });
+  }
+};
+SC.S5 = {
+  title:"“@keys make it glassier”, then one that loses the thread", wave:1, anim:true, period:40,
+  scen:"A tweak row → the sound swaps at s=0; ← restores it at s=0.",
+  look:["A sound change is a new version like any other: outlined pip, “lands in N beats”, sound name swaps at the loop line.","Each tweak also lands in the library (toast).","Esc 4 ← brings the good version back at the next loop line."],
+  frame:(t,s)=>{
+    const keys = {}; let chat=[SYS("Jam started.")], toast=null, chips=null, focus="keys", mode="play", draft="";
+    const L1 = nextLine(4), L2 = nextLine(14), L3 = nextLine(22);
+    if (t<1) { mode="chat"; draft="@keys make it glassier".slice(0,Math.floor(t*24)); }
+    if (t>=1) chat.push({...P("make it glassier","keys"), fresh:t<1.8});
+    if (t>=1 && t<4) keys.status={k:"thinking",t:`thinking… ${Math.floor(t-1)}s`};
+    if (t>=4){ chat.push({...M("keys","More modulator index and a faster tine decay: Glassier EP."), fresh:t<4.8}); keys.rail=rail(3,KEYS_LABELS); }
+    if (t>=4 && t<L1){ keys.status={k:"staged"}; keys.landsIn=beatsLeft(s); keys.stagedSound="Glassier EP"; toast = t<6?{k:"good",t:"Library + Glassier EP · tweak of Glass EP"}:null; }
+    if (t>=L1){ keys.sound="Glassier EP"; keys.orig="tweak of Glass EP"; keys.cur=3; keys.swap = t<L1+1.5; }
+    if (t>=11 && t<12){ mode="chat"; draft="@keys even more shimmer, wash it out".slice(0,Math.floor((t-11)*40)); }
+    if (t>=12) chat.push({...P("even more shimmer, wash it out","keys"), fresh:t<12.8});
+    if (t>=12 && t<14) keys.status={k:"thinking",t:`thinking… ${Math.floor(t-12)}s`};
+    if (t>=14){ chat.push({...M("keys","Long release, chorus on op 2: Shimmer Wash."), fresh:t<14.8}); keys.rail=rail(4,KEYS_LABELS); }
+    if (t>=14 && t<L2){ keys.status={k:"staged"}; keys.landsIn=beatsLeft(s); keys.stagedSound="Shimmer Wash"; }
+    if (t>=L2){ keys.sound="Shimmer Wash"; keys.orig="tweak of Glassier EP"; keys.cur=4; keys.swap=t<L2+1.5; }
+    if (t>=21 && t<22.6){ chips = t<21.5?["Esc"]:(t<22?["Esc","4"]:["Esc","4","←"]); focus = t>=21.5?"keys":null; }
+    if (t>=22 && t<L3){ keys.status={k:"staged"}; keys.landsIn=beatsLeft(s); keys.stagedV=3; keys.stagedSound="Glassier EP"; }
+    if (t>=L3){ keys.sound="Glassier EP"; keys.orig="tweak of Glass EP · back from v4"; keys.cur=3; keys.swap=t<L3+1.5; }
+    return base({ focus, mode, draft, toast, keychips:chips, strips:{ keys }, chat });
+  }
+};
+SC.S6 = {
+  title:"Scenes A/B", wave:1, anim:true, period:30,
+  scen:"Save A → change → save B → recall A. The parts return at s=0, A reads as active, and it survives a reload.",
+  look:["A/B in the top bar: dim = empty, outlined = saved, filled = active (every part's basedOn + muted match).","Recall stages all four strips at once; they land together.","After a change, neither scene reads active; that's correct, not a bug."],
+  frame:(t,s)=>{
+    const L1=nextLine(0.6), L2 = nextLine(12.6);
+    const st = { scenes:{A:"saved",B:"saved"}, strips:{}, keychips:null, toast:null };
+    if (t<L1){ st.scenes.B="active"; }
+    if (t>=0.6 && t<L1){ st.keychips=["["]; st.scenes.A="pending"; st.strips = { drums:{staged:drumsV1,landsIn:beatsLeft(s),status:{k:"staged"}}, bass:{staged:bassV[3],landsIn:beatsLeft(s),status:{k:"staged"},cur:5,rail:rail(5,BASS_LABELS)}, keys:{staged:keysV[1],landsIn:beatsLeft(s),status:{k:"staged"},cur:4,rail:rail(4,KEYS_LABELS)} };
+      st.strips.drums.pattern=drumsV2; st.strips.bass.pattern=bassV[5]; st.strips.keys.pattern=keysReact; }
+    if (t<0.6){ st.strips = { drums:{pattern:drumsV2}, bass:{pattern:bassV[5],cur:5,rail:rail(5,BASS_LABELS)}, keys:{pattern:keysReact,cur:4,rail:rail(4,KEYS_LABELS)} }; }
+    if (t>=L1){ st.scenes.A="active"; st.strips={ bass:{pattern:bassV[3],cur:3,rail:rail(5,BASS_LABELS)}, keys:{pattern:keysV[1],cur:1,rail:rail(4,KEYS_LABELS)} }; }
+    if (t>=L1 && t<L1+2) st.toast={k:"good",t:"Scene A is playing"};
+    if (t>=12 && t<L2){ st.keychips=["M"]; st.focus="drums"; st.strips.drums={muted:true}; st.scenes.A="saved"; }
+    if (t>=L2){ st.focus="drums"; st.strips.drums={muted:true}; st.scenes.A="saved"; }
+    if (t>=13 && t<14.5) st.toast={k:"",t:"drums muted · no scene matches now"};
+    st.chat=[SYS("Jam started."), SYS("Saved scene A."), SYS("Saved scene B."), ...(t>=L1?[SYS("Recalled scene A.")]:[])];
+    return base(st);
+  }
+};
+SC.S7 = {
+  title:"Nudges: the band reacts once", wave:2,
+  scen:"A single-musician note → exactly one reaction, by the mapped reactor, then quiet. @all → none; reacts off → none.",
+  look:["Nudge row: dim italic one-liner, no author weight.","Keys' pill says “reacting to @bass”; its reply threads under your note, not under bass's.","Top bar ● = band reacts on; \\ toggles."],
+  frame:(t,s)=>base({ reacts:true, strips:{ bass:{ pattern:bassV[5], rail:rail(5,BASS_LABELS), cur:5 }, keys:{ status:{k:"reacting",t:"reacting to @bass"}, staged:keysReact, landsIn:beatsLeft(s) } },
+    chat:[ SYS("Jam started."), P("busier, eighth notes","bass"), M("bass","Eighths on the root, accents on each downbeat."), NUDGE("bass changed its part"), {...M("keys","Moving my stabs off the eighths so they don't double the bass."), react:true} ] })
+};
+SC.S8 = {
+  title:"Design failure; the held note is delivered", wave:1, anim:true, period:12,
+  scen:"Refusal, max_tokens or two no-tool strikes → failed and the musician is freed; a note held during the design is delivered afterwards.",
+  look:["While designing, a note to keys shows “queued until the sound is done” on the chat row and a pill on the strip.","The failed rail is red with two ways forward.","The held note is delivered immediately after: keys starts thinking."],
+  frame:(t)=>{
+    const failed = t>=4, delivered = t>=4.3, replied = t>=7;
+    const keys = { pattern:keysV[1], sound:"Warm EP", orig:"starter", rail:rail(1,KEYS_LABELS), cur:1 };
+    if (!failed){ keys.status={k:"designing",t:"designing · iter 2/3"}; keys.design={ origin:"wav", src:"glass_bell.wav", iter:2, of:3, dists:[16.8], why:"(no proposal this turn; strike 1 of 2)", elapsed:t+62 }; keys.queued=1; }
+    if (failed) keys.design = { failed:"design stopped: Claude didn't propose a sound twice (no-tool strikes)." };
+    if (delivered && !replied) keys.status={k:"thinking",t:`thinking… ${Math.floor(t-4.3)}s`};
+    return base({ phase:"soundcheck", playing:false, focus:"keys", spaceHint: failed?"Space starts the jam":"Space waits for keys' design", strips:{ keys, bass:{pattern:bassV[1],rail:rail(1,BASS_LABELS),cur:1} },
+      chat:[ SYS("keys is designing a sound from glass_bell.wav (Opus 5.5)."), {...P("when you're done, keep the voicings low","keys"), queued:!delivered, delivered},
+        ...(failed?[SYS("keys: design stopped. Claude didn't propose a sound twice. Still on Warm EP. Try again, or press B to pick.",true)]:[]),
+        ...(replied?[M("keys","Dropped the triads an octave and spread them: 0-4-9.")]:[]) ] });
+  }
+};
+SC.S9 = {
+  title:"Robustness: invalid calls and the watchdog", wave:1,
+  scen:"An invalid tool call → is_error, idle, and the next note works; the band watchdog reclaims a hung turn; a failed band turn's request isn't re-executed.",
+  look:["An invalid change never half-applies: bass stays on v4, the reason is one plain line.","The watchdog pill shows elapsed seconds past 10s, then gives up at 30s with a system row.","Both musicians are idle and ready for the next note."],
+  frame:(t,s)=>base({ strips:{ drums:{ status:{k:"thinking",t:"thinking… 27s"} } },
+    chat:[ SYS("Jam started."), P("syncopate it, push the 1","bass"), M("bass","Pushing the downbeat to the & of 4."),
+      SYS("bass's change didn't validate (set_pattern: step 40 is outside the 2-bar part). Still on v4.", true),
+      P("try it again, stay inside two bars","bass"), M("bass","Pushed the 1 to step 31, inside the loop."),
+      P("half-time feel","drums") ] })
+};
+SC.S10a = {
+  title:"History: ← and → walk the rail", wave:1, anim:true, period:50,
+  scen:"v1–v4, ← ← → v2 at s=0, → → v3, a prompt adds v5, ← from v5 → v4. No row at either end; a jump to a copy resolves; mute writes no part.",
+  look:["Rail shows content versions only (copies never add pips). Current = filled, staged = outlined.","Each step lands at the loop line with its own countdown.","A new prompt from v3 still becomes v5 (append-only; the newest plays).","← from v5 goes to v4, the pip to its left, not back to v3."],
+  frame:(t,s)=>{
+    const bass={ rail:rail(4,BASS_LABELS), cur:4, pattern:bassV[4] }; let chips=null; const chat=[SYS("Jam started.")];
+    const ev=[ [0.8,"←←",2], [10.8,"→",3] ];
+    for (const [tt,k,v] of ev){ if (t>=tt && t<nextLine(tt)){ bass.staged=bassV[v]; bass.stagedV=v; bass.landsIn=beatsLeft(s); bass.status={k:"staged"}; } if (t>=nextLine(tt)){ bass.cur=v; bass.pattern=bassV[v]; } if (t>=tt && t<tt+1.2) chips=k==="←←"?["←","←"]:[k]; }
+    if (t>=20.8){ chat.push(P("busier, eighth notes","bass")); }
+    if (t>=20.8 && t<23.5) bass.status={k:"thinking",t:`thinking… ${Math.floor(t-20.8)}s`};
+    if (t>=23.5){ bass.rail=rail(5,BASS_LABELS); chat.push(M("bass","Eighths on the root.")); }
+    if (t>=23.5 && t<30){ bass.staged=bassV[5]; bass.stagedV=5; bass.landsIn=beatsLeft(s); bass.status={k:"staged"}; }
+    if (t>=30){ bass.cur=5; bass.pattern=bassV[5]; }
+    if (t>=30.8 && t<40){ bass.staged=bassV[4]; bass.stagedV=4; bass.landsIn=beatsLeft(s); bass.status={k:"staged"}; }
+    if (t>=30.8 && t<32) chips=["←"];
+    if (t>=40){ bass.cur=4; bass.pattern=bassV[4]; }
+    if (t>=41 && t<42.5) chips=["←"];
+    const toast = t>=41 && t<43 ? null : null;
+    return base({ focus:"bass", keychips:chips, toast, strips:{ bass }, chat });
+  }
+};
+SC.S10b = {
+  title:"Undo: Backspace walks back the band's actions", wave:2,
+  scen:"Backspace from v5 → v3; after jumpTo it goes back to where you jumped from; after a recall, all 4 parts and mute revert; it walks across musicians.",
+  look:["Undo says what it undid, in words, and uses the same countdown.","Rail: v3 staged even though v4 exists; undo isn't ← (that would be v4).","No redo; the toast doesn't offer one."],
+  frame:(t,s)=>base({ focus:null, keychips:["⌫"], toast:{k:"",t:"Undo: bass v5 (busier) → v3 · lands in "+beatsLeft(s)+" beats"},
+    strips:{ bass:{ rail:rail(5,BASS_LABELS), cur:5, pattern:bassV[5], staged:bassV[3], stagedV:3, landsIn:beatsLeft(s), status:{k:"staged"} } },
+    chat:[SYS("Jam started."), P("busier, eighth notes","bass"), M("bass","Eighths on the root.")] })
+};
+SC.S11 = {
+  title:"Keys only, and the ? overlay", wave:"1 / 2",
+  scen:"S11a: S3–S6 and S10a are driven entirely from the keyboard (starting a design excepted). S11b: router matrix: modifiers do nothing, a held arrow takes one step, Shift+[ saves A, keyup releases in chat, Space with a focused button toggles once, Enter stays in chat, ? vs /.",
+  look:["? opens the full key map over the app; Esc closes.","Dock mode chip is always visible: PLAY / CHAT / PICKER.","Focus ring on the strip whose number you pressed.","Wave-2 keys are listed dim until they ship."],
+  frame:()=>base({ focus:"keys", help:true })
+};
+SC.S12 = {
+  title:"Ties: glide and merge", wave:2,
+  scen:"Bass glide, keys merge within the bar, re-attack at a chord change, a tie across the repeat, release on promotion, stop and mute.",
+  look:["A tie is a short bar bridging to the next hit (white tick at the cell edge).","Keys ties merge only within the bar; at the bar line the chord changes and the note re-attacks, which the grid shows as a fresh head.","Summary text uses ~ (0:0~ 4:2)."],
+  frame:()=>base({ focus:"bass", strips:{ bass:{ pattern:bassTie, rail:rail(6,[...BASS_LABELS,"slides: glide into the 3rd"]), cur:6 }, keys:{ pattern:keysTie, rail:rail(3,KEYS_LABELS), cur:3 } },
+    chat:[SYS("Jam started."), P("slide into the notes","bass"), M("bass","Tied the root into the third on beats 1 and 3; glides in.")] })
+};
+SC.H = {
+  title:"The headline, steps 1–5", wave:"1 (2 adds the reaction)",
+  scen:"The scripted demo in order, keyboard-first, with fake scripts matching its prompts.",
+  chapters:[["1 Soundcheck","S2"],["2 Space","S3"],["3 @bass busier","S4"],["4 glassier + ←","S5"],["5 Scenes","S6"]],
+  look:["Each chapter replays the scenario frame it's made of.","Pitch line: “the band builds its sounds, then you build a loop together and flip between two sections.”","Step 3's keys reaction (wave 2) is S7."],
+};
+
+const ORDER = ["S1","S2","S2b","S3","S3s","S4","S5","S6","S7","S8","S9","S10a","S10b","S11","S12","H"];
+
+// ---------- rendering ----------
+const $ = (s, r=document) => r.querySelector(s);
+const app = $("#app");
+const esc = (x) => String(x).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ROLE_NUM = { you:1, drums:2, bass:3, keys:4 };
+
+function cellsFor(pat) {
+  // returns map row -> array(64) of {on,acc,sus,gh,tie}
+  const rows = new Map();
+  if (!pat) return rows;
+  const per = pat.bars * 16;
+  const ensure = (r) => { if (!rows.has(r)) rows.set(r, Array.from({length:LOOP_STEPS},()=>({}))); return rows.get(r); };
+  if (pat.kind === "drums") ["kick","snare","hat","ohat"].forEach(ensure);
+  for (let rep = 0; rep < LOOP_STEPS / per; rep++) {
+    for (const n of pat.notes) {
+      const row = ensure(pat.kind === "drums" ? n.voice : n.deg);
+      const len = pat.kind === "drums" ? 1 : n.len;
+      for (let i = 0; i < len; i++) {
+        const st = rep*per + n.step + i; if (st >= LOOP_STEPS) break;
+        row[st] = { on:true, acc:!!n.acc && i===0, sus:i>0, gh:rep>0, tie: n.tie && i===len-1 };
+      }
+    }
+  }
+  return rows;
+}
+function gridHTML(kind, pat, staged) {
+  const cur = cellsFor(pat), stg = cellsFor(staged);
+  let keys = [...new Set([...cur.keys(), ...stg.keys()])];
+  if (kind === "drums") keys = ["kick","snare","hat","ohat"];
+  else keys.sort((a,b)=>b-a);
+  let h = "";
+  for (const k of keys) {
+    const label = kind === "drums" ? ({kick:"kick",snare:"snr",hat:"hat",ohat:"oh"})[k] : k;
+    h += `<div class="rl">${label}</div>`;
+    const a = cur.get(k) || [], b = stg.get(k) || [];
+    for (let i = 0; i < LOOP_STEPS; i++) {
+      const c = a[i] || {}, d = b[i] || {};
+      const cl = ["c", i%16===0?"b16":(i%4===0?"b4":""), c.on?"on":"", c.acc?"acc":"", c.sus?"sus":"", c.gh?"gh":"", c.tie?"tie":"", d.on?"st":""].filter(Boolean).join(" ");
+      h += `<div class="${cl}" data-s="${i}"></div>`;
+    }
+  }
+  return `<div class="grid">${h}<div class="ph"></div></div>`;
+}
+function pillHTML(st, strip) {
+  if (!st) return `<span class="pill">idle</span>`;
+  if (st.k === "staged") return `<span class="pill staged">${strip.stagedSound ? `→ ${esc(strip.stagedSound)} · ` : ""}lands in ${strip.landsIn} beat${strip.landsIn===1?"":"s"}</span>`;
+  const dots = (st.k==="thinking"||st.k==="designing"||st.k==="reacting") ? `<span class="dots"><i></i><i></i><i></i></span>` : "";
+  return `<span class="pill ${st.k}">${dots}${esc(st.t)}</span>`;
+}
+function railHTML(strip) {
+  if (!strip.rail) return "";
+  const pips = strip.rail.map(r => `<span class="pip ${r.v===strip.cur?"cur":""} ${r.v===strip.stagedV || (strip.staged && !strip.stagedV && r.v===strip.rail.length && r.v!==strip.cur)?"stg":""}" title="v${r.v}: ${esc(r.label)}">v${r.v}</span>`).join("");
+  const cur = strip.rail.find(r => r.v === strip.cur);
+  return `<div class="rail">${pips}</div><div class="rlabel">v${strip.cur}: <b>${esc(cur?cur.label:"")}</b></div>`;
+}
+function designInline(d, role) {
+  if (!d) return "";
+  if (d.drop) return `<div class="drail"><div class="drop">⤓ drop to design: <b>electric_piano.wav</b></div><div class="hint">or <span class="describe" style="padding:1px 6px">describe a sound…</span></div></div>`;
+  if (d.describe !== undefined) return `<div class="drail"><div class="hint">drop a WAV, or</div><div class="describe">${esc(d.describe.replace("|",""))}${d.describe.includes("|")?'<span class="caret"></span>':""}</div></div>`;
+  if (d.failed) return `<div class="drail"><div class="drow" style="color:var(--bad)">✕ ${esc(d.failed)}</div><div class="drow"><button class="mini">Try again</button><button class="mini">Pick from library <kbd style="font-family:var(--mono)">B</kbd></button></div></div>`;
+  const max = 20;
+  const bars = d.dists.map((x,i)=>`<i class="${i===d.dists.length-1&&d.iter===d.of?"fin":""}" style="height:${Math.max(3,x/max*22)}px" title="iter ${i+1}: d=${x}"></i>`).join("");
+  const last = d.dists.length ? `d=<em>${d.dists[d.dists.length-1]}</em>` : "measuring…";
+  const first = d.dists.length>1 ? `${d.dists[0]} → ` : "";
+  const mm = Math.floor(d.elapsed/60), ss = String(Math.floor(d.elapsed%60)).padStart(2,"0");
+  return `<div class="drail"><div class="drow"><span class="hint">from <b>${esc(d.src)}</b></span></div>
+    <div class="drow"><div class="dist">${bars}</div><span class="dnum">${first}${last}</span><span class="hint">${mm}:${ss} / 3:00</span><button class="mini">Cancel</button></div>
+    ${d.why?`<div class="why">“${esc(d.why)}”</div>`:""}</div>`;
+}
+function designPanel(st) {
+  const role = Object.keys(st.strips).find(r => { const d = st.strips[r].design; return d && d.dists; });
+  if (!role) return "";
+  const d = st.strips[role].design;
+  const whys = ["FM 1:2 ratio, fast modEnv decay for the tine","raise mod index 2 → 3.4; shorten amp decay","brighter attack, slight detune on op 3; finalize"];
+  const atts = d.dists.map((x,i)=>`<div class="att ${i===d.of-1?"fin":""}"><div class="t"><span>iter ${i+1}</span><em>d=${x}</em></div><div class="why">“${esc(d.origin==="prompt"?d.why:whys[i]||d.why)}”</div><div class="drow"><button class="mini">▶ target</button><button class="mini">▶ this</button></div></div>`).join("");
+  return `<div class="dp"><h3><span class="c-${role}">${role}</span> · designing</h3><div class="hint">from <b>${esc(d.src)}</b> · iter ${d.iter}/${d.of}</div>${atts}${d.dists.length<d.iter?`<div class="att"><div class="t"><span>iter ${d.iter}</span><span class="dots" style="--c:var(--${role})"><i></i><i></i><i></i></span></div></div>`:""}<button class="mini" style="align-self:flex-start">Cancel design</button></div>`;
+}
+function stripHTML(role, st, S) {
+  const s = st.strips[role];
+  const kind = role === "drums" ? "drums" : "pitched";
+  const cls = ["strip", role, S.focus===role?"focus":"", s.muted?"muted":"", st.spot?.includes(role)?"spot":""].join(" ");
+  const head = `<div class="shead">
+      <div class="nm"><span class="num">${ROLE_NUM[role]}</span><span class="who">${role}</span><span class="snd ${s.swap?"swap":""}" title="${esc(s.orig)}">${esc(s.sound)}${role!=="drums"?" ▾":""}</span></div>
+      <div class="orow"><div class="orig">${esc(s.orig)}</div><span class="ms"><span class="${s.muted?"on":""}">M</span><span>S</span></span></div>
+      ${pillHTML(s.status, s)}
+      ${s.queued?`<span class="pill queued">1 note queued until the sound is done</span>`:""}
+      ${role!=="you"?railHTML(s):""}
+      ${S.designMode==="inline" || !(s.design && s.design.dists) ? designInline(s.design, role) : `<div class="hint" style="color:var(--${role})">designing in the side panel → iter ${s.design.iter}/3</div>`}
+    </div>`;
+  let body;
+  if (role === "you") {
+    const ks = KEYROW.map((k,i)=>`<span class="k ${s.liveKeys?.includes(k)?"dn":""}">${DEG[i]}</span>`).join("");
+    body = `<div class="gwrap"><div class="live">${ks}</div><div class="hint">${st.phase==="jam" ? "Plays live only; nothing is recorded. The band is told you're playing along around octave 4." : (S.focus==="you" ? "<b>Armed.</b> Your keyboard auditions this sound." : "Press 1 to audition your sound.")}</div></div>`;
+  } else body = `<div class="gwrap">${gridHTML(kind, s.pattern, s.staged)}</div>`;
+  return `<div class="${cls}" style="--c:var(--${role})">${head}${body}</div>`;
+}
+function chatHTML(st) {
+  return st.chat.map(r => {
+    const fresh = r.fresh ? " new" : "";
+    if (r.k==="system") return `<div class="msg system${r.bad?" bad":""}${fresh}">${esc(r.text)}</div>`;
+    if (r.k==="nudge") return `<div class="msg nudge${fresh}">· ${esc(r.text)} · keys may react</div>`;
+    if (r.k==="producer") return `<div class="msg${fresh}"><span class="a c-you">you</span>${r.to?`<span class="to">→ @${r.to}</span> `:""}${esc(r.text)}${r.queued?`<span class="tag">queued until the sound is done</span>`:""}${r.delivered?`<span class="tag ok">delivered</span>`:""}</div>`;
+    return `<div class="msg reply${fresh}"><span class="a c-${r.who}">@${r.who}</span>${r.react?`<span class="to">(reacting to @bass)</span> `:""}${esc(r.text)}</div>`;
+  }).join("");
+}
+function helpHTML() {
+  const rows = [["A – ;","Scale degrees 0–9, home row"],["Q – P","Same degrees, one octave up"],["Z / X","Octave down / up"],["Space","Start / stop (first press starts the jam)"],["1 – 4","Focus a strip: you, drums, bass, keys"],["Enter or /","Open chat, prefilled @focused"],["Esc","Leave chat or picker; clear focus"],["← / →","Step back / forward on the rail"],["⇧← / ⇧→","Oldest / newest version"],["M / N","Mute / solo the focused strip"],["B","Library picker"],["[ / ]","Recall scene A / B"],["⇧[ / ⇧]","Save scene A / B"],[", / .","bpm −2 / +2"],["?","This overlay"],["⌫","Undo the band's newest action","w2"],["C","Cancel the focused turn","w2"],["\\","Band reacts on / off","w2"]];
+  return `<div class="help"><div class="helpbox"><h3>Keys · every action has one <span class="hint" style="font-weight:400">(dim = wave 2) · Esc closes</span></h3>${rows.map(r=>`<div class="${r[2]||""}"><kbd>${esc(r[0])}</kbd><span>${esc(r[1])}</span></div>`).join("")}</div></div>`;
+}
+function topbarHTML(st, s) {
+  const bar = Math.floor(s/16);
+  const sc = (k) => `<span class="scene ${st.scenes[k]||""}" title="${k}: ${st.scenes[k]||"empty"}">${k}</span>`;
+  const pos = st.playing ? `${bar+1}.${Math.floor((s%16)/4)+1}` : "–";
+  return `<div class="topbar"><span class="brand">Claudio <span>Band</span></span><span class="slug">6ZQQ59Y8</span>
+    <span class="chip ${st.phase==="jam"?"jam":"sc"}">${st.phase==="jam"?"jam":"soundcheck"}</span>
+    <span class="tp"><kbd>Space</kbd>${st.playing?`<span class="play">▶ playing</span>`:`<span>${esc(st.spaceHint||"stopped")}</span>`}</span>
+    <span class="ctl"><span class="box">96</span><small>bpm</small></span>
+    <span class="ctl"><span class="box">D minor</span></span>
+    <span class="prog">${CHORDS.map((c,i)=>`<span class="${st.playing&&i===bar?"on":""}">${c}</span>`).join("")}</span>
+    <span class="ctl"><span class="box">4</span><small>bars</small></span>
+    <span class="pos">${pos}</span>
+    <span class="spacer"></span>
+    <span class="ctl"><small>scenes</small> ${sc("A")} ${sc("B")}</span>
+    ${st.reacts!==null?`<span class="reacts ${st.reacts?"":"off"}">reacts <i>●</i></span>`:""}
+  </div>`;
+}
+function dockHTML(st, S) {
+  const soundcheck = st.phase === "soundcheck";
+  const target = soundcheck ? (S.focus || "you") : "you";
+  const tsound = st.strips[target]?.sound || "";
+  const keys = KEYROW.map((k,i)=>`<div class="key ${i===0||i===7?"root":""} ${st.keysPressed.includes(k)?"dn":""}"><b>${k}</b><small>${DEG[i]}</small></div>`).join("");
+  const target2 = target === "drums" ? "drums · A kick, S snare, D hat, F open hat" : `${target} · ${tsound}`;
+  return `<div class="dock"><span class="mode ${S.mode}">${S.mode.toUpperCase()}</span><div class="keys">${keys}</div>
+    <div class="dockinfo">keys → <b>${esc(target2)}</b>${soundcheck && target!=="you" ? " (armed)" : ""}<br>D minor · oct <b>4</b> (Z/X) · top row +1 oct</div>
+    <div class="r"><span><kbd>B</kbd> library</span><span><kbd>?</kbd> keys</span></div></div>`;
+}
+
+let cur = "S4", chapter = 0, t0 = performance.now(), lastSig = "";
+const opts = { strips:"down", design:"inline", chat:"right", help:"off" };
+try { const saved = JSON.parse(localStorage.getItem("cb-opts")||"null"); if (saved) Object.assign(opts, saved, {help:"off"}); const c = localStorage.getItem("cb-scen"); if (c && SC[c]) cur = c; } catch {}
+if (location.hash && SC[location.hash.slice(1)]) cur = location.hash.slice(1);
+
+function activeScenario() { return cur === "H" ? SC[SC.H.chapters[chapter][1]] : SC[cur]; }
+function render(force) {
+  const sc = activeScenario();
+  let t = (performance.now() - t0) / 1000;
+  if (sc.period) t = t % sc.period;
+  const st = sc.frame(t, Math.floor(t / STEP) % LOOP_STEPS);
+  const s = st.playing ? Math.floor(((performance.now() - t0)/1000) / STEP) % LOOP_STEPS : 0;
+  app.style.setProperty("--s", s);
+  const S = { focus: st.focus, mode: st.picker ? "picker" : st.mode, designMode: opts.design };
+  const sig = JSON.stringify([st, opts, Math.floor(s/4)]);
+  if (sig === lastSig && !force) return;
+  lastSig = sig;
+  app.className = ["app", opts.strips==="across"?"across":"", opts.design==="side"?"dside":"", opts.chat==="bottom"?"chat-bottom":"", st.playing?"":"stopped"].join(" ");
+  const hasPanel = opts.design === "side" && designPanel(st);
+  const rowsEl = app.querySelector(".rows"); const wasBottom = !rowsEl || rowsEl.scrollTop + rowsEl.clientHeight >= rowsEl.scrollHeight - 4;
+  app.innerHTML = `${topbarHTML(st, s)}
+    <div class="body">
+      <div class="main">
+        <div class="strips">${["you","drums","bass","keys"].map(r=>stripHTML(r, st, S)).join("")}</div>
+        <div class="loopbar"><span>loop ${Math.floor(((performance.now()-t0)/1000)/LOOP)+1}</span><div class="lb"><i></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div><span>${st.playing?`next loop line in ${beatsLeft(s)} beats`:"stopped"}</span></div>
+        ${dockHTML(st, S)}
+      </div>
+      <div class="dpanel ${hasPanel?"has":""}">${hasPanel||""}</div>
+      <div class="chat"><div class="h">Band chat</div><div class="rows">${chatHTML(st)}</div>
+        <div class="cin"><div class="inp ${S.mode==="chat"?"active":""}" style="flex:1"><span>${S.mode==="chat" ? esc(st.draft)+'<span class="caret"></span>' : "Enter or / to talk to the band…"}</span><span>⏎</span></div></div></div>
+    </div>
+    ${st.toast?`<div class="toast ${st.toast.k}">${esc(st.toast.t)}</div>`:""}
+    ${st.keychips?`<div class="kc">you pressed ${st.keychips.map(k=>`<kbd>${esc(k)}</kbd>`).join("")}</div>`:""}
+    ${st.hud?`<div class="hud"><span>window.__band</span><br>g ${st.hud.g}<br>missedSteps ${st.hud.missed}<br>promotions ${st.hud.promotions}<br><span>lookahead 150ms</span></div>`:""}
+    ${(st.help || opts.help==="on")?helpHTML():""}`;
+  const rows = app.querySelector(".rows"); if (rows && wasBottom) rows.scrollTop = rows.scrollHeight;
+}
+function renderNotes() {
+  const sc = SC[cur];
+  const inner = cur === "H" ? SC[SC.H.chapters[chapter][1]] : null;
+  const chapters = cur === "H" ? `<div><p class="sub">Chapter</p><div class="chapters">${SC.H.chapters.map((c,i)=>`<button class="tab" data-ch="${i}" aria-pressed="${i===chapter}">${esc(c[0])}</button>`).join("")}</div></div>` : "";
+  $("#notes").innerHTML = `<h2><span class="id">${cur}</span>${esc(sc.title)} <span class="wave">wave ${sc.wave}</span></h2>
+    ${chapters}
+    <div><p class="sub">Scenario (plan)</p><div class="scen">${esc(sc.scen)}</div></div>
+    ${inner?`<div><p class="sub">This chapter: ${cur==="H"?SC.H.chapters[chapter][1]:""}</p><div class="scen">${esc(inner.title)}</div></div>`:""}
+    <div><p class="sub">What to check</p><ul>${(inner||sc).look.concat(inner?sc.look:[]).map(l=>`<li>${esc(l)}</li>`).join("")}</ul></div>
+    ${(inner||sc).period?`<button class="replay" id="replay">↺ Replay from the start</button>`:""}`;
+  $("#notes").querySelectorAll("[data-ch]").forEach(b => b.onclick = () => { chapter = +b.dataset.ch; t0 = performance.now(); renderNotes(); render(true); });
+  const rp = $("#replay"); if (rp) rp.onclick = () => { t0 = performance.now(); render(true); };
+}
+function renderTabs() {
+  const tabs = $("#tabs");
+  tabs.querySelectorAll(".tab").forEach(e=>e.remove());
+  for (const id of ORDER) {
+    const b = document.createElement("button");
+    b.className = "tab" + (String(SC[id].wave).startsWith("2") ? " w2" : "");
+    b.textContent = id; b.title = SC[id].title + " (wave " + SC[id].wave + ")";
+    b.setAttribute("aria-pressed", id === cur);
+    b.onclick = () => { cur = id; chapter = 0; t0 = performance.now(); try{localStorage.setItem("cb-scen",id)}catch{}; renderTabs(); renderNotes(); render(true); };
+    tabs.appendChild(b);
+  }
+}
+document.querySelectorAll(".seg").forEach(seg => {
+  const key = seg.dataset.opt;
+  const sync = () => seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === opts[key]));
+  seg.querySelectorAll("button").forEach(b => b.onclick = () => { opts[key] = b.dataset.v; try{localStorage.setItem("cb-opts",JSON.stringify(opts))}catch{}; sync(); render(true); });
+  sync();
+});
+window.addEventListener("keydown", e => {
+  if (e.key === "?") { opts.help = opts.help==="on"?"off":"on"; document.querySelectorAll('[data-opt="help"] button').forEach(b=>b.setAttribute("aria-pressed", b.dataset.v===opts.help)); render(true); }
+  if (e.key === "Escape" && opts.help==="on") { opts.help="off"; document.querySelectorAll('[data-opt="help"] button').forEach(b=>b.setAttribute("aria-pressed", b.dataset.v==="off")); render(true); }
+});
+renderTabs(); renderNotes(); render(true);
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+setInterval(() => render(false), reduce ? 500 : 60);
+})();
+</script>
