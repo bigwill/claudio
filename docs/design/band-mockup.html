@@ -95,14 +95,14 @@ button{font:inherit;color:inherit}
 .strip.focus{border-color:var(--c);box-shadow:0 0 0 1px var(--c)}
 .strip.muted .grid{opacity:.35}
 .strip.spot::after{content:"";position:absolute;inset:-5px;border:1.5px dashed var(--warn);border-radius:11px;pointer-events:none}
-.shead{padding:9px 10px;border-right:1px solid var(--line2);display:flex;flex-direction:column;gap:6px;min-width:0}
+.shead{padding:9px 10px;border-right:1px solid var(--line2);display:flex;flex-direction:column;gap:6px;min-width:0;overflow:hidden}
 .app.across .shead{border-right:0;border-bottom:1px solid var(--line2)}
 .nm{display:flex;align-items:center;gap:7px;min-width:0}
 .num{font-family:var(--mono);font-size:11px;width:17px;height:17px;display:grid;place-items:center;border:1px solid var(--c);color:var(--c);border-radius:4px;flex:none}
 .who{font-weight:600;color:var(--c)}
 .snd{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px dotted var(--faint);cursor:pointer}
 .snd.swap{color:var(--accent)}
-.orig{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orig{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
 .ms{margin-left:auto;display:flex;gap:3px;flex:none}
 .orow{display:flex;align-items:center;gap:6px;min-width:0}
 .ms span{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:3px;padding:0 4px;color:var(--faint)}
@@ -126,7 +126,7 @@ button{font:inherit;color:inherit}
 
 /* grid */
 .gwrap{padding:8px 10px;min-width:0;display:flex;flex-direction:column;gap:6px;justify-content:center}
-.grid{--lw:28px;position:relative;display:grid;grid-template-columns:var(--lw) repeat(64,minmax(0,1fr));row-gap:2px;width:100%}
+.grid{--lw:28px;position:relative;display:grid;grid-template-columns:var(--lw) repeat(64,minmax(0,1fr));row-gap:2px}
 .app.across .grid{--lw:22px}
 .rl{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:12px;height:12px;padding-right:4px;text-align:right}
 .c{height:12px;border-left:1px solid transparent;background:#24222f}
@@ -179,7 +179,7 @@ button{font:inherit;color:inherit}
 .dock{border-top:1px solid var(--line);background:var(--chrome);padding:9px 14px 11px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .mode{font-size:11px;font-weight:600;letter-spacing:.08em;padding:2px 8px;border-radius:4px;background:#2b2839;color:var(--dim)}
 .mode.play{color:var(--good)}.mode.chat{color:var(--accent);background:#2a2440}.mode.picker{color:var(--warn)}
-.keys{display:flex;gap:3px}
+.kbrow{display:flex;gap:3px}
 .key{width:34px;border:1px solid var(--line);border-bottom-width:3px;border-radius:5px;background:#201e2a;display:flex;flex-direction:column;align-items:center;padding:2px 0 1px;font-family:var(--mono)}
 .key b{font-size:11px;color:var(--text)}.key small{font-size:10px;color:var(--faint)}
 .key.root small{color:var(--accent)}
@@ -278,9 +278,12 @@ button{font:inherit;color:inherit}
     <section>
       <h2>Failure states <small>checklist, not frames</small></h2>
       <table>
-        <tr><td>Band turn: refusal / max_tokens</td><td>Pill clears to idle. System row to you: <q>bass couldn't answer that (the request was refused). Still on v4. Try rewording.</q></td></tr>
+        <tr><td>Band turn: refusal</td><td>Pill clears to idle. System row to you: <q>bass couldn't answer that (the request was refused). Still on v4. Try rewording.</q></td></tr>
+        <tr><td>Band turn: max_tokens</td><td>System row: <q>bass ran out of room before finishing. Still on v4. Ask for something smaller.</q></td></tr>
+        <tr><td>HTTP / network error</td><td>System row: <q>bass couldn't reach Claude. Still on v4. Ask again.</q></td></tr>
         <tr><td>Band turn: invalid tool call</td><td>Musician row carries its <code>say</code> if any. System row: <q>bass's change didn't validate (step 40 is outside the 2-bar part). Still on v4.</q> The next note works (S9).</td></tr>
-        <tr><td>Band watchdog (30s)</td><td>Pill shows elapsed seconds from 10s on (<q>thinking… 24s</q>). At the deadline: <q>drums didn't answer in 30s. Still on v1. Ask again.</q></td></tr>
+        <tr><td>Band timeout (30s)</td><td>Pill shows elapsed seconds from 10s on (<q>thinking… 24s</q>). At 30s the request is aborted: <q>drums didn't answer in 30s. Still on v1. Ask again.</q></td></tr>
+        <tr><td>Band watchdog (45s lease)</td><td>Backstop if the turn never reports back: <q>drums got stuck. Still on v1. Ask again.</q></td></tr>
         <tr><td>Rollback while thinking</td><td><code>←</code> on a thinking strip: the pill switches to <q>cancelled, you took it back</q> for one loop; the late result is dropped, with no row.</td></tr>
         <tr><td>Design: refusal / 2 no-tool strikes / render abandoned</td><td>Design rail turns red, one line: <q>design stopped: Claude didn't propose a sound twice.</q> Buttons: <q>Try again</q>, <q>Pick from library (B)</q>. Held notes are then delivered (S8).</td></tr>
         <tr><td>Design over the headline cutoff</td><td>Rail shows elapsed time against the cutoff (<q>2:40 / 3:00</q>). Past it, nothing is automatic: you press Cancel, then <code>B</code>. Glass EP is in the library with its provenance.</td></tr>
@@ -750,7 +753,7 @@ function dockHTML(st, S) {
   const tsound = st.strips[target]?.sound || "";
   const keys = KEYROW.map((k,i)=>`<div class="key ${i===0||i===7?"root":""} ${st.keysPressed.includes(k)?"dn":""}"><b>${k}</b><small>${DEG[i]}</small></div>`).join("");
   const target2 = target === "drums" ? "drums · A kick, S snare, D hat, F open hat" : `${target} · ${tsound}`;
-  return `<div class="dock"><span class="mode ${S.mode}">${S.mode.toUpperCase()}</span><div class="keys">${keys}</div>
+  return `<div class="dock"><span class="mode ${S.mode}">${S.mode.toUpperCase()}</span><div class="kbrow">${keys}</div>
     <div class="dockinfo">keys → <b>${esc(target2)}</b>${soundcheck && target!=="you" ? " (armed)" : ""}<br>D minor · oct <b>4</b> (Z/X) · top row +1 oct</div>
     <div class="r"><span><kbd>B</kbd> library</span><span><kbd>?</kbd> keys</span></div></div>`;
 }

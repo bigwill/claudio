@@ -65,17 +65,29 @@ The producer's screen is the product, so it is designed and reviewed first.
 - **Data-model artifact:** the ER diagram below, plus a table showing which UI element reads and writes each table (15 minutes).
 - **Will reviews both.** Feedback goes into this plan, and into its checked-in copy, before slice 0.
 
+**Step 1 outcome so far (2026-09-22).** The mockup (`docs/design/band-mockup.html`) and data model (`docs/design/band-data-model.html`) are published privately. Will approved the three layout answers:
+- **strips run down, as lanes**, so one playhead column crosses all four grids;
+- **design iterations sit in the strip** (distance bars, newest distance, latest rationale, Cancel);
+- **chat is in the right column.**
+
+The data-model review is in progress; its feedback so far is folded into §1 (state boundary, best-practice fixes). The sketch below is redrawn as lanes.
+
 ```
-┌ Claudio Band · 6ZQQ59Y8 ── SOUNDCHECK │ Space ▶ │ 96 bpm │ D minor │ i–VI–III–VII │ 3.2 │ [A] [B] │ reacts ● ┐
-│ ┌ 1 you · Soft Pad ▾ ───── LIVE ─────────────────────────────────────────────────┐ │ BAND CHAT      │
-│ ┌ 2 drums · Kit ─────────┐ ┌ 3 bass · Rubber Bass ▾ ─┐ ┌ 4 keys · Glass EP ▾ ──────┐ │ you → @bass:   │
-│ │ kick X...x...X...x...  │ │ 0:0~ 2:0 4:4 6:0 (deg)  │ │ ▬▬▬▬▬▬▬▬    ▬▬▬▬▬▬▬▬       │ │  busier, 8ths  │
-│ │ snr  ....x.......x...  │ │ lands in 3 beats        │ │ designing · iter 2/3      │ │ @bass ↳ eighths│
-│ │ hat  ..x...x...x...x.  │ │ v1 v2 v3 [v4]  think…   │ │ d=18.4 → 11.2   v1 [v2]   │ │  on the root…  │
-│ └────────────────────────┘ └─────────────────────────┘ └───────────────────────────┘ │ [@keys …    ⏎] │
-│ ▕██████████░░░░░░░░░░░░░░░░░░░░░░░░░▏ loop 2                                        │                │
-│ keys → you · D minor · oct 4 (Z/X) · top row +1 oct            B library · ? keys    │                │
-└──────────────────────────────────────────────────────────────────────────────────────┴────────────────┘
+┌ Claudio Band · 6ZQQ59Y8 ─ JAM │ Space ▶ │ 96 bpm │ D minor │ Dm B♭ [F] C │ 4 bars │ 3.2 │ scenes [A] B │ reacts ● ┐
+│ ┌ 1 you · Soft Pad ▾ ───────┬──────────────────────────────────────────────┐ │ BAND CHAT          │
+│ │ LIVE                      │ D E F G A B♭ C D E F   (keys you're holding) │ │ you → @bass:       │
+│ ├ 2 drums · Kit ────────────┼──────────────────────────┃───────────────────┤ │  busier, 8ths      │
+│ │ idle · v1                 │ kick X.....x.X..x...     ┃  (4 voice rows)   │ │  ↳ @bass eighths   │
+│ ├ 3 bass · Rubber Bass ▾ ───┼──────────────────────────┃───────────────────┤ │    on the root…    │
+│ │ lands in 3 beats          │ 4  ..□□....□□....        ┃  staged = outline │ │                    │
+│ │ v1 v2 v3 [v4] ⟨v5⟩        │ 0  □□□□□□□□□□□□□□        ┃                   │ │                    │
+│ ├ 4 keys · Glass EP ▾ ──────┼──────────────────────────┃───────────────────┤ │                    │
+│ │ designing · iter 2/3      │ 4  ▬▬..▬▬..▬▬            ┃                   │ │                    │
+│ │ ▂▅▇ d=18.4 → 11.2 Cancel  │ 0  ▬▬..▬▬..▬▬            ┃  one playhead ┃   │ │                    │
+│ └───────────────────────────┴──────────────────────────┃───────────────────┘ │ [@keys …        ⏎] │
+│ loop 2 ▕██████████░░░░░░░░░░░░░░░░░▏ next loop line in 6 beats                 │                    │
+│ PLAY │ A S D F G H J K L ; │ keys → you · D minor · oct 4 (Z/X)   B library  ? │                    │
+└────────────────────────────────────────────────────────────────────────────────┴────────────────────┘
 ```
 
 ## Approach
@@ -125,27 +137,44 @@ erDiagram
   parts }o--o| library : "parts.libraryId (null = kit)"
   chat }o--o{ musicians : "to[] ids, reactor, chatCursor"
 
-  jams { string slug  string producerClientId  string phase  bool reactive  number bpm  number keyPc  string scale  number bars  array progression  object scenes }
+  jams { string slug  string phase  bool reactive  number bpm  number keyPc  string scale  number bars  array progression  object scenes }
   jamCounters { id jamId  number chatSeq  number reactionBudget  number lastProducerSeq }
-  musicians { id jamId  string kind  string role  string name  bool muted  number liveOctave  string status  string turnCause  number statusSince  number turnSeq  number turnDeadline  id turnJobId  number msgSeq  number chatCursor  id activeDesignId  string lastError }
+  musicians { id jamId  string kind  string role  string name  bool muted  string status  string turnCause  number turnSeq  number turnDeadline  number chatCursor  id activeDesignId }
   parts { id musicianId  id jamId  number version  number basedOn  number prev  bool prevMuted  string txn  string undoes  string source  string label  number lengthBars  array notes  id libraryId }
-  designs { id musicianId  id jamId  string status  string origin  object target  string prompt  object renderSpec  number iteration  string pendingToolUseId  string pendingPresetId  string renderOwnerClientId  number renderLeaseUntil  number renderAttemptNo  number turnSeq  number turnDeadline  number msgSeq  number noToolStrikes  string lastError }
+  designs { id musicianId  string status  string origin  object target  id targetAudioId  string prompt  object renderSpec  number iteration  string pendingToolUseId  string pendingPresetId  string renderOwnerClientId  number renderLeaseUntil  number renderAttemptNo  number turnSeq  number turnDeadline  number noToolStrikes  string lastError }
   messages { id convoId  number seq  string role  any content }
   attempts { id designId  string presetId  number iteration  object preset  string rationale  object features  number distance  bool isFinal }
-  chat { id jamId  number seq  string kind  id fromMusicianId  array to  id reactor  number replyToSeq  string text }
+  chat { id jamId  number seq  string kind  id fromMusicianId  array to  id reactor  number replyToSeq  string text  number octave }
   library { string name  string role  object preset  object features  string origin  string source  id designId  id fromJamId  string starterKey }
   fakeScripts { string match  number turnIndex  any response }
 ```
+
+**State boundary.** A value lives in Convex only if at least one of these holds: **(S)** the server reads it (the agents' snapshot, turn gating, fencing, refusals); **(R)** it must survive a reload (history, scenes, library, chat); **(O)** it enforces ordering or concurrency (seqs, cursors, leases). Everything else is browser state: it lives in the engine or the UI module, is never written to Convex, and resets on reload. Nothing is written at keystroke or audio rate.
+- **Browser-only, so nobody persists it later:**
+  - audio: transport play/stop, playhead `g`/`s`, the staged part and `landsAtG`, "lands in N beats", sounding and tied notes;
+  - playing: solo, the focused/armed strip, key-router mode, octave, held keys, live notes;
+  - UI: picker highlight, chat draft, `?` overlay, toasts, audio-unlock state; test-only `window.__band`.
+- A reload in the jam phase comes back stopped. The first Space restarts playback and doesn't touch `phase`.
+- **Mute is local-first:** on keydown the engine mutes its channel, and `musicians.setMuted` runs with `withOptimisticUpdate` on `jams.state`. The engine never waits for the server.
+
+**Convex best-practice rules** (from Convex's agent skills `convex-reviewer`/`convex-expert` and docs.convex.dev Best Practices):
+- `jams.state` never reads `jamCounters` (otherwise every chat insert re-runs it) and never reads the clock (`Date.now()` in a query doesn't re-run). Lease expiry and "thinking… Ns" are computed on the client or in mutations.
+- Fixed value sets are `v.union(v.literal(...))`: `kind`, `status`, `source`, `phase`, `origin`, `role`, `turnCause`. Nullable fields are `v.union(v.null(), …)`. Storage ids are `v.id("_storage")`.
+- Index, don't filter. No index lists `_creationTime`; "newest first" is `.order("desc")`. No unbounded `.collect()`: `jams.chat` returns the newest 200 rows.
+- Arrays stay small and bounded: `chat.to[]` ≤ 3, `progression` ≤ 4, `parts.notes` ≤ 256 (§2).
+- `messages` is a hand-rolled table on purpose, departing from `convex-design`'s "use @convex-dev/agent": we need raw Messages requests with the log kept exactly as returned.
 
 **Tables** (fields beyond the diagram, and why):
 - **jams**
   - `phase` is soundcheck or jam. Transport play/stop is client-only.
   - `scenes: {A?, B?}` is `v.record(v.id("musicians"), v.object({basedOn, muted}))`. Recall is one txn and is refused while any design is running. Active scene = every part's **`basedOn`** and `muted` match, so a scene you just recalled reads as active.
   - Index: `by_slug`.
-- **jamCounters:** `chatSeq` (every chat insert reads and writes it, so chat order is commit order and the cursor can't skip rows; `_creationTime` was rejected because it is assigned at insert, not commit), `reactionBudget`, `lastProducerSeq`.
+- **jamCounters:** `chatSeq` (every chat insert reads and writes it, so chat order is commit order and the cursor can't skip rows), `reactionBudget`, `lastProducerSeq` (read by the `drainInbox` trigger rule; written in the same patch as `chatSeq`).
+  - **Why not `_id` / `_creationTime` / `commitTs`:** `_id`s are random. `_creationTime` is assigned when a transaction starts, not when it commits, and Convex warns a cursor on it can miss rows (docs.convex.dev/database/advanced/commit-timestamp). The native `db.vars.commitTs` does follow commit order, but all inserts in one transaction share it, and its value can't be read inside the writing mutation, where `postChat` drains. Revisit if chat-insert OCC retries ever show up.
 - **musicians**
-  - `kind` is agent or human. There are 4 per jam. The human row has role `producer`, name `you`, and `liveOctave` (reported in the snapshot). It uses parts (sound only, empty notes), designs, history and scenes, but it has no turn state, and `drainInbox`, nudges and `to[]` all skip it.
+  - `kind` is agent or human. There are 4 per jam. The human row has role `producer` and name `you`. It uses parts (sound only, empty notes), designs, history and scenes, but it has no turn state, and `drainInbox`, nudges and `to[]` all skip it. Your octave is browser state; it travels with each note as `chat.octave`.
   - Band status is `idle` or `thinking`, fenced by `turnSeq`. `activeDesignId` holds the band inbox while it's set.
+  - The turn and inbox fields live here because they're written in the same mutations that flip `status`, so they cause no extra invalidations. If drains ever happen without a status change, move `chatCursor` to its own row.
   - Indexes: `by_jam`, `by_status_deadline`.
 - **parts**
   - `source`: starter, agent, pick, design, history, scene or undo.
@@ -155,28 +184,32 @@ erDiagram
 - **designs:** today's `sessions` row, re-keyed.
   - `status`: thinking, awaiting_render, done or failed.
   - `origin`: wav or prompt.
+  - `targetAudioId` (nullable storage id): the target WAV, for the rail's preview and audition after a reload.
+  - "Any design running" checks read `activeDesignId` on the jam's 4 musicians, so `designs` needs no `jamId`.
   - Indexes: `by_musician`, `by_status_deadline`, `by_render_lease`.
-- **messages:** index `by_convo_seq`.
+- **messages:** index `by_convo_seq`. The next `seq` is read newest-first from it, plus one (no counter on the subscribed `musicians`/`designs` rows). `seq` itself stays, because a turn inserts two rows in one mutation.
 - **attempts:** indexes `by_design_iteration`, `by_design_preset`.
 - **chat**
   - `kind`: producer, musician, system or nudge.
   - `to[]` holds musician **ids**; empty means every agent.
   - `reactor` is the one musician a nudge may trigger.
   - `replyToSeq` threads a reply under the note it answers.
+  - `octave` (producer rows only): your octave when you sent the note, for the snapshot.
   - Index: `by_jam_seq`.
 - **library**
   - `role`: bass or keys. The producer picks from **any** pitched sound. Drums use only the kit, so the drums strip offers no pick or design, and drums get no `use_library_sound` tool.
   - `origin`: starter, designed or tweak.
   - `source`: the WAV filename, the prompt, or "tweak of X".
   - `features` is nullable. `starterKey` is used to upsert rows from `src/shared/starters.ts`.
-  - Indexes: `by_role` (newest first), `by_starterKey`.
+  - `fromJamId` is read by the snapshot ("this jam's newest") and the drawer's provenance.
+  - Indexes: `by_role` (newest first), `by_role_jam`, `by_starterKey`.
 - **fakeScripts:** in the schema everywhere. Every read and write through `testing:*` is refused unless `CLAUDIO_FAKE_LLM=1`.
 - **Deleted:**
-  - presence and its modules, fork, claimRender and releaseOnLeave;
+  - presence and its modules, fork and releaseOnLeave (`claimRender` stays: first caller wins the render lease);
   - `main.ts`, `verify-loop.mjs`, `clearMessages`, `clearSessionContent`.
 - **Rewritten:**
-  - The render owner is `jam.producerClientId`.
-  - `reassignOrAbandonRender` becomes "re-grant to the producer until `MAX_RENDER_ATTEMPTS`, then `endDesign("failed")`".
+  - Render ownership is `claimRender`'s first-caller-wins lease, fenced by `renderAttemptNo`, so any tab or browser showing the jam can render (a stored producer id broke other browsers and Playwright contexts).
+  - `reassignOrAbandonRender` becomes "re-grant to the next caller until `MAX_RENDER_ATTEMPTS`, then `endDesign("failed")`".
 
 **Queries:**
 - `jams.state(slug)`: the jam, musicians, each musician's newest part with its resolved preset, and active designs with their attempts;
@@ -197,7 +230,7 @@ erDiagram
 
 **Rules**
 - `lengthBars` is 1, 2 or 4, and repeats.
-- **`clampPattern()`** clamps and never rejects. It dedupes, caps notes per step (bass 1, keys 4) and in total. An empty pattern means "lay out".
+- **`clampPattern()`** clamps and never rejects. It dedupes, caps notes per step (bass 1, keys 4) and in total (at most 256, i.e. 64 steps × 4). An empty pattern means "lay out".
 - **`summarizePattern()`:** explicit step lists, with accents as `X` vs `x` and ties as `~`, e.g. `kick 0,4,8,12 · snare 4,12` and `0:0~ 4:4`.
 - **Tool schemas** follow the `PRESET_JSON_SCHEMA` rules: strict, every field required, no min/max.
 
@@ -269,7 +302,7 @@ Accent is folded into `vel`.
   - `hit()` forces `t = max(time, last[voice] + 1e-3)` and uses try/catch. Tone throws on equal start times, which late steps can produce.
 - **Your live part:**
   - The key router triggers your channel with **`liveCtx.immediate()`** for both attack and release. Plain `now()` includes the lookahead, which would make you 150ms late.
-  - Keys map to scale degrees in the key through `degreeToMidi`.
+  - Keys map to scale degrees in the key through `degreeToMidi`. The octave (Z/X) is router state; `chat.send` carries it with each note.
   - A held-key → synth map ensures a key released after a sound swap releases on the synth that started it.
   - In soundcheck, the keyboard plays the armed strip; in the jam, always your strip.
 - **Design renders:** unchanged `renderPreset` / `Tone.Offline`. They are safe during playback because every live node is pinned to `liveCtx`.
@@ -297,7 +330,7 @@ Each Convex function type has one job here:
 
 **`chat.send`**
 - Parses `@name`, `@role` and `@all` into ids.
-- Sets `lastProducerSeq`.
+- Sets `lastProducerSeq`, and stores the router's current `octave` on the row.
 - Sets the budget: **1** for a note to one musician, **0** for `@all` or several.
 - Calls `postChat`.
 
@@ -315,7 +348,7 @@ Each Convex function type has one job here:
 It also runs after every commit, fail, cancel and watchdog branch, and after `endDesign`.
 
 **Band turns**
-- **Request:** `claude-sonnet-5`, low effort, `tool_choice: {type:"any"}`, strict tools, **no `disable_parallel_tool_use`**. Lease and timeout come from `llm.ts` for each turn kind: band is 45s lease with a 30s timeout.
+- **Request:** `claude-sonnet-5`, low effort, `tool_choice: {type:"any"}`, strict tools, **no `disable_parallel_tool_use`**. Lease and timeout are named constants in `llm.ts`, each timeout below its lease: `BAND_TIMEOUT_MS = 30_000` < `BAND_LEASE_MS = 45_000`, and `DESIGN_TIMEOUT_MS = 90_000` < `DESIGN_LEASE_MS = 150_000`. One abort timer spans `fetch` and `res.json()`. A unit test asserts `TIMEOUT < LEASE` for each kind.
 - **Tools (a fixed list per role; every tool has a `say`):**
   - `set_pattern` or `set_drum_pattern`;
   - `set_sound` (bass and keys; inserts a `tweak` library row);
@@ -331,6 +364,8 @@ It also runs after every commit, fail, cancel and watchdog branch, and after `en
   6. Post each `say` as a musician row threaded under the note it answers.
   7. Wave 2: if the pattern changed, post one nudge row addressed to every agent, with `reactor` taken from a fixed map (bass → keys, drums → bass, keys → bass).
   8. Set the musician idle, then drain.
+- **`commit` never catches its own errors,** so a thrown mutation rolls back cleanly. If the action's `withRetry(commit)` returns null, the action calls `fail` (band) or `endDesign("failed")` (design) through `withRetry`, fenced on `turnSeq`, with the ignore note. The watchdog stays as the last backstop.
+- **Failure copy** is a system chat row with context, built in `fail`/`endDesign` and posted with `postChat` (e.g. "bass's change didn't validate (step 40 is outside the 2-bar part). Still on v4."). There is no error field on `musicians`; the copy for each failure kind matches the mockup's failure checklist.
 - **Band watchdog** (wave 1): sweeps `musicians.by_status_deadline`. A stuck turn is failed with the same ignore note, then drained.
 - **`cancelTurn(m)`** (wave 2): bumps `turnSeq`, appends "[producer cancelled the request above; ignore it]", sets idle, drains. A cancel that arrives after the commit does nothing and suggests Backspace.
 - **`loadMessages` merges adjacent same-role rows** the same way on every call. The Anthropic docs contradict each other on whether consecutive user messages are allowed; merging makes the question moot. No stored history is edited.
@@ -358,7 +393,7 @@ It also runs after every commit, fail, cancel and watchdog branch, and after `en
   - on finalize, inserts a `designed` library row and appends a `design` part version;
   - posts a system row addressed to the musician ("your sound is now X", or the reason it failed);
   - drains.
-- **Render owner** is the producer. `submitAnalysis` and `submitRenderError` take a `designId`. Notes are held until the design ends, never folded in.
+- **Render owner:** whoever wins `claimRender`. `submitAnalysis` and `submitRenderError` take a `designId`. Notes are held until the design ends, never folded in.
 
 **Jam creation:** upsert starters by `starterKey`. Create **4** musicians: three agents with v1 starter parts, and you with a v1 sound part. Phase is soundcheck. **No automatic first turn.**
 
@@ -377,7 +412,8 @@ It also runs after every commit, fail, cancel and watchdog branch, and after `en
   - bpm, key and progression;
   - every other part as explicit step lists;
   - this musician's own part and sound;
-  - "the producer is playing along live on <sound>, around octave <liveOctave>; leave room";
+  - "the producer is playing along live on <sound>, around octave N (as of your latest note); leave room", with N from the newest producer row's `octave`;
+  - muted parts are marked ("keys (muted)"), so agents don't leave room for silence;
   - up to 8 role-library entries: starters plus this jam's newest designed and tweak sounds;
   - the **rollback note** when its newest row is a history or undo copy ("the producer took you back from v5 (<label>) to v3; don't re-propose it unless asked"), or a scene note for a scene copy.
 - **Design prompts:** today's text, plus the must-call-a-tool rule.
@@ -427,7 +463,7 @@ Key, progression and bar count are changed with visible controls, not keys. Star
   - header: number, name, sound;
   - **DOM step grid** with a playhead column: drums in 4 voice rows, pitched parts as degree rows, accents bold, ties drawn as bars;
   - **history rail** from `parts.rail`, with the label on hover. The current version is filled; a staged one is outlined, with "lands in N beats";
-  - status pill;
+  - status pill; "thinking… Ns" is computed on the client (`now − (turnDeadline − LEASE[kind])`);
   - in soundcheck, the design rail with distances;
   - mute and solo.
 - **Chat:** threaded replies; nudge rows dim.
@@ -456,10 +492,11 @@ Key, progression and bar count are changed with visible controls, not keys. Star
 | S3s | Stress: while the band plays, flood the page with 30 chat rows, 3 parallel part changes per loop, rail and grid redraws, a live-key burst, and one design render. `missedSteps` stays 0, and all tracks' spy-call times for each step are identical | 1 |
 | S4 | "@bass busier" → thinking → threaded reply → bass v+1 lands at s=0, and the countdown matched. The summary shows `X` | 1 |
 | S5 | "@keys glassier" → a `tweak` row → the sound swaps at s=0; `←` restores it at s=0 | 1 |
-| S6 | Scenes: save A → change → save B → recall A. The parts return at s=0, A reads as active, and it survives a reload | 1 |
+| S6 | Scenes: save A → change → save B → recall A. The parts return at s=0 (in session), A reads as active, and after a reload A still reads as active (the transport comes back stopped) | 1 |
 | S7 | Nudges: a single-musician note → exactly one reaction, by the mapped reactor, then 20s of quiet; `@all` → none; reacts off → none; a fake that always reacts still gets exactly one | 2 |
 | S8 | Design failure: refusal, max_tokens or two no-tool strikes → failed and the musician is freed; a note held during the design is delivered afterwards | 1 |
-| S9 | Robustness: an invalid tool call → `is_error`, idle, and the next note works; the band watchdog reclaims a hung turn; a failed band turn's request isn't re-executed | 1 |
+| S9a | Robustness: an invalid tool call → `is_error`, idle, and the next note works; a turn past `BAND_TIMEOUT_MS` (fake `delay`) → idle with the "didn't answer" system row; a failed band turn's request isn't re-executed. Asserts the system row text | 1 |
+| S9b | Watchdog: a turn that never reports back (fake `hang`) → past `turnDeadline`, `watchdog` reclaims it, idle with its system row | 1 |
 | S10a | History: v1–v4, `←` `←` → v2 at s=0, `→` → v3, a prompt adds v5, `←` from v5 → v4. No row at either end; a jump to a copy resolves; a two-call turn is one version; mute writes no part; `←` on a thinking musician discards its result; the rollback note appears in the snapshot | 1 |
 | S10b | Undo: Backspace from v5 → v3; after `jumpTo` it goes back to where you jumped from; after a recall, all 4 parts and mute revert; it walks across musicians. Cancel, then a note: the cancelled request isn't executed and held notes are delivered | 2 |
 | S11a | Keys only: S3–S6 and S10a are driven entirely from the keyboard (starting a design excepted) | 1 |
@@ -475,7 +512,7 @@ Key, progression and bar count are changed with visible controls, not keys. Star
    - the existing `test:dsp`.
 2. **Backend state machine:** `convex-test` + Vitest, seconds.
    - Real mutations and actions run against a mocked backend. Fake timers plus `t.finishAllScheduledFunctions(vi.runAllTimers)` drive turns until nothing is left to do. The watchdogs are called directly (convex-test has no crons).
-   - Covers S1, S2 (with scripted design rounds), S2b, S4–S10, and the data half of H.
+   - Covers S1, S2 (with scripted design rounds), S2b, S4–S8, S9a, S9b, S10, and the data half of H.
    - It does not test concurrency; the budget and cursor rules are pinned in `planDrain`.
 3. **Browser E2E:** Playwright against local Convex + Vite + the fake LLM.
    - Test jams run at **bars=1, bpm=200** with no fake delay, so each landing takes about 1.2s and the suite finishes in about 60s. `--grep` runs one slice's tests.
@@ -491,7 +528,9 @@ Key, progression and bar count are changed with visible controls, not keys. Star
 ### A scripted fake LLM
 - `convex/llm.ts` is the single call site for every model call.
 - With `CLAUDIO_FAKE_LLM=1`, `fakeClaude.ts` looks up a `fakeScripts` row matching (role or design, cue, turn index) and falls back to keyword defaults. The "busier" default includes an accent, plus a tie in wave 2.
-- A script row can return: several tool calls, `stay`, text only, refusal, max_tokens, an invalid id, a delay, or `react: "always"`.
+- A script row can return: several tool calls, `stay`, text only, refusal, max_tokens, an invalid id, a delay, `hang: true`, or `react: "always"`.
+  - `delay` runs through the same `callWithTimeout` and listens to the abort signal, so a delay past the timeout exercises the real timeout path.
+  - `hang: true` makes the action return without committing, which exercises the watchdog.
 - Tests seed rows with `t.run` or `npx convex run testing:setScript`.
 
 ### Commands
@@ -511,13 +550,13 @@ A slice's rails must be green before the next slice starts. Each slice lists its
 | # | Slice | Rails |
 |---|---|---|
 | D | Design review gate (1.5h) | Will signs off on the layout, the schema and the scenario list |
-| 0 | Checkpoint + branch + **plan check-in**; harness: Vitest + convex-test + `@edge-runtime/vm`, `check`/`e2e`/`smoke:real` scripts with the fake preflight, a Playwright skeleton, `fakeScripts` + `testing:*` guards, one placeholder test per layer (1h) | Placeholders green; `verify:loop` still green |
+| 0 | Checkpoint + branch + **plan check-in**; `convex ^1.46.0` (done); `npx convex ai-files install` + `npx skills add get-convex/agent-skills`; harness: Vitest + convex-test + `@edge-runtime/vm`, `@types/node`, `check`/`e2e`/`smoke:real` scripts with the fake preflight, a Playwright skeleton, `fakeScripts` + `testing:*` guards, one placeholder test per layer (1h) | Placeholders green; `verify:loop` still green |
 | 1 | `pattern.ts` (types, `clampPattern`, `degreeToMidi`, summaries) + `sequencer.ts` with **tests first**; then `engine.ts` (liveCtx, tick, spy instruments), kit, `?spike=1`, instant mute, your live channel via `immediate()`, `window.__band` (2.25h) | unit: `pattern.test.ts`, `sequencer.test.ts`; e2e: `spike.spec` (landing at s=0, spy calls, onset test, 0 missed steps, the **S3s stress test**); **listen:** the kit grooves and your keys feel instant |
 | 1b | Real-model spikes (with Will's go-ahead): Sonnet 5 `set_pattern` played in the spike page; **Opus 5.5 WAV design** through today's loop with `DESIGN_MODEL` switched (0.75h) | Sonnet p50 ≤ 10s and it sounds like a part; Opus 5.5 finishes a design; its wall time is recorded. If either fails, stop and rethink |
 | 2 | Starter library (run today's loop over the bass, EP and pad WAVs into `starters.ts`); starter parts (0.75h) | **listen:** the starter loop sounds good on its own |
-| 3 | **Wipe local data**; schema; **re-key the design modules so they compile**; delete `main.ts` + `verify:loop`; jam create/state, `parts.rail`, library; direct mutations (pick, mute, `step`/`jumpTo`, scenes, start); `postChat` + cursor; band UI with DOM grids, rails and the key router (2.75h) | unit: `planHistory`, `planDrain`, `routeKey` (S11b); convex-test: S1, S6, S10a (picks); e2e: S1, S3, S6 |
+| 3 | **Wipe local data**; schema; **re-key the design modules so they compile**; delete `main.ts` + `verify:loop`; jam create/state, `parts.rail`, library; direct mutations (pick, mute, `step`/`jumpTo`, scenes, start); `postChat` + cursor; band UI with DOM grids, rails and the key router (2.75h) | unit: `planHistory`, `planDrain`, `routeKey` (S11b); convex-test: S1, S6, S10a (picks); e2e: S1, S3, S6; a `convex-reviewer` skill pass on `convex/schema.ts` and the §1 functions |
 | 4 | Design jobs on Opus 5.5: `designs.start` (WAV or prompt), `endDesign`, no-tool guard, held inbox, design watchdog (1.25h) | convex-test: S2, S2b, S8; e2e: S2 |
-| 5 | Band turns: `llm.ts` per-kind config, `drainInbox`, `planCommit` (merged row, ignore notes), snapshot with the rollback note, stop reasons, band watchdog, thinking-rollback fence (2h) | convex-test: S4, S5, S9, S10a; e2e: S4, S5, S10a, S11a; **listen:** a bass change lands musically |
+| 5 | Band turns: `llm.ts` per-kind config (named timeouts and leases), `drainInbox`, `planCommit` (merged row, ignore notes), commit fallback, failure copy, snapshot with the rollback note, stop reasons, band watchdog, thinking-rollback fence (2h) | convex-test: S4, S5, S9a, S9b, S10a; e2e: S4, S5, S10a, S11a; **listen:** a bass change lands musically |
 | 6 | Real prompts tuned against the headline; `docs/headline.md`; the H scenario (1.25h) | e2e: H; smoke:real: S2, S4, S5, with 3 of 3 headline runs |
 
 ### Wave 2: depth (~6h)
@@ -533,13 +572,29 @@ A slice's rails must be green before the next slice starts. Each slice lists its
 **Never cut:** the harness and scenario suite, soundcheck design, scenes A/B, `←`/`→` history, the key router, instant mute, the real-model spikes.
 **If wave 2 runs short:** it stops at a finished slice. Each slice stands alone.
 
+## Convex components considered (2026-09-22)
+Audited against the plan, with adversarial review; none adopted for wave 1.
+- **AI Gateway:** revisit after wave 1 (Will's call). Adoption is a small `llm.ts` change for band turns. Opus 5.5 isn't on the gateway, so design jobs stay on direct Anthropic either way.
+- **Workpool:** rejected. The watchdog cron and the `turnSeq` fence stay regardless, it has no per-job timeout, and at four musicians it saves nothing.
+- **Workflow:** rejected. Its `awaitEvent` has no timeout, and it would rewrite a design loop that works.
+- **Agent:** rejected. It's built on the Vercel AI SDK, not raw Messages with a log kept exactly as returned.
+- **Rate Limiter:** rejected. It refills over time; the reaction budget is granted per event.
+- **Sharded Counter / Aggregate:** rejected. `chatSeq` must be strictly ordered in the same transaction.
+- **Not needed:** ai-budget (alpha), table-history (beta), Presence (deleted by design), Crons (static crons suffice), Migrations (data is wiped), Action Cache (starters are built offline), Persistent Text Streaming (band turns are strict tool calls), R2 (WAVs are analysed in the browser).
+
 ## Risks
 1. **Real-model pattern latency, musicality, and Opus 5.5 design time.** All three are measured at 1b, before most of the build. The design p50 sets the headline cutoff.
 2. **Audio correctness while the band plays.** Pinned by the pure sequencer tests, the spy instruments, the onset test and the listens. Other mitigations: every live node built on liveCtx, a try/catch around the tick, the kit start-time guard, pre-warmed voices.
 3. **Opus 5.5 on launch day:** no forced tool call, broader safety classifiers. Covered by the no-tool guard, the refusal guard and the `DESIGN_MODEL` fallback.
 4. **A band turn that answers a part note with only `just_reply`.** Handled by the prompt rule and the fake-LLM test. Not policed in `commit`.
 5. **The re-key touches every backend module.** Slice 3 takes the compile-level re-key, so the check stays green.
-6. **Estimates:** wave 1 is ~12.5h and wave 2 ~6h, ~18.5h in total. That is well over the original "about a day"; the waves mean the headline is finished first.
+6. **AI Gateway, when revisited:** run a 10+ request passthrough spike (it serves requests via OpenRouter providers, which may vary per request); use a cloud dev deployment with a disable threshold (a spend-limit hit disables the whole deployment); never switch transport in the middle of a conversation. `getServiceToken` is available from `convex` 1.45.
+7. **Estimates:** wave 1 is ~12.5h and wave 2 ~6h, ~18.5h in total. That is well over the original "about a day"; the waves mean the headline is finished first.
 
 ## Change log
 - 2026-09-22: plan created; reviewed adversarially five times (shape, data model ×2, turns, final three-lens).
+- 2026-09-22: `convex` upgraded 1.44.0 → 1.46.0 (no breaking changes; typecheck baseline unchanged, `test:dsp` and `verify:loop` pass).
+- 2026-09-22: Step 1: Will approved lanes-down, design rail in the strip, chat on the right; the sketch is redrawn as lanes.
+- 2026-09-22: Convex components audited (Workpool and Gateway adoption drafted, then refuted on review); gateway deferred to after wave 1. See "Convex components considered".
+- 2026-09-22: Hardening: named timeouts below leases; commit fallback from the action; fake `delay` honours the timeout and new `hang`; failure copy as system rows. S9 splits into S9a (timeout) and S9b (watchdog); S9 was not yet green, so no frozen test changed.
+- 2026-09-22: State boundary (Will): removed `liveOctave` (now `chat.octave`), `musicians.lastError`, `statusSince`, `producerClientId` (render lease via `claimRender`); added `designs.targetAudioId`; mute is local-first. Best-practice pass: removed dead `turnJobId`, both `msgSeq` counters, `designs.jamId`; added `library.by_role_jam`; `chatSeq` kept (why not `_creationTime`/`commitTs` recorded); hygiene rules added to §1. S6 reload wording clarified.
