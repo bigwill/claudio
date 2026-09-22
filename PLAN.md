@@ -1,5 +1,7 @@
 # Claudio — Agent-Loop FM Sound Design Tool
 
+> **Superseded direction:** the multi-agent band (a producer jamming with Claude musicians) is planned in [`docs/plans/claudio-band.md`](docs/plans/claudio-band.md). This file is the original take-home plan, kept for the record.
+
 ## Context
 
 `/Users/willstockwell/agent-workspace/claudio/develop` is an empty repo (one README, one commit, branch `develop`). We are building a **2-hour timeboxed prototype** of a browser-based FM synthesizer driven by a Claude agent loop.
