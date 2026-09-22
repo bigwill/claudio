@@ -17,7 +17,7 @@
     "verify:loop": "node scripts/verify-loop.mjs"
   },
   "dependencies": {
-    "convex": "^1.44.0",
+    "convex": "^1.46.0",
     "tone": "^15.1.22"
   },
   "devDependencies": {
