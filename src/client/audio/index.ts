@@ -3,22 +3,29 @@
  * nothing else under audio/ — it owns Tone, all AudioContext lifecycle, and all
  * clamping. (PLAN.md "Repo layout", third boundary.)
  *
- *   analyzeTarget(file)            -> features for the agent; the audio stays local
- *   evaluatePreset(preset, target) -> features + diff for the agent
- *   playNote / setLivePreset       -> live audition
- *   renderTwiceIdentical(...)      -> determinism smoke test, run once on boot
+ *   analyzeTarget(file)                  -> features + prepared audio for a new session
+ *   specForTarget / specForPrompt        -> mint a session's render spec, ONCE
+ *   evaluateWithSpec(preset, spec, tgt)  -> features + diff, against the SESSION's spec
+ *   playNote / setLivePreset             -> live audition
+ *   renderTwiceIdentical(...)            -> determinism smoke test, run once on boot
+ *
+ * The spec/evaluate split is what makes this multiplayer-safe: the spec is minted
+ * once by whoever starts the session and stored server-side, and every other
+ * contributor renders against that same spec rather than one derived from their
+ * own hardware.
  */
 
 import type { FeatureDiff, FeatureSummary } from "../../shared/features";
-import type { TargetInfo } from "../../shared/protocol";
+import type { RenderSpec, TargetInfo } from "../../shared/protocol";
 import { clampPreset, type ClaudioPreset } from "../../shared/preset";
 import { diffFeatures } from "../dsp/diff";
 import { extractFeatures } from "../dsp/features";
 import { prepare } from "../dsp/prepare";
-import { renderPreset, renderIdle, type PreparedAudio, type RenderSpec } from "./render";
+import { renderPreset, renderIdle, type PreparedAudio } from "./render";
 import * as voice from "./voice";
 
-export type { PreparedAudio, RenderSpec } from "./render";
+export type { PreparedAudio } from "./render";
+export type { RenderSpec } from "../../shared/protocol";
 export { presetToOptions, buildVoice, ensureAudio, setLivePreset, stopLive, disposeLive, midiToHz, noteOn, noteOff } from "./voice";
 export { renderPreset, renderIdle, isRendering, MAX_RENDER_MS } from "./render";
 
@@ -83,6 +90,37 @@ export async function analyzeTarget(file: File): Promise<TargetAnalysis> {
 }
 
 // ---------------------------------------------------------------------------
+// Sharing the target
+//
+// The prepared buffer is mono, trimmed, peak-normalized and capped at 4s, so
+// 16-bit PCM keeps a typical target well under half a megabyte. The sample rate
+// is NOT stored alongside it — it already travels in the FeatureSummary, and
+// having one authority for it is what keeps a re-decode honest.
+// ---------------------------------------------------------------------------
+
+/** Float32 [-1,1] -> little-endian Int16. Halves the payload, inaudible loss. */
+export function encodePreparedAudio(prepared: PreparedAudio): ArrayBuffer {
+  const src = prepared.data;
+  const out = new Int16Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    const s = Math.max(-1, Math.min(1, src[i]));
+    // Asymmetric scaling: Int16 runs -32768..32767, so the negative side gets
+    // the larger multiplier. Using 32767 for both would clip the trough.
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out.buffer;
+}
+
+export function decodePreparedAudio(bytes: ArrayBuffer, sampleRate: number): PreparedAudio {
+  const src = new Int16Array(bytes);
+  const data = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    data[i] = src[i] < 0 ? src[i] / 0x8000 : src[i] / 0x7fff;
+  }
+  return { data, sampleRate };
+}
+
+// ---------------------------------------------------------------------------
 // Candidate
 // ---------------------------------------------------------------------------
 
@@ -114,29 +152,33 @@ export function specForPrompt(): RenderSpec {
 }
 
 /**
- * Render a preset and measure it, with no reference to compare against.
- * Used by prompt-started sessions: the agent still learns what its patch
- * actually came out as, which is real feedback — there is just no distance.
+ * Render a preset against the session's pinned spec and measure it.
+ *
+ * THE SPEC COMES FROM THE SESSION, not from this browser. specForTarget /
+ * specForPrompt above are for MINTING a spec once, when a session is created;
+ * from then on every contributor renders against that same stored spec.
+ *
+ * That distinction is the whole point. specForPrompt() reads the live
+ * AudioContext's sample rate, so if each browser derived its own spec, two
+ * contributors on 44.1 kHz and 48 kHz hardware would measure the same session at
+ * different FFT bin resolutions and STFT frame alignments — and diffFeatures
+ * would compare those numbers anyway, feeding the agent a difference it would
+ * attribute to its own parameter change. Tone.Offline takes sampleRate
+ * explicitly (render.ts gotcha 3), so a pinned spec makes renders comparable
+ * across machines.
+ *
+ * `targetFeatures` is null for prompt-started sessions: the agent still learns
+ * what its patch actually came out as, there is simply no distance to minimise.
  */
-export async function measurePreset(preset: ClaudioPreset): Promise<PresetEvaluation> {
-  const p = clampPreset(preset);
-  const prepared = await renderPreset(p, specForPrompt());
-  const features = extractFeatures(prepared.data, prepared.sampleRate);
-  return { features, diff: null, prepared };
-}
-
-/**
- * Render a candidate preset at the target's f0 / duration / sample rate, extract
- * the same features, and diff. This is the whole feedback half of the loop.
- */
-export async function evaluatePreset(
+export async function evaluateWithSpec(
   preset: ClaudioPreset,
-  target: TargetAnalysis,
+  spec: RenderSpec,
+  targetFeatures: FeatureSummary | null,
 ): Promise<PresetEvaluation> {
   const p = clampPreset(preset);
-  const prepared = await renderPreset(p, specForTarget(target));
+  const prepared = await renderPreset(p, spec);
   const features = extractFeatures(prepared.data, prepared.sampleRate);
-  const diff = diffFeatures(target.features, features);
+  const diff = targetFeatures ? diffFeatures(targetFeatures, features) : null;
   return { features, diff, prepared };
 }
 

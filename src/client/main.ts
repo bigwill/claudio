@@ -1,35 +1,42 @@
 /**
- * UI + the drain loop.
+ * UI, and the reconciliation loop that replaced drain().
  *
- * The whole client is driven by one union: every endpoint returns a `Step`, and
- * `drain()` keeps rendering-and-reporting for as long as the agent keeps asking
- * for renders. A chat turn ("brighter") flows through the identical path.
+ * The old client was driven by one union: every endpoint returned a `Step`, and
+ * `drain()` kept rendering-and-reporting for as long as the agent kept asking.
+ * That worked because exactly one browser was ever involved.
+ *
+ * Now the server owns the loop and the browser subscribes. Every view function
+ * below is a pure function of the latest snapshot, `reconcile()` is synchronous,
+ * and the only asynchronous thing the client decides for itself is whether it is
+ * the browser on the hook to render the current proposal (see reconcile.ts).
  */
 
 import type { ClaudioPreset } from "../shared/preset";
-import { looksLikeSessionId, type SessionSnapshot, type Step } from "../shared/protocol";
-import type { FeatureSummary } from "../shared/features";
-import * as apiClient from "./api";
+import {
+  HEARTBEAT_MS,
+  looksLikeSessionId,
+  newSessionId,
+  sanitizeNickname,
+} from "../shared/protocol";
 import {
   analyzeTarget,
+  decodePreparedAudio,
+  encodePreparedAudio,
   ensureAudio,
-  evaluatePreset,
-  measurePreset,
   noteOff,
   noteOn,
   playBuffer,
   playNote,
   renderIdle,
   setLivePreset,
-  type TargetAnalysis,
+  specForPrompt,
+  specForTarget,
+  type PreparedAudio,
 } from "./audio";
-
-/** Plain JSON fetch. The app is open — no key, no gate. */
-export async function api(path: string, init: RequestInit = {}): Promise<Response> {
-  const headers = new Headers(init.headers);
-  headers.set("content-type", "application/json");
-  return fetch(path, { ...init, headers });
-}
+import * as backend from "./convex";
+import type { AttemptView, ChatView, Snapshot } from "./convex";
+import { me } from "./identity";
+import { iAmPlaying, maybeRender, msUntilLeaseExpiry, notePlaying, playingUntil } from "./reconcile";
 
 /**
  * One-click ways in, for someone with no sample to hand. Each runs the ordinary
@@ -53,11 +60,6 @@ const STARTER_PROMPTS = [
 
 // --- session addressing ----------------------------------------------------
 
-/**
- * Sessions live at /<SESSION_ID>, so a run is bookmarkable and shareable and
- * survives a reload. The id is minted server-side on first upload; until then
- * the app sits at / with no session at all.
- */
 function sessionIdFromUrl(): string | null {
   const seg = location.pathname.split("/").filter(Boolean)[0];
   return seg && looksLikeSessionId(seg) ? seg : null;
@@ -69,38 +71,37 @@ function putSessionInUrl(id: string): void {
 
 // --- state -----------------------------------------------------------------
 
-interface AttemptView {
-  presetId: string;
-  preset: ClaudioPreset;
-  rationale: string;
-  distance: number | null;
-  features: FeatureSummary | null;
-  /**
-   * Whether the browser is still rendering this one. Tracked explicitly rather
-   * than inferred from `distance === null`: prompt-started sessions have no
-   * target, so they never get a distance at all, and inferring made every
-   * finished row animate as though it were still loading.
-   */
-  pending: boolean;
-}
-
 const state = {
-  sessionId: null as string | null,
-  target: null as TargetAnalysis | null,
-  attempts: [] as AttemptView[],
+  slug: null as string | null,
+  /** The newest snapshot. Every view reads from this, never from ad-hoc fields. */
+  snap: { session: null, attempts: [], peers: [], loaded: false } as Snapshot,
+  /**
+   * The target's audio, if this browser has it. Uploaders have it from the file;
+   * everyone else fetches it. Kept out of `snap` because it is a big buffer with
+   * a completely different lifecycle from the reactive document.
+   */
+  targetAudio: null as PreparedAudio | null,
+  targetAudioFor: null as string | null,
   current: null as ClaudioPreset | null,
   loadedPresetId: null as string | null,
-  busy: false,
-  /** Auto-scroll the rail to the newest attempt — until the user scrolls up. */
+  /** A preset the user chose from the rail — suppresses auto-loading newer ones. */
+  pinnedPresetId: null as string | null,
+  /** The newest render this tab has declined to auto-load, offered instead. */
+  offeredPresetId: null as string | null,
   followLatest: true,
-  /** Newest first. Kept as data so the view can order and fade it. */
-  chat: [] as { role: "you" | "agent"; text: string }[],
-  /** Rail rows whose rationale the user expanded — survives re-render. */
   expanded: new Set<string>(),
+  /** Chat rows whose chips this tab has used — so they don't resurrect. */
+  usedChips: new Set<string>(),
+  starting: false,
+  transientError: null as string | null,
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
 const app = () => document.getElementById("app")!;
+
+let detach: (() => void) | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let leaseTimer: ReturnType<typeof setTimeout> | null = null;
 
 // --- rendering -------------------------------------------------------------
 
@@ -110,7 +111,9 @@ function shell(): void {
       <div class="brand">Claud<span>io</span></div>
       <p class="sub muted">FM sound design</p>
       <div class="spacer"></div>
-      <span id="sessionlabel" class="muted" style="font-size:12px"></span>
+      <div id="peers" class="peers"></div>
+      <span id="sessionlabel" class="muted mono"></span>
+      <button id="share" class="chip tiny hidden">copy link</button>
     </header>
 
     <div class="layout">
@@ -126,7 +129,7 @@ function shell(): void {
 
       <section class="stage">
         <div class="stage-scroll">
-          <div class="panel">
+          <div class="panel" id="startpanel">
             <div id="drop">Drop a WAV here, or click to choose
               <input id="file" type="file" accept="audio/*" class="hidden" />
             </div>
@@ -137,8 +140,9 @@ function shell(): void {
               <button id="promptgo">Design it</button>
             </div>
             <div id="starters" class="row" style="margin-top:10px"></div>
-            <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
           </div>
+
+          <div id="targetinfo" class="row muted hidden" style="margin-top:12px"></div>
 
           <div class="statusbar" id="statuspanel">
             <span class="tag">status</span>
@@ -201,7 +205,6 @@ function shell(): void {
       btn.addEventListener("click", () => {
         const text = STARTER_PROMPTS[Number(btn.dataset.starter)];
         const box = $<HTMLInputElement>("promptbox");
-        // Show what was asked — it stays editable if they want to tweak and retry.
         if (box && text) box.value = text;
         startFromPrompt();
       });
@@ -218,6 +221,18 @@ function shell(): void {
     if (e.key === "Enter") sendChat();
     if (e.key === "Escape") (e.target as HTMLInputElement).blur();
   });
+
+  $("share")?.addEventListener("click", async () => {
+    const btn = $("share")!;
+    try {
+      await navigator.clipboard.writeText(location.href);
+      btn.textContent = "copied ✓";
+      setTimeout(() => (btn.textContent = "copy link"), 1200);
+    } catch {
+      btn.textContent = "copy failed";
+      setTimeout(() => (btn.textContent = "copy link"), 1200);
+    }
+  });
 }
 
 // --- keyboard --------------------------------------------------------------
@@ -230,11 +245,6 @@ const BLACK = new Set([1, 3, 6, 8, 10]);
  * are. Note the gaps — there is deliberately no binding above D (E/F have no
  * black key between them) or above G (likewise B/C), which is what makes the
  * shape feel like a keyboard rather than an arbitrary strip of buttons.
- *
- *   w   e       t   y   u       o   p
- *  C#  D#      F#  G#  A#     C#' D#'
- * a   s   d   f   g   h   j   k   l   ;
- * C   D   E   F   G   A   B   C'  D'  E'
  */
 const KEY_MAP: Record<string, number> = {
   // white
@@ -243,16 +253,8 @@ const KEY_MAP: Record<string, number> = {
   w: 1, e: 3, t: 6, y: 8, u: 10, o: 13, p: 15,
 };
 
-/**
- * Draw exactly the range QWERTY can reach — C up to the E an octave and a third
- * above, `;` being the last usable key. Derived from KEY_MAP rather than
- * hardcoded so the drawn keys and the playable ones cannot drift apart; keys
- * you can see but not play are just a lie about the instrument.
- * Z/X shift the whole span if you need another register.
- */
 const KB_SEMITONES = Math.max(...Object.values(KEY_MAP)) + 1;
 
-/** Reverse lookup so each drawn key can print the letter that plays it. */
 const LABEL_FOR_SEMITONE = new Map<number, string>(
   Object.entries(KEY_MAP).map(([k, semi]) => [semi, k === ";" ? ";" : k.toUpperCase()]),
 );
@@ -272,7 +274,6 @@ function buildKeyboard(): void {
     const midi = octaveBase + i;
     const label = LABEL_FOR_SEMITONE.get(i) ?? "";
     if (BLACK.has(i % 12)) {
-      // Straddles the gap between the previous white key and the next one.
       blacks.push(
         `<div class="key black" data-midi="${midi}" style="left:calc(${whiteIndex} * var(--kw) - var(--kw) * 0.3)">` +
           `<span>${label}</span></div>`,
@@ -305,11 +306,24 @@ function keyEl(midi: number): HTMLElement | null {
   return document.querySelector<HTMLElement>(`.key[data-midi="${midi}"]`);
 }
 
+/**
+ * Note-on now waits for render-idle.
+ *
+ * It didn't have to before: you only ever rendered as a consequence of your own
+ * action, so you were never playing during one. In a shared session another
+ * contributor's turn can hand THIS tab a render at any moment, and Tone.Offline
+ * swaps the global context while it runs — a voice built during that window
+ * belongs to the offline context and is simply never heard.
+ */
 async function press(id: string, midi: number, el?: HTMLElement | null): Promise<void> {
   if (held.has(id)) return;
   held.set(id, midi);
   (el ?? keyEl(midi))?.classList.add("on");
+  notePlaying();
   await ensureAudio();
+  await renderIdle();
+  // The key may have been released during the await.
+  if (!held.has(id)) return;
   noteOn(midi, 0.9);
 }
 
@@ -318,6 +332,7 @@ function release(id: string): void {
   if (midi === undefined) return;
   held.delete(id);
   keyEl(midi)?.classList.remove("on");
+  notePlaying();
   noteOff(midi);
 }
 
@@ -343,21 +358,124 @@ function bindTypingKeyboard(): void {
   window.addEventListener("blur", () => { held.clear(); noteOff(); });
 }
 
-// --- suggestion chips ------------------------------------------------------
+// --- views (pure functions of the snapshot) --------------------------------
 
-function renderChips(suggestions: string[] | undefined): void {
-  const row = $("chips");
-  if (!row) return;
-  if (!suggestions?.length) { row.innerHTML = ""; return; }
-  row.innerHTML = suggestions
-    .map((s, i) => `<button class="chip" data-i="${i}">${escapeHtml(s)}</button>`)
-    .join("");
-  row.querySelectorAll<HTMLButtonElement>(".chip").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const text = suggestions[Number(btn.dataset.i)];
-      if (text) sendChat(text);
-    });
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+}
+
+function pip(color: string | null): string {
+  return `<span class="pip" style="background:${escapeHtml(color ?? "#888")}"></span>`;
+}
+
+function nameOf(clientId: string | null): string {
+  if (!clientId) return "someone";
+  if (clientId === me.id) return "you";
+  const peer = state.snap.peers.find((p) => p.clientId === clientId);
+  if (peer) return peer.nickname;
+  // They've left, but their work is still on screen — find them in the chat log.
+  const row = state.snap.session?.chat.find((c) => c.authorClientId === clientId);
+  return row?.nickname ?? "someone";
+}
+
+function colorOf(clientId: string | null): string | null {
+  if (!clientId) return null;
+  const peer = state.snap.peers.find((p) => p.clientId === clientId);
+  if (peer) return peer.color;
+  return state.snap.session?.chat.find((c) => c.authorClientId === clientId)?.color ?? null;
+}
+
+function renderPeers(): void {
+  const el = $("peers");
+  if (!el) return;
+  const peers = state.snap.peers;
+  if (!state.slug || peers.length === 0) { el.innerHTML = ""; return; }
+
+  const owner = state.snap.session?.render?.ownerClientId ?? null;
+  const mine = peers.find((p) => p.clientId === me.id);
+  const others = peers.filter((p) => p.clientId !== me.id);
+  const shown = others.slice(0, 5);
+  const overflow = others.length - shown.length;
+
+  const youPip = pip(mine?.color ?? me.color);
+  const parts = [
+    `<span class="peer you" title="you">${youPip}` +
+      `<input id="nickname" class="name-edit" value="${escapeHtml(me.nickname)}" maxlength="16" spellcheck="false" />` +
+      `</span>`,
+    ...shown.map(
+      (p) =>
+        `<span class="peer" title="${escapeHtml(p.nickname)}${p.clientId === owner ? " — rendering" : ""}">` +
+        `<span class="pip${p.clientId === owner ? " rendering" : ""}" style="background:${escapeHtml(p.color)}"></span>` +
+        `<span class="pname">${escapeHtml(p.nickname)}</span></span>`,
+    ),
+  ];
+  if (overflow > 0) parts.push(`<span class="muted">+${overflow}</span>`);
+  el.innerHTML = parts.join("");
+
+  const input = $<HTMLInputElement>("nickname");
+  input?.addEventListener("change", () => {
+    const stored = me.rename(input.value);
+    // Reflect what was ACTUALLY stored — sanitizing can shorten or replace it,
+    // and the box must not disagree with what the room sees.
+    input.value = stored;
+    void beat();
   });
+  input?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") { input.value = me.nickname; input.blur(); }
+  });
+}
+
+function renderSessionLabel(): void {
+  const label = $("sessionlabel");
+  const share = $("share");
+  if (!label || !share) return;
+  if (!state.slug) { label.textContent = ""; share.classList.add("hidden"); return; }
+  label.textContent = state.slug;
+  share.classList.remove("hidden");
+}
+
+function renderStartPanel(): void {
+  const panel = $("startpanel");
+  if (!panel) return;
+  const s = state.snap.session;
+  const started = !!s && (s.target !== null || s.promptText !== null || state.snap.attempts.length > 0);
+  // Once a session is under way its start controls disappear for EVERYONE. A
+  // joiner's first instinct is otherwise to drop their own WAV into a room
+  // somebody else is working in, and the server would (correctly) refuse.
+  panel.classList.toggle("hidden", started);
+}
+
+function renderTargetRow(): void {
+  const el = $("targetinfo");
+  if (!el) return;
+  const s = state.snap.session;
+  if (!s || (s.target === null && s.promptText === null)) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+
+  if (s.target === null) {
+    el.innerHTML = `<span class="tag">prompt</span> ${escapeHtml(s.promptText ?? "")}`;
+    return;
+  }
+
+  const info = s.targetInfo;
+  const head =
+    `<span class="tag">target</span> ${escapeHtml(info?.filename ?? "sample")} · ` +
+    `${s.target.f0Hz.toFixed(1)} Hz · ${s.target.durationMs} ms `;
+
+  if (state.targetAudio) {
+    el.innerHTML = `${head}<button id="playtarget">▶︎ target</button>`;
+    $("playtarget")?.addEventListener("click", async () => {
+      await ensureAudio();
+      await renderIdle();
+      playBuffer(state.targetAudio!);
+    });
+  } else if (s.hasTargetAudio) {
+    el.innerHTML = `${head}<span class="muted">(loading audio…)</span>`;
+  } else {
+    // Sessions started before audio was stored, or an upload that failed.
+    el.innerHTML = `${head}<span class="muted">(audio wasn't stored — it can't be replayed here)</span>`;
+  }
 }
 
 function setStatus(text: string, tone: "muted" | "good" | "working" = "muted"): void {
@@ -372,46 +490,100 @@ function setStatus(text: string, tone: "muted" | "good" | "working" = "muted"): 
   else el.style.removeProperty("color");
 }
 
+function renderStatus(): void {
+  if (state.transientError) return setStatus(state.transientError);
+
+  const s = state.snap.session;
+  if (!state.slug) return setStatus("Waiting for a sample.");
+  if (!state.snap.loaded) return setStatus("Joining", "working");
+  if (!s) return setStatus("No such session — start a new one above.");
+
+  const q = s.queuedCount > 0 ? ` · ${s.queuedCount} queued` : "";
+
+  switch (s.status) {
+    case "idle":
+      if (s.lastError) return setStatus(s.lastError);
+      return setStatus(state.snap.attempts.length ? `Ready.${q}` : "Waiting for a sample.");
+    case "thinking": {
+      const who = nameOf(s.turnStartedBy);
+      return setStatus(`Thinking about ${who === "you" ? "your" : `${who}'s`} message${q}`, "working");
+    }
+    case "awaiting_render": {
+      const attempt = state.snap.attempts.find((a) => a.presetId === s.render?.presetId);
+      const name = attempt?.preset.name ?? "the patch";
+      const left = Math.max(0, s.maxIterations - s.iteration);
+      const owner = s.render?.ownerClientId ?? null;
+      if (owner === me.id) return setStatus(`Rendering “${name}” here · ${left} left${q}`, "working");
+      if (msUntilLeaseExpiry(state.snap) > 0) {
+        return setStatus(`${nameOf(owner)} is rendering “${name}”${q}`, "working");
+      }
+      return setStatus(`${nameOf(owner)} dropped out — picking up “${name}”${q}`, "working");
+    }
+    case "done": {
+      const best = state.snap.attempts.find((a) => a.presetId === s.bestPresetId);
+      const dist = best?.distance;
+      return setStatus(
+        `Done — “${best?.preset.name ?? ""}”` +
+          (dist !== null && dist !== undefined ? ` at distance ${dist.toFixed(1)}` : "") +
+          q,
+        "good",
+      );
+    }
+    default:
+      return setStatus(s.lastError ?? "Ready.");
+  }
+}
+
 function renderAttempts(): void {
   const panel = $("attemptspanel");
   const list = $("attempts");
   if (!panel || !list) return;
-  if (state.attempts.length === 0) return;
+  const attempts = state.snap.attempts;
+  if (attempts.length === 0) return;
   panel.classList.remove("hidden");
 
-  const best = state.attempts.reduce<number | null>(
+  const s = state.snap.session;
+  const best = attempts.reduce<number | null>(
     (m, a) => (a.distance !== null && (m === null || a.distance < m) ? a.distance : m),
     null,
   );
 
-  list.innerHTML = state.attempts
+  list.innerHTML = attempts
     .map((a, i) => {
       const d = a.distance;
-      const pending = a.pending;
       const scored = d !== null;
+      const pending = s?.status === "awaiting_render" && s.render?.presetId === a.presetId;
       const pct = scored ? Math.max(0, Math.min(100, 100 - d)) : 0;
       const isBest = scored && d === best;
       const isLoaded = state.loadedPresetId === a.presetId;
+      const isOffered = state.offeredPresetId === a.presetId;
+
+      // The .working sweep now means "somebody, somewhere is rendering this",
+      // which is a strictly better meaning for the same pixels than "I am".
+      const byline = renderByline(a, pending, s?.render?.ownerClientId ?? null);
+
       return `
         <div class="attempt ${pending ? "working" : ""}" data-load="${a.presetId}" style="cursor:pointer">
           <div class="row" style="justify-content:space-between">
             <div><strong>${i + 1}. ${escapeHtml(a.preset.name)}</strong>
               ${isBest ? '<span class="tag" style="color:var(--good);border-color:var(--good)">best</span>' : ""}
+              ${a.isFinal ? '<span class="tag">final</span>' : ""}
               ${isLoaded ? '<span class="tag" style="color:var(--accent);border-color:var(--accent)">loaded</span>' : ""}
             </div>
             <span class="dist">${scored ? d.toFixed(1) : ""}</span>
           </div>
+          <div class="byline">${byline}</div>
           <div class="why${state.expanded.has(a.presetId) ? " open" : ""}">${escapeHtml(a.rationale)}</div>
           <button class="morelink" data-expand="${a.presetId}">${
             state.expanded.has(a.presetId) ? "less" : "more"
           }</button>
+          <button class="morelink" data-fork="${a.presetId}" title="Start a new session from this patch">fork</button>
+          ${isOffered ? `<button class="chip tiny" data-offer="${a.presetId}">new — load it</button>` : ""}
           ${pending || scored ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}
         </div>`;
     })
     .join("");
 
-  // Any attempt is loadable at any time, finished or not — the user may simply
-  // like one and want to keep playing it.
   list.querySelectorAll<HTMLButtonElement>("[data-expand]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       // The whole row loads the preset on click; expanding must not do that too.
@@ -423,18 +595,132 @@ function renderAttempts(): void {
     });
   });
 
-  list.querySelectorAll<HTMLElement>("[data-load]").forEach((el) => {
-    el.addEventListener("click", async () => {
-      const a = state.attempts.find((x) => x.presetId === el.dataset.load);
-      if (a) await loadPreset(a.preset, a.presetId, { audition: true });
+  list.querySelectorAll<HTMLButtonElement>("[data-fork]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      // The row itself loads the preset on click; forking must not also do that.
+      e.stopPropagation();
+      void forkFrom(btn.dataset.fork!);
     });
   });
 
-  // Follow the newest row. scrollTop rather than scrollIntoView: the latter
-  // would scroll the PAGE to bring the rail into view, which is exactly the
-  // main-view movement this pane exists to prevent.
+  list.querySelectorAll<HTMLButtonElement>("[data-offer]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const a = state.snap.attempts.find((x) => x.presetId === btn.dataset.offer);
+      if (!a) return;
+      state.offeredPresetId = null;
+      state.pinnedPresetId = null;
+      await loadPreset(a.preset, a.presetId);
+    });
+  });
+
+  list.querySelectorAll<HTMLElement>("[data-load]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const a = state.snap.attempts.find((x) => x.presetId === el.dataset.load);
+      if (!a) return;
+      // An explicit choice pins it: nobody else's turn should yank it away.
+      state.pinnedPresetId = a.presetId;
+      state.offeredPresetId = null;
+      await loadPreset(a.preset, a.presetId, { audition: true });
+    });
+  });
+
   if (state.followLatest) list.scrollTop = list.scrollHeight;
 }
+
+function renderByline(
+  a: AttemptView,
+  pending: boolean,
+  owner: string | null,
+): string {
+  const asked = a.askedByClientId
+    ? `${pip(colorOf(a.askedByClientId))}${escapeHtml(nameOf(a.askedByClientId))} asked`
+    : "";
+  let measured = "";
+  if (pending) {
+    measured = owner
+      ? ` · ${pip(colorOf(owner))}${escapeHtml(nameOf(owner))} rendering…`
+      : " · waiting for a browser";
+  } else if (a.measuredByClientId) {
+    measured = ` · ${pip(colorOf(a.measuredByClientId))}measured by ${escapeHtml(nameOf(a.measuredByClientId))}`;
+  }
+  return asked + measured;
+}
+
+function renderChat(): void {
+  const el = $("chatlog");
+  const panel = $("chatpanel");
+  if (!el || !panel) return;
+  const rows = (state.snap.session?.chat ?? []).filter((c) => c.status !== "cancelled");
+  if (rows.length === 0 && state.snap.attempts.length === 0) return;
+  panel.classList.remove("hidden");
+
+  el.innerHTML = rows
+    .map((m, i) => {
+      const mine = m.authorClientId === me.id;
+      const cls = [
+        "turn",
+        m.kind === "agent" ? "agent" : m.kind === "system" ? "system" : "you",
+        mine ? "mine" : "",
+        m.status === "queued" ? "queued" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      // Fade with age, but to a much higher floor than the solo version used:
+      // with several authors you genuinely need to read back to see who said
+      // what and what is still waiting.
+      const opacity = m.status === "queued" ? "1" : Math.max(0.6, 1 - i * 0.08).toFixed(2);
+      const who =
+        m.kind === "agent"
+          ? "agent"
+          : m.kind === "system"
+            ? "·"
+            : `${pip(m.color)}${escapeHtml(mine ? "you" : (m.nickname ?? "someone"))}`;
+      const badge =
+        m.status === "queued"
+          ? ` <span class="tag">queued</span>${mine ? ` <button class="morelink" data-cancel="${m.id}">cancel</button>` : ""}`
+          : "";
+      return `<div class="${cls}" style="opacity:${opacity}">
+        <span class="who">${who}${badge}</span>
+        <p>${escapeHtml(m.text)}</p>
+      </div>`;
+    })
+    .join("");
+
+  el.querySelectorAll<HTMLButtonElement>("[data-cancel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (state.slug) void backend.cancelQueued(state.slug, btn.dataset.cancel!);
+    });
+  });
+}
+
+function renderChips(): void {
+  const row = $("chips");
+  if (!row) return;
+  const rows = state.snap.session?.chat ?? [];
+  // Newest agent row that offered chips and that this tab hasn't used.
+  const src = rows.find(
+    (c: ChatView) => c.kind === "agent" && c.suggestions.length > 0 && !state.usedChips.has(c.id),
+  );
+  if (!src) { row.innerHTML = ""; return; }
+
+  row.innerHTML = src.suggestions
+    .map((s, i) => `<button class="chip" data-i="${i}">${escapeHtml(s)}</button>`)
+    .join("");
+  row.querySelectorAll<HTMLButtonElement>(".chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const text = src.suggestions[Number(btn.dataset.i)];
+      // Chips are shared now, so mark this row used LOCALLY — otherwise the next
+      // snapshot brings them straight back, and two people clicking the same chip
+      // would each queue the same instruction.
+      state.usedChips.add(src.id);
+      renderChips();
+      if (text) sendChat(text);
+    });
+  });
+}
+
+// --- audio ------------------------------------------------------------------
 
 /**
  * Make a preset the audible one.
@@ -461,181 +747,191 @@ async function loadPreset(
   }
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}
-
 function midiForTarget(): number {
-  const f0 = state.target?.features.f0Hz ?? 220;
+  const f0 = state.snap.session?.target?.f0Hz ?? 220;
   return Math.round(69 + 12 * Math.log2(f0 / 440));
 }
 
 /**
- * Newest turn on top. The conversation is a working surface, not a document —
- * the thing you just asked for is what you want to read, and older turns fade
- * out down the page rather than pushing the live one off screen.
+ * Auto-load the newest measured preset — unless that would be rude.
+ *
+ * In a shared session someone else's turn can produce a new patch at any moment,
+ * and silently swapping the timbre out from under someone's hands is the fastest
+ * way to make an instrument feel untrustworthy. So: never while they are playing,
+ * and never over a preset they explicitly chose from the rail. Offer it instead,
+ * ON the rail row, where the evidence that something new exists already is.
  */
-function logChat(who: "you" | "agent", text: string): void {
-  state.chat.unshift({ role: who, text });
-  renderChat();
+function maybeAutoLoad(): void {
+  const attempts = state.snap.attempts;
+  const newest = attempts[attempts.length - 1];
+  if (!newest) return;
+  if (state.loadedPresetId === newest.presetId) { state.offeredPresetId = null; return; }
+  // Not yet measured and not rendering here — wait for it to become real.
+  const pending = state.snap.session?.render?.presetId === newest.presetId;
+  if (pending && newest.features === null) return;
+
+  const pinnedElsewhere = state.pinnedPresetId !== null && state.pinnedPresetId !== newest.presetId;
+  if (pinnedElsewhere || iAmPlaying() || held.size > 0) {
+    state.offeredPresetId = newest.presetId;
+    return;
+  }
+  state.offeredPresetId = null;
+  void loadPreset(newest.preset, newest.presetId);
 }
 
-function renderChat(): void {
-  const el = $("chatlog");
-  if (!el) return;
-  el.innerHTML = state.chat
-    .map((m, i) => {
-      // Fade with age, to a floor — still legible if you go looking.
-      const opacity = Math.max(0.32, 1 - i * 0.17).toFixed(2);
-      return `<div class="turn ${m.role}" style="opacity:${opacity}">
-        <span class="who">${m.role}</span>
-        <p>${escapeHtml(m.text)}</p>
-      </div>`;
-    })
-    .join("");
-}
+/** Pull the shared target audio down once, so joiners can hear the sample too. */
+async function ensureTargetAudio(): Promise<void> {
+  const s = state.snap.session;
+  if (!s || !state.slug) return;
+  if (!s.hasTargetAudio || !s.target) return;
+  if (state.targetAudioFor === state.slug) return;
+  state.targetAudioFor = state.slug;
 
-// --- the loop --------------------------------------------------------------
-
-async function start(file: File): Promise<void> {
-  if (state.busy) return;
-  state.busy = true;
-  state.attempts = [];
-  renderAttempts();
-
+  const url = await backend.targetAudioUrl(state.slug);
+  if (!url) return;
   try {
-    $("starters")?.classList.add("hidden");
-    setStatus(`Analyzing ${file.name}`, "working");
-    const target = await analyzeTarget(file);
-    state.target = target;
-
-    const info = $("targetinfo")!;
-    info.classList.remove("hidden");
-    info.innerHTML =
-      `<span class="tag">target</span> ${escapeHtml(file.name)} · ` +
-      `${target.features.f0Hz.toFixed(1)} Hz · ${target.features.durationMs} ms ` +
-      `<button id="playtarget">▶︎ target</button>`;
-    $("playtarget")?.addEventListener("click", async () => {
-      await ensureAudio();
-      playBuffer(target.prepared);
-    });
-
-    setStatus("Listening to your sample, sketching a patch", "working");
-    // A fresh upload is a fresh session, so the old URL keeps its own history.
-    state.sessionId = await apiClient.createSession();
-    putSessionInUrl(state.sessionId);
-    const step = await apiClient.setTarget(state.sessionId, target.features, target.info);
-    await drain(step);
-  } catch (err) {
-    setStatus(`Failed: ${String(err)}`);
-  } finally {
-    state.busy = false;
+    const res = await fetch(url);
+    const bytes = await res.arrayBuffer();
+    state.targetAudio = decodePreparedAudio(bytes, s.target.sampleRate);
+    renderTargetRow();
+  } catch {
+    state.targetAudioFor = null; // let a later snapshot retry
   }
 }
 
-/** Start from a description rather than a sample. No target, so no distance. */
+// --- reconciliation ---------------------------------------------------------
+
+/**
+ * The whole client loop, and it is synchronous.
+ *
+ * Everything asynchronous is dispatched behind a guard and re-enters here when
+ * it finishes. That one rule is what replaced `state.busy`: the same snapshot can
+ * arrive any number of times and this is a no-op every time after the first.
+ */
+function reconcile(snap: Snapshot): void {
+  state.snap = snap;
+
+  renderPeers();
+  renderSessionLabel();
+  renderStartPanel();
+  renderTargetRow();
+  renderAttempts();
+  renderChat();
+  renderChips();
+  renderStatus();
+
+  void ensureTargetAudio();
+  maybeAutoLoad();
+  maybeRender(snap, { loadPreset, reconcile: () => reconcile(state.snap) });
+  scheduleLeaseWake(snap);
+}
+
+/**
+ * A lease lapsing is NOT a database write, so no subscription will ever fire for
+ * it. If this tab might need to take a render over, it has to watch the clock
+ * itself — otherwise a dead render owner stalls the session until something
+ * unrelated happens to change the document.
+ */
+function scheduleLeaseWake(snap: Snapshot): void {
+  if (leaseTimer) clearTimeout(leaseTimer);
+  const s = snap.session;
+  if (!s || s.status !== "awaiting_render" || !s.render) return;
+  if (s.render.ownerClientId === me.id) return;
+  const wait = Math.max(0, msUntilLeaseExpiry(snap)) + 250;
+  leaseTimer = setTimeout(() => reconcile(state.snap), wait);
+}
+
+// --- actions ----------------------------------------------------------------
+
+async function start(file: File): Promise<void> {
+  if (state.starting) return;
+  state.starting = true;
+  try {
+    state.transientError = null;
+    setStatus(`Analyzing ${file.name}`, "working");
+    const target = await analyzeTarget(file);
+    state.targetAudio = target.prepared;
+
+    const slug = newSessionId();
+    await backend.createSession(slug);
+    // We analyzed the file here, so we already hold the audio — carrying it past
+    // attach()'s reset avoids downloading back what we are about to upload.
+    attach(slug, { targetAudio: true });
+
+    setStatus("Storing the sample so everyone can hear it", "working");
+    const audioId = await backend.uploadTargetAudio(encodePreparedAudio(target.prepared));
+
+    setStatus("Listening to your sample, sketching a patch", "working");
+    await backend.setTarget({
+      slug,
+      features: target.features,
+      info: target.info,
+      spec: specForTarget(target),
+      audioId,
+    });
+  } catch (err) {
+    state.transientError = `Failed: ${String(err)}`;
+    renderStatus();
+  } finally {
+    state.starting = false;
+  }
+}
+
 async function startFromPrompt(): Promise<void> {
   const box = $<HTMLInputElement>("promptbox");
   const prompt = box?.value.trim();
-  if (!prompt || state.busy) return;
+  if (!prompt || state.starting) return;
   box?.blur();
 
-  state.busy = true;
-  state.attempts = [];
-  state.target = null;
-  renderAttempts();
-
+  state.starting = true;
   try {
-    $("starters")?.classList.add("hidden");
+    state.transientError = null;
+    state.targetAudio = null;
     setStatus(`Designing “${prompt}”`, "working");
-    state.sessionId = await apiClient.createSession();
-    putSessionInUrl(state.sessionId);
 
-    const info = $("targetinfo");
-    if (info) {
-      info.classList.remove("hidden");
-      info.innerHTML = `<span class="tag">prompt</span> ${escapeHtml(prompt)}`;
-    }
-
-    await drain(await apiClient.startFromPrompt(state.sessionId, prompt));
+    const slug = newSessionId();
+    await backend.createSession(slug);
+    attach(slug);
+    await backend.startFromPrompt({ slug, prompt, spec: specForPrompt() });
   } catch (err) {
-    setStatus(`Failed: ${String(err)}`);
+    state.transientError = `Failed: ${String(err)}`;
+    renderStatus();
   } finally {
-    state.busy = false;
+    state.starting = false;
   }
 }
 
 /**
- * Render → analyze → report, for as long as the agent keeps proposing.
- * A render failure is reported to the agent rather than thrown: an out-of-range
- * preset must not wedge the session, and the agent can self-correct.
+ * Take a patch somewhere else.
+ *
+ * A shared session can't be restarted — setTarget and startFromPrompt wipe the
+ * conversation, which in a room full of people would delete everyone's work, so
+ * the server refuses them once a session is under way. Forking is the way out
+ * that doesn't destroy anything: a new room, seeded with this target and this
+ * preset, where you get your own turns and nobody has to queue behind you.
  */
-async function drain(step: Step): Promise<void> {
-  const sessionId = state.sessionId!;
-
-  while (step.kind === "render") {
-    // Capture before the awaits: reassigning `step` inside try/catch loses the
-    // narrowing, so the catch block can no longer see these fields.
-    const { presetId, preset, iterationsRemaining } = step;
-
-    state.current = preset;
-    state.attempts.push({
-      presetId, preset, rationale: step.rationale,
-      distance: null, features: null, pending: true,
-    });
-    renderAttempts();
-    setStatus(`Rendering “${preset.name}” · ${iterationsRemaining} left`, "working");
-
-    try {
-      // No target means a prompt-started session: still render and measure so
-      // the agent sees what it built, there's just nothing to score against.
-      const { features, diff } = state.target
-        ? await evaluatePreset(preset, state.target)
-        : await measurePreset(preset);
-      const a = state.attempts.find((x) => x.presetId === presetId);
-      if (a) { a.distance = diff ? diff.distance : null; a.features = features; a.pending = false; }
-      // Load it the moment it has been rendered, so the newest patch is always
-      // playable — the user may like an in-progress one and want to keep it.
-      await loadPreset(preset, presetId);
-      setStatus(
-        diff ? `distance ${diff.distance.toFixed(1)} — ${diff.verdict}` : `Rendered “${preset.name}”`,
-        "working",
-      );
-      step = await apiClient.submitAnalysis(sessionId, presetId, features, diff);
-    } catch (err) {
-      // A bad preset must not wedge the session — report it and let the agent
-      // self-correct rather than throwing out of the loop.
-      const failed = state.attempts.find((x) => x.presetId === presetId);
-      if (failed) failed.pending = false;
-      renderAttempts();
-      setStatus(`Render failed, telling the agent: ${String(err)}`);
-      step = await apiClient.submitRenderError(sessionId, presetId, String(err));
-    }
-  }
-
-  if (step.kind === "done") {
-    await loadPreset(step.preset, step.presetId);
-    setStatus(
-      `Done — “${step.preset.name}”${step.distance !== null ? ` at distance ${step.distance.toFixed(1)}` : ""}.`,
-      "good",
-    );
-    logChat("agent", step.text);
-    renderChips(step.suggestions);
-    $("chatpanel")?.classList.remove("hidden");
-  } else if (step.kind === "message") {
-    if (step.preset) await loadPreset(step.preset, null);
-    setStatus("Ready.");
-    logChat("agent", step.text);
-    renderChips(step.suggestions);
-    $("chatpanel")?.classList.remove("hidden");
-  } else if (step.kind === "error") {
-    setStatus(`Agent error: ${step.message}`);
-  }
+async function forkFrom(presetId: string): Promise<void> {
+  if (!state.slug) return;
+  setStatus("Forking…", "working");
+  const newSlug = await backend.forkSession(state.slug, newSessionId(), presetId);
+  // null means the mutation failed and already reported itself.
+  if (!newSlug) return;
+  // The fork points at the SAME stored audio, so carry the decoded buffer over
+  // rather than downloading it again.
+  attach(newSlug, { targetAudio: state.targetAudio !== null });
 }
 
+/**
+ * Send, or queue. Never blocked.
+ *
+ * The old client refused while busy. With several people in a room somebody is
+ * almost always mid-turn, so refusing would mean an input that is dead most of
+ * the time — and an input that is dead most of the time is one people stop
+ * trusting. The server decides whether this becomes a turn or a queued row.
+ */
 async function sendChat(preset?: string): Promise<void> {
   const input = $<HTMLInputElement>("chat");
-  if (!state.sessionId || state.busy) return;
+  if (!state.slug) return;
   const msg = (preset ?? input?.value ?? "").trim();
   if (!msg) return;
   if (input && !preset) input.value = "";
@@ -643,94 +939,87 @@ async function sendChat(preset?: string): Promise<void> {
   // keystrokes while an input has focus, so leaving focus in the box means the
   // next thing you play types instead — right when you want to hear the change.
   input?.blur();
-  renderChips([]); // chips are stale the moment one is used
-  logChat("you", msg);
-  state.busy = true;
-  try {
-    setStatus("Thinking", "working");
-    await drain(await apiClient.chat(state.sessionId, msg));
-  } catch (err) {
-    setStatus(`Failed: ${String(err)}`);
-  } finally {
-    state.busy = false;
-  }
+  // Asking for a change means you want to hear it: stop pinning an older patch.
+  state.pinnedPresetId = null;
+  state.transientError = null;
+  await backend.sendChat(state.slug, msg, state.loadedPresetId);
 }
 
-// --- boot ------------------------------------------------------------------
+// --- boot -------------------------------------------------------------------
+
+function beat(): Promise<void> {
+  const id = state.snap.session?.sessionId;
+  if (!id) return Promise.resolve();
+  return backend.heartbeat(id, playingUntil());
+}
 
 /**
- * Rebuild the UI from a session's stored history.
+ * Point this tab at a session.
  *
- * The uploaded AUDIO is not recoverable — we never persist it, only the feature
- * vector it produced. That is enough to keep iterating (renders are specced
- * from the features), but the target itself can no longer be auditioned, so we
- * don't offer a button that would silently do nothing.
+ * Called on boot, and again on every fork — so it has to leave no trace of the
+ * previous session behind. `carry.targetAudio` is the one exception: a fork
+ * references the same stored audio object, so re-downloading it would be waste.
  */
-async function restoreSession(id: string): Promise<void> {
-  let snap: SessionSnapshot;
-  try {
-    snap = await apiClient.snapshot(id);
-  } catch {
-    setStatus("Could not load that session — drop a sample to start a new one.");
-    return;
-  }
-  if (!snap?.target || !snap.history?.length) {
-    setStatus("That session is empty — drop a sample to begin.");
-    return;
-  }
+function attach(slug: string, carry: { targetAudio?: boolean } = {}): void {
+  detach?.();
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  if (leaseTimer) clearTimeout(leaseTimer);
 
-  state.sessionId = id;
-  state.target = {
-    features: snap.target,
-    info: snap.targetInfo ?? { filename: "restored", durationSec: 0, sampleRate: snap.target.sampleRate },
-    // No audio: reconstructed sessions can render and diff, but not play the target.
-    prepared: { data: new Float32Array(0), sampleRate: snap.target.sampleRate },
-  };
-  state.attempts = snap.history.map((a) => ({
-    presetId: a.presetId,
-    preset: a.preset,
-    rationale: a.rationale,
-    distance: a.distance,
-    features: a.features,
-    pending: false,
-  }));
-  renderAttempts();
-
-  const info = $("targetinfo");
-  if (info) {
-    info.classList.remove("hidden");
-    info.innerHTML =
-      `<span class="tag">target</span> ${escapeHtml(snap.targetInfo?.filename ?? "restored session")} · ` +
-      `${snap.target.f0Hz.toFixed(1)} Hz · ${snap.target.durationMs} ms ` +
-      `<span class="muted">(audio not stored — reload can't replay it)</span>`;
+  // Per-session view state, all of it keyed to a session that is no longer this
+  // one. Leaving any of it behind shows the new room someone else's decisions.
+  state.expanded.clear();
+  state.usedChips.clear();
+  state.pinnedPresetId = null;
+  state.offeredPresetId = null;
+  state.loadedPresetId = null;
+  state.transientError = null;
+  if (carry.targetAudio && state.targetAudio) {
+    state.targetAudioFor = slug;
+  } else {
+    state.targetAudio = null;
+    state.targetAudioFor = null;
   }
 
-  const best =
-    state.attempts.find((a) => a.presetId === snap.bestPresetId) ??
-    state.attempts[state.attempts.length - 1];
-  if (best) await loadPreset(best.preset, best.presetId);
-  $("chatpanel")?.classList.remove("hidden");
-  setStatus(`Restored ${state.attempts.length} iteration(s). Play it, or keep tweaking.`, "good");
+  state.slug = slug;
+  putSessionInUrl(slug);
+  state.snap = { session: null, attempts: [], peers: [], loaded: false };
+  renderStatus();
+
+  detach = backend.subscribeSession(slug, reconcile, (message) => {
+    state.transientError = message;
+    renderStatus();
+  });
+
+  heartbeatTimer = setInterval(() => void beat(), HEARTBEAT_MS);
+  void beat();
 }
 
-async function boot(): Promise<void> {
+function boot(): void {
   shell();
   bindTypingKeyboard();
-  try {
-    const res = await api("/api/ping");
-    const info = (await res.json()) as { hasAnthropicKey?: boolean };
-    if (!info.hasAnthropicKey) {
-      setStatus("Worker has no ANTHROPIC_API_KEY set — the agent loop will fail until it's added.");
-      return;
-    }
-    const existing = sessionIdFromUrl();
-    if (existing) await restoreSession(existing);
-  } catch (err) {
-    setStatus(`Could not reach the API: ${String(err)}`);
-  }
+  backend.setErrorReporter((message) => {
+    state.transientError = message;
+    renderStatus();
+  });
+
+  // Registered ONCE, not per attach: these read the current session out of
+  // state, so re-registering them on every fork would just stack duplicate
+  // handlers that all do the same thing.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void beat();
+  });
+  window.addEventListener("pagehide", () => {
+    const id = state.snap.session?.sessionId;
+    if (id) backend.leave(id);
+  });
+
+  // The front page has nothing to do with any session, so it paints immediately.
+  // Gating it behind a WebSocket handshake would make the most common entry into
+  // the app slower for no reason at all.
+  renderStatus();
+
+  const existing = sessionIdFromUrl();
+  if (existing) attach(existing);
 }
 
-boot().catch((e) => {
-  const el = $("status") ?? $("boot");
-  if (el) el.textContent = `boot failed: ${String(e)}`;
-});
+boot();

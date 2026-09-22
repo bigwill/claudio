@@ -4,7 +4,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["@cloudflare/workers-types", "vite/client"],
+    "types": ["vite/client"],
     "strict": true,
     "noUnusedLocals": false,
     "skipLibCheck": true,
@@ -15,7 +15,11 @@
   },
   // scripts/ is deliberately excluded: those are Node-only dev utilities run
   // through node's type stripper, and they'd need @types/node globals that
-  // conflict with the Workers/DOM lib set the app compiles against. They're
-  // verified by being run (npm run test:dsp / npm run analyze), not by tsc.
-  "include": ["src", "vite.config.ts", "worker-configuration.d.ts"]
+  // conflict with the DOM lib set the app compiles against. They're verified by
+  // being run (npm run test:dsp / npm run analyze), not by tsc.
+  //
+  // convex/ IS included: its functions import src/shared, so a change there that
+  // breaks the backend should fail here rather than at push time. (The Workers
+  // types are gone with the Worker — the backend is Convex now.)
+  "include": ["src", "convex", "vite.config.ts"]
 }

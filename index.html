@@ -205,15 +205,22 @@
         font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
         color: var(--dim);
       }
-      .turn.you .who { color: var(--accent); }
       .turn p {
         margin: 0;
         /* The panel is wide; prose past ~72 characters gets hard to track back
            to the start of the next line. */
         max-width: 72ch;
       }
-      .turn.you p { color: var(--accent); font-size: 15px; }
+      /* Accent means YOU, not "a human said it". With several authors in the
+         room, colouring every user turn would make the log a wall of purple —
+         and the one thing you need to find fast is your own message. */
+      .turn.mine .who { color: var(--accent); }
+      .turn.mine p { color: var(--accent); font-size: 15px; }
       .turn.agent p { color: var(--text); }
+      .turn.system p { color: var(--dim); font-size: 13px; font-style: italic; }
+      /* Queued messages are the thing you most need to read BEFORE typing, so
+         they are never faded — reconcile() sets their opacity to 1 explicitly. */
+      .turn.queued p { color: var(--text); }
 
       /* suggestion chips */
       .chip {
@@ -221,6 +228,45 @@
         background: #262336; border-color: #3d3852;
       }
       .chip:hover:not(:disabled) { background: #2f2b42; border-color: var(--accent); }
+      .chip.tiny { padding: 3px 9px; font-size: 12px; }
+
+      /* ---- multiplayer chrome ------------------------------------------- */
+
+      .peers { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); }
+      .peer { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+      .peer.you { color: var(--text); }
+      .pip {
+        width: 9px; height: 9px; border-radius: 50%; flex: none;
+        display: inline-block; box-shadow: 0 0 0 1px #0e0d12;
+      }
+      /* Reuses the existing `pulse` keyframes from the status dots — same visual
+         vocabulary, no new animation. */
+      .pip.rendering {
+        box-shadow: 0 0 0 2px var(--accent);
+        animation: pulse 1.1s ease-in-out infinite;
+      }
+      .name-edit {
+        background: transparent; border: 0; border-bottom: 1px dashed var(--line);
+        color: inherit; font: inherit; font-size: 12px; width: 11ch; padding: 0 0 1px;
+      }
+      .name-edit:focus { outline: none; border-bottom-color: var(--accent); }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
+
+      /* Attribution under each iteration: who asked, who measured it. */
+      .byline {
+        display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+        font-size: 11px; color: var(--dim); margin: 3px 0 2px;
+      }
+      .byline:empty { display: none; }
+      .turn .who .pip { margin-right: 5px; vertical-align: middle; }
+
+      @media (max-width: 860px) {
+        /* The rail is hidden on small screens (the instrument wins), but a
+           joiner arriving from a pasted link is the MOST likely mobile visitor
+           and all the attribution lives there. Keep names off the topbar and let
+           the pips alone carry presence. */
+        .peer .pname, .name-edit, #sessionlabel { display: none; }
+      }
     </style>
   </head>
   <body>

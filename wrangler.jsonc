@@ -1,21 +1,25 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "claudio",
-  "main": "./src/worker/index.ts",
   "compatibility_date": "2026-08-14",
-  "compatibility_flags": ["nodejs_compat"],
 
+  // ---------------------------------------------------------------------
+  // Static assets only.
+  //
+  // There is no `main` any more, and no Durable Objects: the backend moved to
+  // Convex, and Cloudflare's whole job is serving the built client. The browser
+  // talks to Convex directly over a WebSocket, so nothing here proxies an API.
+  //
+  // `directory` is NOT optional — the Vite plugin used to supply it, and without
+  // it an assets-only deploy uploads nothing at all.
+  //
+  // `not_found_handling` is what makes /<SESSION_ID> work: those paths have no
+  // file behind them and must fall through to index.html.
+  // ---------------------------------------------------------------------
   "assets": {
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
   },
-
-  "durable_objects": {
-    "bindings": [{ "name": "SESSION", "class_name": "SessionDO" }]
-  },
-
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SessionDO"] }],
 
   "observability": { "enabled": true },
 
@@ -25,48 +29,35 @@
   //   default (this file's top level) — the `develop` branch, served at
   //     claudio.<subdomain>.workers.dev. Deploy with `npm run deploy`.
   //
-  //   production — the `main` branch, served at claudio.humble.audio.
-  //     Deploy with `npm run deploy:prod`.
+  //   production — the `main` branch. Deploy with `npm run deploy:prod`.
   //
-  // Production is a SEPARATE Worker (claudio-prod), which means a separate
-  // Durable Object namespace and separate secrets. That's deliberate: dev
-  // iteration can't disturb live sessions, and a `npm run deploy` from a
-  // half-finished branch can't reach the custom domain.
+  // Each environment points at its OWN Convex deployment, and that URL is baked
+  // into the bundle at build time via VITE_CONVEX_URL — so the build and the
+  // deploy have to agree. That is the one footgun this file still has; see the
+  // deploy scripts, which set it explicitly rather than relying on .env.local.
   //
-  // assets / durable_objects / migrations are NOT inherited into an
-  // environment — they must be repeated here or the production Worker
-  // deploys without them.
+  // assets is NOT inherited into an environment — it must be repeated here or
+  // the production Worker deploys without it.
   // ---------------------------------------------------------------------
   "env": {
     "production": {
       "name": "claudio-prod",
-
-      // Reachable at claudio-prod.<subdomain>.workers.dev until the custom
-      // domain is sorted. Without this, production has no route at all and is
-      // simply unreachable — which is where it sat after the first deploy
-      // attempt failed to attach the route.
       "workers_dev": true,
 
       // TODO: re-enable once Cloudflare is authoritative for the hostname.
       //
       //   "routes": [{ "pattern": "claudio.humble.audio", "custom_domain": true }],
       //
-      // This line CANNOT be enabled until claudio.humble.audio is a zone on
-      // this Cloudflare account (deploy fails: "Could not find zone"). A CNAME
-      // at an external registrar pointing to *.workers.dev does not work as a
-      // substitute: the browser sends SNI for claudio.humble.audio and
-      // Cloudflare has no certificate for it, so TLS fails before routing is
-      // ever considered. Cloudflare must hold the zone to issue that cert.
+      // Unchanged by the Convex port: Cloudflare still terminates TLS for the
+      // static site, so this still requires claudio.humble.audio to be a zone on
+      // this account. A CNAME at an external registrar cannot substitute — the
+      // browser sends SNI for claudio.humble.audio and Cloudflare holds no
+      // certificate for it, so TLS fails before routing is considered.
       // See README "Custom domain prerequisite".
       "assets": {
-        "binding": "ASSETS",
-        "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*"]
+        "directory": "./dist",
+        "not_found_handling": "single-page-application"
       },
-      "durable_objects": {
-        "bindings": [{ "name": "SESSION", "class_name": "SessionDO" }]
-      },
-      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SessionDO"] }],
       "observability": { "enabled": true }
     }
   }

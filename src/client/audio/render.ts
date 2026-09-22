@@ -21,23 +21,19 @@
 
 import * as Tone from "tone";
 import { clampPreset, type ClaudioPreset } from "../../shared/preset";
+import type { RenderSpec } from "../../shared/protocol";
 import { prepare, type PreparedAudio } from "../dsp/prepare";
 import { buildVoice } from "./voice";
 
 export type { PreparedAudio } from "../dsp/prepare";
 
-export interface RenderSpec {
-  /** Fundamental to render at, in Hz — the target's detected f0. */
-  f0: number;
-  /** Total buffer length to render, ms. Capped at MAX_RENDER_MS. */
-  durationMs: number;
-  /** Render sample rate — the target's rate. Never hardcode 44100. */
-  sampleRate: number;
-  /** Note-on duration, ms. Usually durationMs minus the amp release. */
-  gateMs: number;
-  /** 0..1, default 0.9. */
-  velocity?: number;
-}
+/**
+ * RenderSpec now lives in shared/protocol.ts, because it is persisted on the
+ * session and mirrored by a Convex validator: every contributor must render a
+ * given preset against the SAME spec for their measurements to be comparable.
+ * Re-exported here so nothing under audio/ has to know where it moved to.
+ */
+export type { RenderSpec } from "../../shared/protocol";
 
 /** Keeps the agent loop responsive; PLAN.md risk 5. */
 export const MAX_RENDER_MS = 2500;
