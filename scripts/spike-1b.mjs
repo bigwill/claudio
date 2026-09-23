@@ -1,7 +1,7 @@
 /**
  * Slice 1b: real-model spikes. COSTS MONEY; Will's go-ahead only.
  *
- *   node scripts/spike-1b.mjs --yes [--band] [--design]   (default: both)
+ *   node scripts/spike-1b.mjs --yes [--band] [--design] [--design-model=<id>]   (default: both, claude-opus-5-5)
  *
  * Band: Sonnet 5 answers producer notes with set_pattern (spikes:bandTurn).
  *   Records latency (bar: p50 ≤ 10s) and writes the parts to
@@ -22,6 +22,7 @@ if (!process.argv.includes("--yes")) {
 const only = ["--band", "--design"].filter((f) => process.argv.includes(f));
 const doBand = only.length === 0 || only.includes("--band");
 const doDesign = only.length === 0 || only.includes("--design");
+const designModel = process.argv.find((a) => a.startsWith("--design-model="))?.split("=")[1] ?? "claude-opus-5-5";
 mkdirSync("docs/spikes", { recursive: true });
 
 // The spike page's "a" parts, as the agents' snapshot will render them (§5).
@@ -93,18 +94,18 @@ async function design() {
   }
   const wallMs = Date.now() - t0;
   const slug = new URL(page.url()).pathname.split("/").filter(Boolean)[0];
-  await page.screenshot({ path: "docs/spikes/1b-design.png", fullPage: true });
+  await page.screenshot({ path: `docs/spikes/1b-design-${designModel}.png`, fullPage: true });
   await browser.close();
   const report = slug ? JSON.parse(convex("run", "spikes:designReport", JSON.stringify({ slug }))) : null;
-  const out = { model: "claude-opus-5-5", at: new Date().toISOString(), wav: "electric_piano_jd800_soft_ep.wav", outcome, wallMs, slug, report, log };
-  writeFileSync("docs/spikes/1b-design.json", JSON.stringify(out, null, 2) + "\n");
+  const out = { model: designModel, at: new Date().toISOString(), wav: "electric_piano_jd800_soft_ep.wav", outcome, wallMs, slug, report, log };
+  writeFileSync(`docs/spikes/1b-design-${designModel}.json`, JSON.stringify(out, null, 2) + "\n");
   console.log(`[design] ${outcome} in ${(wallMs / 1000).toFixed(1)}s; turns ${report?.turns?.join(",")}; no-tool turns ${report?.noToolTurns}`);
   return out;
 }
 
 try {
   if (doBand) await withRealModel("spike-1b band", band);
-  if (doDesign) await withRealModel("spike-1b design", design, { DESIGN_MODEL: "claude-opus-5-5" });
+  if (doDesign) await withRealModel("spike-1b design", design, { DESIGN_MODEL: designModel });
 } catch (e) {
   console.error(`[spike-1b] ${e.message}`);
   process.exitCode = 1;
