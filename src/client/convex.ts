@@ -35,8 +35,12 @@ export type HistoryMove =
 
 export type RenderJob = NonNullable<FunctionReturnType<typeof api.designs.renderJob>>;
 
-/** This tab's render identity: claimRender is first-caller-wins across tabs and browsers. */
-export const clientId = crypto.randomUUID();
+/**
+ * This tab's render identity: claimRender is first-caller-wins across tabs and
+ * browsers. Not crypto.randomUUID(): browsers only provide it in secure
+ * contexts, and a jam opened from another machine is plain http://<ip>:5173.
+ */
+export const clientId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 
 export const band = {
   create: (slug: string, opts: { bpm?: number; bars?: 1 | 2 | 4 }) => convex.mutation(api.jams.create, { slug, ...opts }),

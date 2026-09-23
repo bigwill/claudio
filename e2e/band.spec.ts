@@ -3,6 +3,8 @@
  * Each test opens a fresh jam (a new slug). `?spy=1` records every instrument
  * call; `?bpm=200&bars=1` makes a landing take ~1.2s.
  */
+import { networkInterfaces } from "node:os";
+
 import { expect, test, type Page } from "@playwright/test";
 
 interface Call {
@@ -249,4 +251,21 @@ test("S2b: typing a description types (no notes), Enter starts the design, and i
   await expect(page.getByTestId("mode")).toHaveText("PLAY");
   await page.waitForFunction(() => !(window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.designing, undefined, { timeout: 30_000 });
   await expect(page.getByTestId("chat")).toContainText("bass now plays");
+});
+
+test("the app loads over a plain-http network address (not a secure context), with no page errors", async ({ page }) => {
+  // Opened from another machine the page is http://<ip>:5173, where browsers
+  // withhold secure-context APIs such as crypto.randomUUID.
+  const ip = Object.values(networkInterfaces())
+    .flat()
+    .find((a) => a && a.family === "IPv4" && !a.internal)?.address;
+  const url = `http://${ip}:5173`;
+  const reachable = ip ? await fetch(url).then((r) => r.ok, () => false) : false;
+  test.skip(!reachable, `dev server not reachable at ${url} (vite not started with --host)`);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(`${url}/${slug()}`);
+  await page.waitForFunction(() => (window as unknown as W).__band?.ready === true && (window as unknown as W).__band.view() !== null);
+  expect(await page.evaluate(() => isSecureContext)).toBe(false);
+  expect(errors).toEqual([]);
 });
