@@ -38,6 +38,7 @@ interface SpikeApi {
   designRender(): Promise<number>;
   /** The live context's currentTime. */
   now(): number;
+  stopThenLateTick(): void;
   onsetTest(): Promise<{ sampleRate: number; expected: number[]; found: Array<number | null> }>;
 }
 declare global {
@@ -49,10 +50,10 @@ declare global {
 
 const LOOP = 16; // bars=1
 
-async function open(page: Page) {
+async function open(page: Page, bars = 1) {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?spike=1&bpm=200&bars=1");
+  await page.goto(`/?spike=1&bpm=200&bars=${bars}`);
   await page.waitForFunction(() => window.__spike?.ready === true);
   return errors;
 }
@@ -127,6 +128,41 @@ test("S3: your keys sound immediately, in key", async ({ page }) => {
   // immediate(): no lookahead, so the attack is scheduled for (about) now.
   const now = await page.evaluate(() => window.__spike.now());
   for (const c of you) expect(now - c.time).toBeGreaterThanOrEqual(-0.02);
+});
+
+test("S3: stop then restart: nothing ticks after stop, and every part lands at g=0 again", async ({ page }) => {
+  await open(page, 4);
+  for (let round = 0; round < 4; round++) {
+    await startBand(page);
+    await page.waitForFunction(() => window.__band.g >= 20);
+    // Stop, with the tick Tone's clock can still deliver up to the stop time
+    // (which includes the lookahead). It must not move lastG off -1.
+    await page.evaluate(() => window.__spike.stopThenLateTick());
+    await page.waitForTimeout(400);
+    const stopped = await page.evaluate(() => ({ lastG: window.__band.lastG(), promos: window.__band.promotions.length }));
+    expect(stopped.lastG).toBe(-1);
+    await page.evaluate((v) => window.__spike.stage("bass", v), round % 2 ? "a" : "busy");
+    expect(await page.evaluate(() => window.__band.landsIn("bass"))).toBe(0);
+    await startBand(page);
+    const after = (await band(page)).promotions.slice(stopped.promos);
+    expect(after.length).toBeGreaterThanOrEqual(3);
+    expect(after.every((p) => p.g === 0)).toBe(true);
+    await page.keyboard.press("Space");
+  }
+});
+
+test("S3: two keys on the same note: releasing one doesn't cut the other", async ({ page }) => {
+  await open(page);
+  await startBand(page);
+  // Q is degree 7 (D5); K is also degree 7 on the home row.
+  await page.keyboard.down("KeyQ");
+  await page.keyboard.down("KeyK");
+  await page.keyboard.up("KeyK");
+  const mid = (await band(page)).calls.filter((c) => c.track === "you" && c.method === "release");
+  expect(mid).toEqual([]);
+  await page.keyboard.up("KeyQ");
+  const end = (await band(page)).calls.filter((c) => c.track === "you" && c.method === "release");
+  expect(end.map((c) => c.note)).toEqual([74]);
 });
 
 test("onset: a 1-bar part rendered through the real engine has its kicks on the grid", async ({ page }) => {

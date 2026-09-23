@@ -112,7 +112,8 @@ export function buildKit(kick: AudioBuffer, context: Tone.BaseContext): Instrume
     modulationIndex: 32,
     resonance: 4000,
     octaves: 1.5,
-    envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+    // sustain 0, so the decay (not the gate) sets the length: hat 50ms, open hat 350ms.
+    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
     volume: -24,
     context,
   }).connect(out);
@@ -137,8 +138,9 @@ export function buildKit(kick: AudioBuffer, context: Tone.BaseContext): Instrume
         snareNoise.triggerAttackRelease(0.1, t, vel);
         snareBody.triggerAttackRelease(180, 0.1, t, vel);
       } else {
-        metal.envelope.decay = voice === "hat" ? 0.05 : 0.35;
-        metal.triggerAttackRelease(300, 0.02, t, vel);
+        const decay = voice === "hat" ? 0.05 : 0.35;
+        metal.envelope.decay = decay;
+        metal.triggerAttackRelease(300, decay, t, vel);
       }
     },
     releaseAll: (time) => {

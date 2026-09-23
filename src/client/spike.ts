@@ -357,6 +357,11 @@ Object.assign(window, {
       return performance.now() - t0;
     },
     now: () => engine.context.currentTime,
+    /** Test-only: what Tone's clock does when a tick is still due after stop(). */
+    stopThenLateTick() {
+      engine.stop();
+      (engine as unknown as { tick(t: number): void }).tick(engine.context.now());
+    },
     onsetTest,
   },
 });

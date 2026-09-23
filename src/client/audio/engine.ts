@@ -85,7 +85,8 @@ export class BandEngine {
   private mailbox: Mail[] = [];
   private tracks: Record<TrackId, Track>;
   private you: { channel: Tone.Channel; inst: Instrument };
-  private held = new Map<number, Instrument>();
+  /** Held live notes: the synth that started each, and how many keys hold it. */
+  private held = new Map<number, { inst: Instrument; count: number }>();
   private master: Tone.Gain;
   private kick: AudioBuffer;
   private repeatId: number | null = null;
@@ -185,33 +186,57 @@ export class BandEngine {
     this.drainMailbox();
     this.seq = resetForStart(this.seq);
     this.running = false;
+    this.g = -1;
+    // A tempo staged before the stop applies on restart; the transport must agree.
+    this.transportTempo(this.seq.harmony.bpm);
+    // PolySynth defers future-time attacks with setTimeout; anything it started
+    // after the first releaseAll is caught once the lookahead has passed.
+    setTimeout(() => {
+      if (this.running) return;
+      const t = this.context.now();
+      for (const id of TRACKS) this.tracks[id].inst?.releaseAll(t);
+    }, (LOOKAHEAD_SEC + 0.05) * 1000);
   }
 
   // --- your live channel -------------------------------------------------
 
   /** immediate(), not now(): now() includes the lookahead and would make you 150ms late. */
   liveAttack(midi: number, vel = 0.85): void {
+    // Two keys can map to the same note (K and Q are both degree 7): the note
+    // sounds once and is released when the last of them lets go.
+    const held = this.held.get(midi);
+    if (held) {
+      held.count++;
+      return;
+    }
     const inst = this.you.inst;
-    this.held.get(midi)?.release(midi, this.context.immediate());
-    this.held.set(midi, inst);
+    this.held.set(midi, { inst, count: 1 });
     inst.attack(midi, this.context.immediate(), vel);
   }
 
   /** Released on the synth that started the note, even after a sound swap. */
   liveRelease(midi: number): void {
-    const inst = this.held.get(midi);
-    if (!inst) return;
+    const held = this.held.get(midi);
+    if (!held) return;
+    if (--held.count > 0) return;
     this.held.delete(midi);
-    inst.release(midi, this.context.immediate());
+    held.inst.release(midi, this.context.immediate());
   }
 
   liveReleaseAll(): void {
-    for (const midi of [...this.held.keys()]) this.liveRelease(midi);
+    for (const [midi, held] of [...this.held]) {
+      this.held.delete(midi);
+      held.inst.release(midi, this.context.immediate());
+    }
   }
 
   // --- the tick ----------------------------------------------------------
 
   private tick(time: number): void {
+    // Tone's clock can still fire ticks up to the stop time, which includes the
+    // lookahead; after stop() they would run on the reset state and promote
+    // everything off g=0.
+    if (!this.running) return;
     try {
       const g = Math.round(this.context.transport.getTicksAtTime(time) / STEP_TICKS);
       if (time < this.context.currentTime) this.missedSteps++;
