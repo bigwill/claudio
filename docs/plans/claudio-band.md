@@ -469,7 +469,7 @@ Key, progression and bar count are changed with visible controls, not keys. Star
   - **DOM step grid** with a playhead column: drums in 4 voice rows, pitched parts as degree rows, accents bold, ties drawn as bars;
   - **history rail** from `parts.rail`, with the label on hover. The current version is filled; a staged one is outlined, with "lands in N beats";
   - status pill; "thinking… Ns" is computed on the client (`now − (turnDeadline − LEASE[kind])`);
-  - in soundcheck, the design rail with distances;
+  - the design rail with distances, in soundcheck and throughout the jam (Will, 2026-09-22). Mid-jam, the strip keeps playing its current sound and the new one lands at the next bar line;
   - mute and solo.
 - **Chat:** threaded replies; nudge rows dim.
 - **Library drawer:** Starters / Designed / Tweaks, newest first, with provenance.
@@ -689,3 +689,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **Process lapse:** `e2e/tsconfig.json` lacked `DOM.Iterable`, so the typecheck was red for three commits (`30fa291`, `21b9887`, `6a46b96`). My grep for "ALL CHECKS" returned nothing and I read that as clean. Fixed here; from now on I read `check`'s output tail.
   - **`build-starters.mjs` stays retired:** starters can be re-designed in the band UI. Revive the script on `designs.start` only if a batch rebuild is needed.
 - 2026-09-22: **Fix: white screen from another machine after slice 4.** Slice 4's render id used `crypto.randomUUID()`, which browsers only provide in secure contexts (HTTPS or localhost); over `http://<ip>:5173` it threw on load. Tests open `localhost`, which is secure, so they passed. The id now comes from `Math.random`. New E2E test: the app loads over the machine's plain-http network address with no page errors (it failed before the fix; it skips if Vite isn't bound to the network). Also removed the unused multiplayer leftovers in `protocol.ts` (nicknames, colors, `newClientId`, presence and queue constants).
+- 2026-09-22: **Design stays available through the jam (Will: "the opportunity should also persist through the experience").** The design rail (drop or pick a WAV, or describe) now shows in both phases. Mid-jam, the strip keeps playing and the new sound lands at the next bar line. Unchanged: Start is still refused while a design runs (the soundcheck gate), the pitch still frames sound design as coming first, and a running design still holds that musician's notes and blocks scene recall. New E2E test: design keys while the band plays; the new sound lands on a bar line and the transport keeps running.

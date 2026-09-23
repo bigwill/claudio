@@ -269,3 +269,20 @@ test("the app loads over a plain-http network address (not a secure context), wi
   expect(await page.evaluate(() => isSecureContext)).toBe(false);
   expect(errors).toEqual([]);
 });
+
+test("design stays available in the jam: design keys while the band plays; the new sound lands on a bar line", async ({ page }) => {
+  await openJam(page);
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => (window as unknown as W).__band.running && (window as unknown as W).__band.g >= 2);
+  await expect(page.getByTestId("strip-keys").getByText("drop a WAV, or pick one")).toBeVisible();
+  const before = (await strip(page, "keys")).sound;
+  const promos = await page.evaluate(() => (window as unknown as W).__band.promotions.length);
+  await page.getByTestId("design-file-keys").setInputFiles("samples/electric_piano_jd800_soft_ep.wav");
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing);
+  await page.waitForFunction(() => !(window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing, undefined, { timeout: 30_000 });
+  expect((await strip(page, "keys")).sound).not.toBe(before);
+  await page.waitForFunction((n) => (window as unknown as W).__band.promotions.slice(n).some((p) => p.track === "keys"), promos);
+  const landed = (await page.evaluate(() => (window as unknown as W).__band.promotions)).slice(promos).filter((p) => p.track === "keys");
+  expect(landed.every((p) => p.g % 16 === 0)).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as W).__band.running)).toBe(true);
+});

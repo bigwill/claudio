@@ -211,8 +211,8 @@ function renderStripsInner(): void {
 }
 
 /**
- * The design rail (plan §7): in soundcheck, pitched strips and yours can be
- * designed from a WAV (drop it on the strip, or pick a file) or a description.
+ * The design rail (plan §7): pitched strips and yours can be designed, in
+ * soundcheck or mid-jam, from a WAV (drop it on the strip, or pick a file) or a description.
  * While a design runs: distance bars, the newest distance, the latest
  * rationale, and Cancel.
  */
@@ -233,7 +233,8 @@ function designRailHtml(m: Strip): string {
       ${why ? `<div class="why">${esc(why.slice(0, 160))}</div>` : ""}
     </div>`;
   }
-  if (state?.jam.phase !== "soundcheck") return "";
+  // Available the whole time (Will, 2026-09-22): in the jam the strip keeps
+  // playing its current sound, and the new one lands at the next bar line.
   return `<div class="drail">
     <label class="drop">drop a WAV, or <u>pick one</u><input type="file" accept="audio/*" hidden data-design-file="${m.role}" data-testid="design-file-${ROLE_KEY[m.role] === "you" ? "you" : m.role}" /></label>
     <input class="describe" data-typing data-describe="${m.role}" data-testid="design-describe-${ROLE_KEY[m.role] === "you" ? "you" : m.role}" placeholder="or describe it, then Enter" />
@@ -945,7 +946,7 @@ document.addEventListener("drop", (e) => {
   if (!strip || !file) return;
   e.preventDefault();
   const role = strip.id.replace("strip-", "") as Strip["role"];
-  if (role !== "drums" && state?.jam.phase === "soundcheck") void startWavDesign(role, file);
+  if (role !== "drums") void startWavDesign(role, file);
 });
 
 void boot();
