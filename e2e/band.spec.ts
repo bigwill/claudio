@@ -138,3 +138,51 @@ test("S6: save A, pick a new bass sound, save B, recall A: it lands on a bar lin
   expect(await page.evaluate(() => (window as unknown as W).__band.running)).toBe(false);
   expect(s).toBeTruthy();
 });
+
+test("layout: the dock's keys sit in the dock, and rail pips are readable buttons", async ({ page }) => {
+  await openJam(page);
+  const r = await page.evaluate(() => {
+    const dock = document.querySelector(".dock")!.getBoundingClientRect();
+    const keys = [...document.querySelectorAll(".kbrow .key")].map((k) => k.getBoundingClientRect());
+    const pip = document.querySelector(".pip")!.getBoundingClientRect();
+    return { dockTop: dock.top, keyTops: keys.map((k) => k.top), keyLefts: keys.map((k) => k.left), pipWidth: pip.width };
+  });
+  expect(r.keyTops.every((t) => t >= r.dockTop)).toBe(true);
+  expect(new Set(r.keyLefts.map(Math.round)).size).toBe(10); // side by side, not stacked
+  expect(r.pipWidth).toBeGreaterThan(14);
+});
+
+test("focus: Esc leaves chat (after / or a click), and the keyboard plays again", async ({ page }) => {
+  await openJam(page);
+  const mode = () => page.getByTestId("mode");
+  for (const enter of ["slash", "click"] as const) {
+    if (enter === "slash") await page.keyboard.press("Slash");
+    else await page.getByTestId("chat-input").click();
+    await expect(mode()).toHaveText("CHAT");
+    await page.keyboard.type("hello");
+    await page.keyboard.press("Escape");
+    await expect(mode()).toHaveText("PLAY");
+    expect(await page.evaluate(() => document.activeElement?.id ?? "")).not.toBe("chatin");
+  }
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("KeyA");
+  const calls = await page.evaluate(() => (window as unknown as W).__band.calls);
+  expect(calls.some((c) => c.track === "bass" && c.method === "attack")).toBe(true);
+});
+
+test("focus: Esc closes the ? overlay and the library picker, and ? toggles", async ({ page }) => {
+  await openJam(page);
+  await page.keyboard.press("Shift+Slash");
+  await expect(page.getByTestId("overlay")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("overlay")).toHaveCount(0);
+  await page.keyboard.press("Shift+Slash");
+  await page.keyboard.press("Shift+Slash");
+  await expect(page.getByTestId("overlay")).toHaveCount(0);
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("KeyB");
+  await expect(page.getByTestId("picker")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("picker")).toHaveCount(0);
+  await expect(page.getByTestId("mode")).toHaveText("PLAY");
+});

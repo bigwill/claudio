@@ -99,7 +99,7 @@ document.body.innerHTML = `
       <div class="strips" id="strips"></div>
       <div class="loopbar"><span id="loopn">loop</span><span class="lb"><i id="lbfill" style="--p:0"></i></span><span id="loopnext"></span></div>
       <div class="dock">
-        <span class="mode play" id="mode">PLAY</span>
+        <span class="mode play" id="mode" data-testid="mode">PLAY</span>
         <span class="kbrow" id="kbrow"></span>
         <span class="dockinfo" id="dockinfo"></span>
         <span class="r"><span><kbd>B</kbd> library</span><span><kbd>?</kbd> keys</span></span>
@@ -522,6 +522,12 @@ async function act(a: KeyAction): Promise<void> {
       return;
     }
     case "focus":
+      // Esc closes the ? overlay first, before it clears the focus.
+      if (a.strip === null && ui.overlay) {
+        ui.overlay = false;
+        renderModal();
+        return;
+      }
       ui.focus = a.strip;
       break;
     case "octave":

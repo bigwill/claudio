@@ -668,3 +668,8 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - Deferred to slice 4: routing every terminal design branch through `endDesign`, so a failed design frees its musician.
   - Left as is: design progress inside `jams.state` (the plan accepts it at demo scale); the unused `clientId` on submits (harmless); `parts.by_jam` and `library.by_role_jam`, which wave 2 undo and slice 5's snapshot need.
 - 2026-09-22: **Fix: the band UI was blank when opened from another machine** (Will, from his laptop over Tailscale). The client dialled `VITE_CONVEX_URL` (`127.0.0.1:3210`), which on the laptop is the laptop, so no jam loaded and no engine started. Now Vite proxies `/api` (including the sync websocket) to the local backend, and the dev client dials the page's own origin. The page also shows "Connecting…", then a clear message, instead of a blank screen. New E2E test: the Convex websocket uses the page's origin (it failed before the fix). Checked by loading a jam through the Tailscale host.
+- 2026-09-22: **UI fixes from Will's first look.**
+  - `index.html` still carried the pre-band app's stylesheet. Its `.key` and `.pip` rules stacked the dock keyboard at the top-left (the box over "Band") and squashed the rail pips. `index.html` is now minimal.
+  - `Esc` now closes the `?` overlay before it clears the focus.
+  - New E2E tests: dock keys sit in the dock side by side, and pips are readable; `Esc` leaves chat after `/` or a click and the keyboard plays again; `Esc` closes the overlay and the picker, and `?` toggles.
+  - `V` stays unbound in the band (it was the spike page's variant key).
