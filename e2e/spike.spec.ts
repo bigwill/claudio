@@ -97,7 +97,7 @@ test("S3: every part promotes at s=0 on start, all tracks sound on the same time
   expect(errors).toEqual([]);
 });
 
-test("S3: a staged change lands at the next loop line, exactly when the countdown said", async ({ page }) => {
+test("S3: a staged change lands at the next bar line, exactly when the countdown said", async ({ page }) => {
   await open(page);
   await startBand(page);
   await page.waitForFunction(() => window.__band.g % 16 === 5);
@@ -112,6 +112,22 @@ test("S3: a staged change lands at the next loop line, exactly when the countdow
   expect(promo.g).toBe(staged.lastG + 1 + staged.landsIn!);
   expect(promo.g % LOOP).toBe(0);
   expect(b.missedSteps).toBe(0);
+});
+
+test("S3: in a 4-bar loop, a change lands at the next bar line, not the loop line", async ({ page }) => {
+  await open(page, 4);
+  await startBand(page);
+  await page.waitForFunction(() => window.__band.g % 64 === 21);
+  const staged = await page.evaluate(() => {
+    window.__spike.stage("bass", "busy");
+    return { lastG: window.__band.lastG(), landsIn: window.__band.landsIn("bass") };
+  });
+  expect(staged.landsIn).toBeLessThanOrEqual(15);
+  await page.waitForFunction(() => window.__band.promotions.some((p) => p.track === "bass" && p.id === "bass:busy"));
+  const promo = (await band(page)).promotions.find((p) => p.track === "bass" && p.id === "bass:busy")!;
+  expect(promo.g).toBe(staged.lastG + 1 + staged.landsIn!);
+  expect(promo.g % 16).toBe(0);
+  expect(promo.g % 64).not.toBe(0);
 });
 
 test("S3: your keys sound immediately, in key", async ({ page }) => {
@@ -212,6 +228,6 @@ test("S3s: under load, no step is missed and every track stays on one time per s
   const bad = [...timesByStep(b.calls)].filter(([, t]) => t.size !== 1).map(([g]) => g);
   expect(bad).toEqual([]);
   expect(b.calls.some((c) => c.track === "you")).toBe(true);
-  expect(b.promotions.filter((p) => p.g > 0).every((p) => p.g % LOOP === 0)).toBe(true);
+  expect(b.promotions.filter((p) => p.g > 0).every((p) => p.g % 16 === 0)).toBe(true);
   expect(errors).toEqual([]);
 });

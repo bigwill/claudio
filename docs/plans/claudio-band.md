@@ -14,7 +14,7 @@ The new direction:
 
 | Area | Decision |
 |---|---|
-| Timing | Musicians submit whole patterns; changes land at the next **loop line** |
+| Timing | Musicians submit whole patterns; part changes land at the next **bar line** (harmony changes at the next loop line). Was "loop line"; changed by Will on 2026-09-22 because waiting out a 4-bar loop isn't fun |
 | Chat | One band chat with @mentions; each musician keeps its own Claude context |
 | Library | Global. Starters plus every sound anyone designs. Per musician: pick one, design one (drop a WAV or describe it), or tweak it in chat |
 | Drums | Sample kit (808 kick sample; the other voices synthesized) |
@@ -39,9 +39,9 @@ The new direction:
 2. **`Space`: the jam starts.** The starter parts play, and you play along.
 3. **"@bass busier, eighth notes".**
    - Bass's strip shows thinking, then "lands in N beats".
-   - The change lands at the loop line while everything keeps playing, and bass's reply threads under your note.
+   - The change lands at the next bar line while everything keeps playing, and bass's reply threads under your note.
    - The band reacts once: keys adjusts to the new bass (wave 2).
-4. **"@keys make it glassier", then one more try that loses the thread.** The new sound swaps in at the loop line and appears in the library. `Esc` `4` `←` brings the good version back at the next loop line.
+4. **"@keys make it glassier", then one more try that loses the thread.** The new sound swaps in at the next bar line and appears in the library. `Esc` `4` `←` brings the good version back at the next bar line.
 5. **Scenes.** Save A, reshape the band, save B, flip between them.
 
 ## Step 0: check the plan in (first action after approval)
@@ -87,7 +87,7 @@ Will's data-model feedback is folded into §1 (state boundary, best-practice fix
 │ │ designing · iter 2/3      │ 4  ▬▬..▬▬..▬▬            ┃                   │ │                    │
 │ │ ▂▅▇ d=18.4 → 11.2 Cancel  │ 0  ▬▬..▬▬..▬▬            ┃  one playhead ┃   │ │                    │
 │ └───────────────────────────┴──────────────────────────┃───────────────────┘ │ [@keys …        ⏎] │
-│ loop 2 ▕██████████░░░░░░░░░░░░░░░░░▏ next loop line in 6 beats                 │                    │
+│ loop 2 ▕██████████░░░░░░░░░░░░░░░░░▏ next bar line in 2 beats                 │                    │
 │ PLAY │ A S D F G H J K L ; │ keys → you · D minor · oct 4 (Z/X)   B library  ? │                    │
 └────────────────────────────────────────────────────────────────────────────────┴────────────────────┘
 ```
@@ -250,7 +250,7 @@ erDiagram
 
 On each step:
 - `s = (g − g0) % loopSteps`, and `bar = floor(s/16)`.
-- **Promotion** happens only when `g >= landsAtG`. `landsAtG` is set at stage time to `(floor(lastG/loopSteps)+1)*loopSteps`, relative to `g0`. That makes the countdown and the actual landing the same number.
+- **Promotion** happens only when `g >= landsAtG`. `landsAtG` is set at stage time to the next **bar line**, `(floor(lastG/16)+1)*16` relative to `g0`. A staged harmony change uses the next **loop line**, `(floor(lastG/loopSteps)+1)*loopSteps`. That makes the countdown and the actual landing the same number. A part landing mid-loop starts at its own step `s % partSteps`, so it stays in phase with the loop.
 - A promotion also releases any held notes and applies staged tempo, key, progression or bar-count changes. A bar-count change resets `g0`.
 - **Pitch** resolves per bar, so a 1-bar part follows the chords.
 - The sequencer **ignores mute**; the channel does the muting, so a tied note is released even while muted.
@@ -449,7 +449,7 @@ It also runs after every commit, fail, cancel and watchdog branch, and after `en
 | `1`–`4` | Focus a strip: you, drums, bass, keys |
 | `Enter` or `/` | Open chat, prefilled with `@<focused> ` |
 | `Esc` | Leave chat or the picker; clear the focus |
-| `←` / `→` | Step back / forward on the focused strip's rail. Lands at the next loop line, with a countdown |
+| `←` / `→` | Step back / forward on the focused strip's rail. Lands at the next bar line, with a countdown |
 | `Shift+←` / `Shift+→` | Jump to the oldest / newest version |
 | `Backspace` | Undo the band's newest action (wave 2) |
 | `C` | Cancel the focused musician's turn (wave 2) |
@@ -494,14 +494,14 @@ Key, progression and bar count are changed with visible controls, not keys. Star
 | S2b | Design from a description (prompt origin) → finalize → library | 1 |
 | S3 | Start: every part promotes at s=0; your keys sound immediately and in key; 0 missed steps; the spy instruments receive the expected calls | 1 |
 | S3s | Stress: while the band plays, flood the page with 30 chat rows, 3 parallel part changes per loop, rail and grid redraws, a live-key burst, and one design render. `missedSteps` stays 0, and all tracks' spy-call times for each step are identical | 1 |
-| S4 | "@bass busier" → thinking → threaded reply → bass v+1 lands at s=0, and the countdown matched. The summary shows `X` | 1 |
-| S5 | "@keys glassier" → a `tweak` row → the sound swaps at s=0; `←` restores it at s=0 | 1 |
-| S6 | Scenes: save A → change → save B → recall A. The parts return at s=0 (in session), A reads as active, and after a reload A still reads as active (the transport comes back stopped) | 1 |
+| S4 | "@bass busier" → thinking → threaded reply → bass v+1 lands at the next bar line, and the countdown matched. The summary shows `X` | 1 |
+| S5 | "@keys glassier" → a `tweak` row → the sound swaps at the next bar line; `←` restores it at the next bar line | 1 |
+| S6 | Scenes: save A → change → save B → recall A. The parts return together at the next bar line (in session), A reads as active, and after a reload A still reads as active (the transport comes back stopped) | 1 |
 | S7 | Nudges: a single-musician note → exactly one reaction, by the mapped reactor, then 20s of quiet; `@all` → none; reacts off → none; a fake that always reacts still gets exactly one | 2 |
 | S8 | Design failure: refusal, max_tokens or two no-tool strikes → failed and the musician is freed; a note held during the design is delivered afterwards | 1 |
 | S9a | Robustness: an invalid tool call → `is_error`, idle, and the next note works; a turn past `BAND_TIMEOUT_MS` (fake `delay`) → idle with the "didn't answer" system row; a failed band turn's request isn't re-executed. Asserts the system row text | 1 |
 | S9b | Watchdog: a turn that never reports back (fake `hang`) → past `turnDeadline`, `watchdog` reclaims it, idle with its system row | 1 |
-| S10a | History: v1–v4, `←` `←` → v2 at s=0, `→` → v3, a prompt adds v5, `←` from v5 → v4. No row at either end; a jump to a copy resolves; a two-call turn is one version; mute writes no part; `←` on a thinking musician discards its result; the rollback note appears in the snapshot | 1 |
+| S10a | History: v1–v4, `←` `←` → v2 at the next bar line, `→` → v3, a prompt adds v5, `←` from v5 → v4. No row at either end; a jump to a copy resolves; a two-call turn is one version; mute writes no part; `←` on a thinking musician discards its result; the rollback note appears in the snapshot | 1 |
 | S10b | Undo: Backspace from v5 → v3; after `jumpTo` it goes back to where you jumped from; after a recall, all 4 parts and mute revert; it walks across musicians. Cancel, then a note: the cancelled request isn't executed and held notes are delivered | 2 |
 | S11a | Keys only: S3–S6 and S10a are driven entirely from the keyboard (starting a design excepted) | 1 |
 | S11b | Router matrix: modifier keys do nothing; a held arrow takes one step; `Shift+[` saves A; keyup releases in chat; Space with a focused button toggles once; Enter stays in chat; `?` vs `/` | 1 (unit) / 2 (E2E) |
@@ -627,3 +627,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
 - 2026-09-22: **Root cause of the placeholder presets found and fixed.** The live Worker-era original (`claudio-prod`), run on today's Opus 5 with the same WAV, was clean: no placeholders, 42.1 → 38.7 on iteration 2 (`docs/spikes/1b-design-original-prod.json`). The one input difference is that **Convex sorts stored object keys**. The model's earlier `propose_preset` calls were replayed alphabetized (`ampEnv…name`), while the strict schema makes it write `name, harmonicity, modulationIndex…`. The stubbed fields were exactly those leading ones, and only on replayed turns. Fix: `messages.content` holds JSON text (`encodeContent`/`decodeContent`), and the action passes the model's content to `commit` as text, because Convex arguments sort keys too. Tests in `convex/messagesLog.test.ts` fail without the fix. The live backend now stores text in model order. §1 and the ER diagram are updated. Paid re-verification is pending Will's go-ahead.
 - 2026-09-22: **Re-verification after the key-order fix (Will's go-ahead): not fixed.** Replayed calls now keep model order, but placeholder fields persist. Opus 5: 41.3 → 40.1 → 38.3; iteration 3 had `name "x"` and `harmonicity 0`; it finalized `"x"` with `harmonicity 0` and `modulationIndex 0`. Opus 5.5: 52.6 → 72.8 (`"x"`, 0, 0, `"placeholder"`) → 44.5 (rationale `"x"`); it finalized `"x"`. The key-order bug was real but not sufficient. The pre-fix runs are kept as `*-before-fix.json`. Next: a controlled replay experiment (see the session report).
 - 2026-09-22: **Replay experiment (Will's go-ahead, $0.34).** The failing Opus 5.5 turn (post-fix session `NWR9AGRW588G`, message 3) was resent 5× under each condition: A, the port's request; B, without rule 10; C, rationale first and name last. **0/15 had placeholders**, including A. The replay passed the conversation as JSON text, while the live loop received it from `planForAction` as an object, and **Convex also sorts keys in query return values**. So the live loop was still sending alphabetized history. Fix: `planForAction` returns `messagesJson` (a test fails without the fix). All three crossings (storage, query → action, action → mutation) now carry text. Rule 10 and field order are cleared as causes. Data: `docs/spikes/1b-replay-claude-opus-5-5.json`. The end-to-end re-verification is pending Will's go-ahead.
+- 2026-09-22: **Landing moves from the loop line to the bar line for part changes (Will: "sometimes it takes a while for the variation to land and you wait a while. that's not fun").** At 96 bpm, a 4-bar loop meant waiting up to 10s; now it's at most one bar. Harmony changes (tempo, key, progression, bars) still land at the loop line, because a bar-count change moves `g0`. Updated: the decisions table, the headline, the sketch, the key map, §3 and S4/S5/S6/S10a. **Frozen-test changes (Will's instruction is the OK):** in `sequencer.test.ts`, "…in one loop all promote on the same step" became "…within one bar all promote together on the next bar line"; "a staged part plays nothing until it lands" was re-staged so the old part has a note before the bar line; "the countdown uses the old loop length" now expects the part at the bar line (16) and the harmony at the loop line (32). In `spike.spec.ts`, the landing test is renamed to "bar line", and S3s asserts `g % 16`. New tests: bar landing in a 4-bar loop (unit and E2E), and in-phase landing mid-loop.

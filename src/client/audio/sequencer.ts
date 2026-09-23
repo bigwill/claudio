@@ -5,7 +5,9 @@
  * `schedulerStep(state, g)` once per sixteenth with the global step `g`, and
  * gets back the next state plus what to promote and what to play. Because every
  * track is stepped in the same call, tracks cannot drift, and every staged
- * change promotes on the same step: the next loop line.
+ * change promotes on a shared line: part changes on the next BAR line (so a
+ * change never waits out a whole 4-bar loop), harmony changes on the next LOOP
+ * line (a bar-count change moves the loop origin, which only makes sense there).
  *
  * Staging sets `landsAtG` once, at stage time, from the last step processed.
  * The countdown the UI shows ("lands in N beats") is derived from the same
@@ -105,10 +107,15 @@ export function nextLoopLine(state: SeqState): number {
   return state.g0 + (Math.floor((state.lastG - state.g0) / L) + 1) * L;
 }
 
+/** The first bar line after the last processed step (0 before the first step). */
+export function nextBarLine(state: SeqState): number {
+  return state.g0 + (Math.floor((state.lastG - state.g0) / STEPS_PER_BAR) + 1) * STEPS_PER_BAR;
+}
+
 export function stage(state: SeqState, track: TrackId, part: PartRef): SeqState {
   return {
     ...state,
-    tracks: { ...state.tracks, [track]: { ...state.tracks[track], staged: part, landsAtG: nextLoopLine(state) } },
+    tracks: { ...state.tracks, [track]: { ...state.tracks[track], staged: part, landsAtG: nextBarLine(state) } },
   };
 }
 

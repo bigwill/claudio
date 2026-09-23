@@ -25,7 +25,7 @@ import type { ClaudioPreset } from "../../shared/preset";
 import { buildBass, buildKit, buildPoly, KEYS_MAX_RELEASE, spy, type Instrument, type SpyCall } from "./instruments";
 import {
   initialState,
-  nextLoopLine,
+  nextBarLine,
   resetForStart,
   schedulerStep,
   stage as seqStage,
@@ -146,7 +146,7 @@ export class BandEngine {
   /** Steps until the track's staged part lands (the "lands in N" countdown). */
   landsIn(track: TrackId): number | null {
     const pending = this.mailbox.some((m) => m.kind === "part" && m.track === track);
-    if (pending) return Math.max(0, nextLoopLine(this.seq) - (this.seq.lastG + 1));
+    if (pending) return Math.max(0, nextBarLine(this.seq) - (this.seq.lastG + 1));
     const t = this.seq.tracks[track];
     return t.staged && t.landsAtG !== null ? Math.max(0, t.landsAtG - (this.seq.lastG + 1)) : null;
   }

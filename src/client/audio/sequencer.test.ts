@@ -110,7 +110,31 @@ describe("repeats and pitch", () => {
 });
 
 describe("staging and promotion", () => {
-  test("landsAtG is the next loop line, and the countdown matches the actual landing", () => {
+  test("in a 4-bar loop, a part change lands at the next BAR line, not the loop line", () => {
+    let s = stage(initialState({ ...H, bars: 4 }), "bass", bass("b1"));
+    s = run(s, 0, 20).state;
+    s = stage(s, "bass", bass("b2"));
+    expect(s.tracks.bass.landsAtG).toBe(32);
+    expect(stepsUntilLanding(s, "bass")).toBe(11);
+    const { byG } = run(s, 21, 40);
+    expect([...byG].filter(([, r]) => r.promotions.length).map(([g]) => g)).toEqual([32]);
+  });
+
+  test("a part landing mid-loop stays in phase with the loop", () => {
+    const twoBar: PitchedPattern = {
+      lengthBars: 2,
+      notes: [0, 16].map((step) => ({ step, deg: 0, len: 1, vel: 0.8, accent: false, tie: false })),
+    };
+    let s = stage(initialState({ ...H, bars: 4 }), "bass", bass("b1", { lengthBars: 1, notes: [] }));
+    s = run(s, 0, 5).state;
+    s = stage(s, "bass", bass("b2", twoBar));
+    const { byG } = run(s, 6, 63);
+    // Lands at g=16 (loop bar 1), where a 2-bar part is in its second bar: its step 16.
+    const gs = [...byG].filter(([, r]) => events(r, "attack").length).map(([g]) => g);
+    expect(gs).toEqual([16, 32, 48]);
+  });
+
+  test("landsAtG is the next bar line, and the countdown matches the actual landing", () => {
     let s = stage(initialState(H), "bass", bass("b1"));
     s = run(s, 0, 5).state;
     s = stage(s, "bass", bass("b2"));
@@ -122,31 +146,36 @@ describe("staging and promotion", () => {
     expect(promotedAt).toEqual([6 + countdown]);
   });
 
-  test("changes staged at different times in one loop all promote on the same step", () => {
-    let s = initialState({ ...H, bars: 2 });
+  test("changes staged at different times within one bar all promote together on the next bar line", () => {
+    // Was "…in one loop…promote on the same step" (loop landing). Changed with the
+    // switch to bar landing (Will, 2026-09-22); see the plan's change log.
+    let s = initialState({ ...H, bars: 4 });
     s = stage(s, "drums", drums("d1"));
     s = stage(s, "bass", bass("b1"));
     s = stage(s, "keys", keys("k1"));
-    s = run(s, 0, 2).state;
+    s = run(s, 0, 17).state;
     s = stage(s, "drums", drums("d2"));
-    s = run(s, 3, 14).state;
+    s = run(s, 18, 22).state;
     s = stage(s, "bass", bass("b2"));
-    s = run(s, 15, 29).state;
+    s = run(s, 23, 30).state;
     s = stage(s, "keys", keys("k2"));
-    const { byG } = run(s, 30, 40);
+    const { byG } = run(s, 31, 40);
     const promo = [...byG].filter(([, r]) => r.promotions.length);
     expect(promo.map(([g]) => g)).toEqual([32]);
     expect(promo[0][1].promotions).toHaveLength(3);
   });
 
   test("a staged part plays nothing until it lands; the old part keeps playing", () => {
-    let s = stage(initialState({ ...H, bars: 2 }), "bass", bass("b1"));
+    // Re-staged for bar landing (Will, 2026-09-22): the old part's step 8 still
+    // falls before the bar line.
+    const old: PitchedPattern = { lengthBars: 1, notes: [0, 8].map((step) => ({ ...bassRoot.notes[0], step })) };
+    let s = stage(initialState({ ...H, bars: 2 }), "bass", bass("b1", old));
     s = run(s, 0, 3).state;
-    const moved: PitchedPattern = { lengthBars: 1, notes: [{ ...bassRoot.notes[0], step: 8 }] };
+    const moved: PitchedPattern = { lengthBars: 1, notes: [{ ...bassRoot.notes[0], step: 12 }] };
     s = stage(s, "bass", bass("b2", moved));
     const { byG } = run(s, 4, 47);
-    // b1 still plays bar 2 (g=16); b2 lands at the line (g=32) and plays its step 8.
-    expect([...byG].filter(([, r]) => events(r, "attack").length).map(([g]) => g)).toEqual([16, 40]);
+    // b1 still plays g=8; b2 lands at the bar line (g=16) and plays its step 12.
+    expect([...byG].filter(([, r]) => events(r, "attack").length).map(([g]) => g)).toEqual([8, 28, 44]);
   });
 
   test("the promotion carries the new sound so the engine can swap instruments", () => {
@@ -218,7 +247,8 @@ describe("harmony changes", () => {
     s = run(s, 0, 3).state;
     s = stageHarmony(s, { ...H, bars: 1 });
     s = stage(s, "bass", bass("b2"));
-    expect(s.tracks.bass.landsAtG).toBe(32);
+    // Harmony waits for the (old, 2-bar) loop line; the part only for the bar line.
     expect(s.harmonyLandsAtG).toBe(32);
+    expect(s.tracks.bass.landsAtG).toBe(16);
   });
 });
