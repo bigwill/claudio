@@ -56,7 +56,8 @@ export const band = {
   pick: (musicianId: MusicianId, libraryId: Id<"library">) => convex.mutation(api.parts.pick, { musicianId, libraryId }),
   history: (musicianId: MusicianId, move: HistoryMove) => convex.mutation(api.parts.history, { musicianId, move }),
   setMuted: (musicianId: MusicianId, muted: boolean) => convex.mutation(api.musicians.setMuted, { musicianId, muted }),
-  send: (jamId: JamId, text: string, octave: number) => convex.mutation(api.chat.send, { jamId, text, octave }),
+  /** A note, or a design ("@keys design …", "@me …"): chat.send routes it. `spec` is used if it designs. */
+  send: (jamId: JamId, text: string, octave: number, spec: RenderSpec) => convex.mutation(api.chat.send, { jamId, text, octave, spec }),
 };
 
 export const design = {

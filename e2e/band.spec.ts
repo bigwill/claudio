@@ -210,11 +210,13 @@ test("V on a band strip answers (a hint until band turns exist), and is never si
   await expect(page.getByTestId("toast")).toContainText(/variation/i);
 });
 
-test("S2: drop a WAV on keys in soundcheck: it iterates with distances, finalizes, the keys sound swaps; Start is refused meanwhile", async ({ page }) => {
+test("S2: a WAV for keys (focused) from the chat, in soundcheck: it iterates with distances, finalizes, the keys sound swaps; Start is refused meanwhile", async ({ page }) => {
   test.setTimeout(60_000);
   const { errors } = await openJam(page);
   const before = (await strip(page, "keys")).sound;
-  await page.getByTestId("design-file-keys").setInputFiles("samples/electric_piano_jd800_soft_ep.wav");
+  // Changed with design-in-chat (Will, 2026-09-22): focus keys, then the chat's WAV control.
+  await page.keyboard.press("Digit4");
+  await page.getByTestId("design-file").setInputFiles("samples/electric_piano_jd800_soft_ep.wav");
   await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing);
   await expect(page.getByTestId("design-rail-keys")).toBeVisible();
 
@@ -239,18 +241,69 @@ test("S2: drop a WAV on keys in soundcheck: it iterates with distances, finalize
   expect(errors).toEqual([]);
 });
 
-test("S2b: typing a description types (no notes), Enter starts the design, and it finalizes", async ({ page }) => {
+test("S2b: \"@bass design …\" in the chat (prefilled by focus) shows the route, starts the design, and it finalizes", async ({ page }) => {
+  // Changed with design-in-chat (Will, 2026-09-22): was the strip's describe box.
   await openJam(page);
-  await page.getByTestId("design-describe-bass").click();
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("mode")).toHaveText("CHAT");
-  await page.keyboard.type("a round sub with a slow attack");
+  await expect(page.getByTestId("chat-input")).toHaveValue("@bass ");
+  await page.keyboard.type("design a round sub with a slow attack");
+  await expect(page.getByTestId("route")).toContainText("new design for bass");
   const notes = (await page.evaluate(() => (window as unknown as W).__band.calls)).filter((c) => c.method === "attack");
-  expect(notes).toEqual([]);
+  expect(notes).toEqual([]); // typing typed; it played nothing
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.designing);
-  await expect(page.getByTestId("mode")).toHaveText("PLAY");
+  await expect(page.getByTestId("chat-input")).toHaveValue("");
   await page.waitForFunction(() => !(window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.designing, undefined, { timeout: 30_000 });
+  await expect(page.getByTestId("chat")).toContainText("Designing bass: a round sub with a slow attack");
   await expect(page.getByTestId("chat")).toContainText("bass now plays");
+});
+
+test("the chat box follows focus: @name for a musician, @me for you, never over your own text", async ({ page }) => {
+  await openJam(page);
+  const box = page.getByTestId("chat-input");
+  await page.keyboard.press("Digit3");
+  await expect(box).toHaveValue("@bass ");
+  await page.keyboard.press("Digit4");
+  await expect(box).toHaveValue("@keys ");
+  await page.keyboard.press("Digit1");
+  await expect(box).toHaveValue("@me ");
+  await page.keyboard.press("Digit4");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("hold that");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Digit2"); // a draft is never overwritten
+  await expect(box).toHaveValue("@keys hold that");
+  await expect(page.getByTestId("route")).toContainText("note to keys");
+});
+
+test("a refused route keeps your text and says why", async ({ page }) => {
+  await openJam(page);
+  await page.keyboard.press("Digit2");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("design a tight kit");
+  await expect(page.getByTestId("route")).toContainText("kit");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("toast")).toContainText("kit");
+  await expect(page.getByTestId("chat-input")).toHaveValue("@drums design a tight kit");
+});
+
+test("dropping a WAV on the chat panel designs the focused strip, and never navigates away", async ({ page }) => {
+  await openJam(page);
+  const url = page.url();
+  await page.keyboard.press("Digit4");
+  const bytes = [...(await import("node:fs")).readFileSync("samples/electric_piano_jd800_soft_ep.wav")];
+  const dt = await page.evaluateHandle((b) => {
+    const t = new DataTransfer();
+    t.items.add(new File([new Uint8Array(b)], "electric_piano_jd800_soft_ep.wav", { type: "audio/wav" }));
+    return t;
+  }, bytes);
+  await page.dispatchEvent("[data-testid=chat-panel]", "dragover", { dataTransfer: dt });
+  await expect(page.getByTestId("drop-chip")).toContainText("Drop to design keys");
+  await page.dispatchEvent("[data-testid=chat-panel]", "drop", { dataTransfer: dt });
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing);
+  expect(page.url()).toBe(url);
 });
 
 test("the app loads over a plain-http network address (not a secure context), with no page errors", async ({ page }) => {
@@ -274,10 +327,12 @@ test("design stays available in the jam: design keys while the band plays; the n
   await openJam(page);
   await page.keyboard.press("Space");
   await page.waitForFunction(() => (window as unknown as W).__band.running && (window as unknown as W).__band.g >= 2);
-  await expect(page.getByTestId("strip-keys").getByText("drop a WAV, or pick one")).toBeVisible();
+  // Changed with design-in-chat (Will, 2026-09-22): focus keys, then the chat's WAV control.
+  await page.keyboard.press("Digit4");
+  await expect(page.getByTestId("chat-wav")).toBeVisible();
   const before = (await strip(page, "keys")).sound;
   const promos = await page.evaluate(() => (window as unknown as W).__band.promotions.length);
-  await page.getByTestId("design-file-keys").setInputFiles("samples/electric_piano_jd800_soft_ep.wav");
+  await page.getByTestId("design-file").setInputFiles("samples/electric_piano_jd800_soft_ep.wav");
   await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing);
   await page.waitForFunction(() => !(window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing, undefined, { timeout: 30_000 });
   expect((await strip(page, "keys")).sound).not.toBe(before);

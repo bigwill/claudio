@@ -250,3 +250,53 @@ describe("design watchdog", () => {
     expect((await musician(t, keys._id)).activeDesignId).toBeNull();
   });
 });
+
+describe("designing from the chat (Will, 2026-09-22)", () => {
+  test("\"@keys design …\" starts a measured design, logged as a system row, never as a note the musician answers later", async () => {
+    const { t, jamId, keys } = await setup();
+    await t.mutation(api.chat.send, { jamId, text: "@keys design a glassy bell, quite short", octave: 4, spec: SPEC });
+    const m = await musician(t, keys._id);
+    expect(m.activeDesignId).not.toBeNull();
+    const d = await designOf(t, m.activeDesignId!);
+    expect(d).toMatchObject({ origin: "prompt", prompt: "a glassy bell, quite short" });
+    const chat = await t.query(api.jams.chat, { jamId });
+    expect(chat.map((r) => [r.kind, r.text])).toEqual([["system", "Designing keys: a glassy bell, quite short"]]);
+
+    for (let i = 0; i < 4; i++) {
+      await settle(t);
+      const cur = await designOf(t, d._id);
+      if (cur.status !== "awaiting_render") break;
+      await t.mutation(api.render.submitAnalysis, { designId: d._id, clientId: "b", presetId: cur.pendingPresetId!, features: FEATURES, diff: null });
+    }
+    await settle(t);
+    expect((await designOf(t, d._id)).status).toBe("done");
+    expect(await t.run((ctx) => inboxPlan(ctx, keys._id))).not.toMatchObject({ action: "turn" });
+  });
+
+  test("\"@me …\" designs your own sound", async () => {
+    const { t, jamId } = await setup();
+    await t.mutation(api.chat.send, { jamId, text: "@me a warm pad with a slow attack", octave: 4, spec: SPEC });
+    const s = (await t.query(api.jams.state, { slug: "DESIGNTEST01" }))!;
+    expect(s.musicians.find((x) => x.role === "producer")!.activeDesignId).not.toBeNull();
+  });
+
+  test("a refused route throws with the reason and writes nothing", async () => {
+    const { t, jamId } = await setup();
+    await expect(t.mutation(api.chat.send, { jamId, text: "@drums design a tight kit", octave: 4, spec: SPEC })).rejects.toThrow(/kit/);
+    await expect(t.mutation(api.chat.send, { jamId, text: "@bass @keys design a warm pad", octave: 4, spec: SPEC })).rejects.toThrow(/one musician/);
+    expect(await t.query(api.jams.chat, { jamId })).toEqual([]);
+  });
+
+  test("a design note to a musician already designing is refused, not held", async () => {
+    const { t, jamId, keys } = await setup();
+    await startWav(t, keys._id);
+    await expect(t.mutation(api.chat.send, { jamId, text: "@keys design a glassy bell", octave: 4, spec: SPEC })).rejects.toThrow(/already designing/);
+  });
+
+  test("a WAV design is logged in the chat too", async () => {
+    const { t, jamId, keys } = await setup();
+    await startWav(t, keys._id);
+    const chat = await t.query(api.jams.chat, { jamId });
+    expect(chat.map((r) => r.text)).toEqual(["Designing keys from electric_piano.wav"]);
+  });
+});

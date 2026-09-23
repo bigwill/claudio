@@ -110,7 +110,14 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
 .msg.nudge{color:var(--faint);font-size:11.5px}
 .msg.reply{margin-left:14px;border-left:2px solid var(--line);padding-left:8px}
 .cin{border-top:1px solid var(--line);padding:8px}
-.cin input{width:100%;background:#16151d;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:6px 8px;font:inherit}
+.cinrow{display:flex;gap:6px;align-items:center}
+.cinrow .wav{flex:none;padding:5px 8px;border-radius:6px}
+.route{font-size:11.5px;color:var(--dim);min-height:16px;padding-top:4px}
+.route.design{color:var(--accent)}
+.route.refuse{color:var(--bad)}
+.dropchip{margin:0 8px 8px;border:1.5px dashed var(--accent);border-radius:8px;padding:10px;text-align:center;color:var(--accent);font-size:12.5px}
+.strip.droptarget{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.cin input{flex:1;min-width:0;width:100%;background:#16151d;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:6px 8px;font:inherit}
 .cin input:focus{border-color:var(--accent);outline:none}
 
 .modal{position:fixed;inset:0;background:#0008;display:grid;place-items:center;z-index:10}

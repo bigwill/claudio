@@ -18,6 +18,7 @@ import { band, convexUrl, design, errorText, type ChatRow, type JamState, type L
 import { DRUM_VOICES, ROLE_OCTAVE, STEPS_PER_BAR, degreeToMidi } from "../../shared/pattern";
 import type { DrumHit, Pattern, PitchedNote, Scale } from "../../shared/pattern";
 import { newSessionId } from "../../shared/protocol";
+import { routeNote } from "../../shared/route";
 import { routeKey, type KeyAction, type Mode, type Strip as StripKey } from "./keys";
 import { CSS } from "./styles";
 
@@ -106,10 +107,18 @@ document.body.innerHTML = `
         <span class="r"><span><kbd>B</kbd> library</span><span><kbd>?</kbd> keys</span></span>
       </div>
     </div>
-    <aside class="chat">
+    <aside class="chat" id="chatpanel" data-testid="chat-panel">
       <div class="h">Band chat</div>
       <div class="rows" id="chatrows" data-testid="chat"></div>
-      <div class="cin"><input id="chatin" data-testid="chat-input" placeholder="@bass busier… (Enter or /)" autocomplete="off" /></div>
+      <div class="dropchip" id="dropchip" data-testid="drop-chip" hidden></div>
+      <div class="cin">
+        <div class="cinrow">
+          <input id="chatin" data-testid="chat-input" placeholder="@bass busier · @keys design a glassy bell" autocomplete="off" />
+          <button class="mini wav" id="chatwav" data-testid="chat-wav" title="Design the focused strip's sound from a WAV">＋ WAV</button>
+          <input type="file" accept="audio/*" hidden id="designfile" data-testid="design-file" />
+        </div>
+        <div class="route" id="route" data-testid="route"></div>
+      </div>
     </aside>
   </div>
 </div>
@@ -168,21 +177,6 @@ function chordName(keyPc: number, scale: Scale, deg: number): string {
 }
 
 function renderStrips(): void {
-  // A description being typed survives the re-render (value, focus, caret).
-  const typing = document.activeElement as HTMLInputElement | null;
-  const keep = typing?.dataset?.describe ? { role: typing.dataset.describe, value: typing.value, at: typing.selectionStart ?? 0 } : null;
-  renderStripsInner();
-  if (keep) {
-    const input = document.querySelector<HTMLInputElement>(`[data-describe="${keep.role}"]`);
-    if (input) {
-      input.value = keep.value;
-      input.focus();
-      input.setSelectionRange(keep.at, keep.at);
-    }
-  }
-}
-
-function renderStripsInner(): void {
   const host = $("strips");
   const strips = stripsInOrder();
   for (const [i, m] of strips.entries()) {
@@ -211,10 +205,8 @@ function renderStripsInner(): void {
 }
 
 /**
- * The design rail (plan §7): pitched strips and yours can be designed, in
- * soundcheck or mid-jam, from a WAV (drop it on the strip, or pick a file) or a description.
- * While a design runs: distance bars, the newest distance, the latest
- * rationale, and Cancel.
+ * The design rail (plan §7): a running design's progress in its strip:
+ * distance bars, the newest distance, the latest rationale, and Cancel.
  */
 function designRailHtml(m: Strip): string {
   if (m.role === "drums") return "";
@@ -233,12 +225,9 @@ function designRailHtml(m: Strip): string {
       ${why ? `<div class="why">${esc(why.slice(0, 160))}</div>` : ""}
     </div>`;
   }
-  // Available the whole time (Will, 2026-09-22): in the jam the strip keeps
-  // playing its current sound, and the new one lands at the next bar line.
-  return `<div class="drail">
-    <label class="drop">drop a WAV, or <u>pick one</u><input type="file" accept="audio/*" hidden data-design-file="${m.role}" data-testid="design-file-${ROLE_KEY[m.role] === "you" ? "you" : m.role}" /></label>
-    <input class="describe" data-typing data-describe="${m.role}" data-testid="design-describe-${ROLE_KEY[m.role] === "you" ? "you" : m.role}" placeholder="or describe it, then Enter" />
-  </div>`;
+  // Designs start from the chat (a WAV, or "@keys design …"), aimed at the
+  // focused strip (Will, 2026-09-22); the strip shows only their progress.
+  return "";
 }
 
 function railHtml(m: Strip): string {
@@ -578,6 +567,7 @@ async function act(a: KeyAction): Promise<void> {
         return;
       }
       ui.focus = a.strip;
+      followFocus();
       break;
     case "octave":
       ui.octave = Math.min(6, Math.max(1, ui.octave + a.delta));
@@ -585,7 +575,8 @@ async function act(a: KeyAction): Promise<void> {
     case "chat-open": {
       setMode("chat");
       const input = $<HTMLInputElement>("chatin");
-      input.value = a.prefill;
+      if (isMentionOnly(input.value)) input.value = mentionFor(ui.focus);
+      updateRoute();
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
       return;
@@ -727,28 +718,17 @@ $<HTMLInputElement>("chatin").addEventListener("keydown", (e) => {
   const input = e.currentTarget as HTMLInputElement;
   const text = input.value.trim();
   if (!text) return;
-  input.value = "";
-  void run(band.send(state.jam._id, text, ui.octave)); // Enter sends and stays in chat
+  // Enter sends and stays in chat. The box clears only once the send lands, so
+  // a refused note ("drums play the kit") keeps your text.
+  void band.send(state.jam._id, text, ui.octave, specForPrompt()).then(
+    () => {
+      if (input.value.trim() === text) input.value = "";
+      updateRoute();
+    },
+    (err) => toast(errorText(err)),
+  );
 });
-document.addEventListener("focusin", (e) => {
-  if ((e.target as HTMLElement).hasAttribute?.("data-typing") && ui.mode !== "chat") setMode("chat");
-});
-document.addEventListener("focusout", (e) => {
-  if ((e.target as HTMLElement).hasAttribute?.("data-typing") && ui.mode === "chat") setMode("play");
-});
-document.addEventListener("keydown", (e) => {
-  const input = e.target as HTMLInputElement;
-  const role = input.dataset?.describe as Strip["role"] | undefined;
-  if (!role || e.key !== "Enter" || !state) return;
-  e.preventDefault();
-  const text = input.value.trim();
-  const m = state.musicians.find((x) => x.role === role);
-  if (!text || !m) return;
-  input.value = "";
-  input.blur();
-  void run(design.startPrompt(m._id, text, specForPrompt()));
-});
-
+$<HTMLInputElement>("chatin").addEventListener("input", () => updateRoute());
 $<HTMLInputElement>("chatin").addEventListener("focus", () => {
   if (ui.mode !== "chat") setMode("chat");
 });
@@ -932,22 +912,97 @@ async function startWavDesign(role: Strip["role"], file: File): Promise<void> {
   }
 }
 
-document.addEventListener("change", (e) => {
+// --- design entry: the chat's WAV control and drop target, aimed at the focused strip
+
+/** The strip a WAV would design right now, or why not. */
+function designTarget(): { role: Strip["role"]; name: string } | { why: string } {
+  if (!ui.focus) return { why: "Press 1, 3 or 4 to pick whose sound to design, then add the WAV." };
+  if (ui.focus === "drums") return { why: "Drums play the kit; there's no sound to design." };
+  const role = KEY_ROLE[ui.focus];
+  return { role, name: ui.focus === "you" ? "your sound" : ui.focus };
+}
+
+$("chatwav").addEventListener("click", () => {
+  const t = designTarget();
+  if ("why" in t) return toast(t.why);
+  $<HTMLInputElement>("designfile").click();
+});
+$<HTMLInputElement>("designfile").addEventListener("change", (e) => {
   const input = e.target as HTMLInputElement;
-  const role = input.dataset?.designFile as Strip["role"] | undefined;
-  if (role && input.files?.[0]) void startWavDesign(role, input.files[0]);
+  const file = input.files?.[0];
+  input.value = "";
+  const t = designTarget();
+  if (!file) return;
+  if ("why" in t) return toast(t.why);
+  void startWavDesign(t.role, file);
 });
-document.addEventListener("dragover", (e) => {
-  if ((e.target as HTMLElement).closest?.(".strip")) e.preventDefault();
-});
-document.addEventListener("drop", (e) => {
-  const strip = (e.target as HTMLElement).closest?.<HTMLElement>(".strip");
-  const file = e.dataTransfer?.files?.[0];
-  if (!strip || !file) return;
+
+// Files dragged anywhere must never navigate the page away.
+const hasFiles = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes("Files");
+window.addEventListener("dragover", (e) => {
+  if (!hasFiles(e)) return;
   e.preventDefault();
-  const role = strip.id.replace("strip-", "") as Strip["role"];
-  if (role !== "drums") void startWavDesign(role, file);
+  const over = (e.target as HTMLElement).closest?.("#chatpanel");
+  showDropChip(over ? designTarget() : null);
 });
+window.addEventListener("dragleave", (e) => {
+  if (!(e.relatedTarget as HTMLElement | null)?.closest?.("#chatpanel")) showDropChip(null);
+});
+window.addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  showDropChip(null);
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  if (!(e.target as HTMLElement).closest?.("#chatpanel")) return toast("Drop the WAV on the chat to design the focused strip's sound.");
+  const t = designTarget();
+  if ("why" in t) return toast(t.why);
+  void startWavDesign(t.role, file);
+});
+
+function showDropChip(t: ReturnType<typeof designTarget> | null): void {
+  const chip = $("dropchip");
+  chip.hidden = t === null;
+  chip.textContent = t === null ? "" : "why" in t ? t.why : `Drop to design ${t.name}`;
+  for (const el of document.querySelectorAll(".strip")) el.classList.remove("droptarget");
+  if (t && !("why" in t)) document.getElementById(`strip-${t.role}`)?.classList.add("droptarget");
+}
+
+// --- the chat box follows focus (Will, 2026-09-22)
+
+const mentionFor = (focus: StripKey | null) => (focus === null ? "" : focus === "you" ? "@me " : `@${focus} `);
+const isMentionOnly = (v: string) => /^\s*(@[a-z]+\s*)?$/i.test(v);
+
+/** Aim the box at the focused strip, but only if it holds nothing but a mention. */
+function followFocus(): void {
+  const input = $<HTMLInputElement>("chatin");
+  if (isMentionOnly(input.value)) input.value = mentionFor(ui.focus);
+  updateRoute();
+}
+
+/** The chip under the box: where Enter would send this note. */
+function updateRoute(): void {
+  const el = $("route");
+  const text = $<HTMLInputElement>("chatin").value.trim();
+  if (!state || !text || isMentionOnly(text)) {
+    el.textContent = "";
+    el.className = "route";
+    return;
+  }
+  const r = routeNote(
+    text,
+    state.musicians.map((m) => ({ id: m._id as string, name: m.name, role: m.role, kind: m.kind })),
+  );
+  const names = new Map(state.musicians.map((m) => [m._id as string, m.role === "producer" ? "you" : m.name]));
+  el.className = `route ${r.kind}`;
+  el.textContent =
+    r.kind === "refuse"
+      ? r.why
+      : r.kind === "design"
+        ? `→ new design for ${names.get(r.musicianId)} (~30s, measured)`
+        : `→ note to ${r.to.length ? r.to.map((id) => names.get(id)).join(", ") : "the band"}`;
+}
+
 
 void boot();
 export {};

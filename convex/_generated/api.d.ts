@@ -20,7 +20,6 @@ import type * as model_design from "../model/design.js";
 import type * as model_drain from "../model/drain.js";
 import type * as model_history from "../model/history.js";
 import type * as model_jam from "../model/jam.js";
-import type * as model_mentions from "../model/mentions.js";
 import type * as model_messages from "../model/messages.js";
 import type * as model_tools from "../model/tools.js";
 import type * as musicians from "../musicians.js";
@@ -51,7 +50,6 @@ declare const fullApi: ApiFromModules<{
   "model/drain": typeof model_drain;
   "model/history": typeof model_history;
   "model/jam": typeof model_jam;
-  "model/mentions": typeof model_mentions;
   "model/messages": typeof model_messages;
   "model/tools": typeof model_tools;
   musicians: typeof musicians;

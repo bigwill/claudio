@@ -19,10 +19,13 @@
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { MAX_ITERATIONS, MAX_RENDER_ATTEMPTS, RENDER_LEASE_MS, TURN_LEASE_MS } from "../../src/shared/protocol";
+import { ConvexError } from "convex/values";
+
+import type { FeatureSummary } from "../../src/shared/features";
+import { MAX_ITERATIONS, MAX_RENDER_ATTEMPTS, RENDER_LEASE_MS, TURN_LEASE_MS, type RenderSpec } from "../../src/shared/protocol";
 import { postChat } from "./chat";
 import { planDrain, type DrainPlan } from "./drain";
-import { appendPart, newestPart, newTxn } from "./jam";
+import { appendPart, discardTurn, newestPart, newTxn } from "./jam";
 import { abandonedRenderToolResult, appendMessage } from "./messages";
 
 export type Design = Doc<"designs">;
@@ -211,4 +214,76 @@ export async function reopenOrAbandonRender(ctx: MutationCtx, design: Design, no
     return;
   }
   await openRenderWindow(ctx, design, now, next, design.pendingPresetId!);
+}
+
+export type DesignSource =
+  | { kind: "wav"; features: FeatureSummary; info: { filename: string; durationSec: number; sampleRate: number }; audioId: Id<"_storage"> | null }
+  | { kind: "prompt"; text: string };
+
+/**
+ * Start a design: the one way in, whether from designs.start (a WAV or the
+ * describe path) or from a "@keys design …" chat note (plan §4). Logs a
+ * system row to the musician, frees it from any band turn in flight, and
+ * schedules the first Claude turn, all in the caller's transaction.
+ */
+export async function startDesign(
+  ctx: MutationCtx,
+  musicianId: Id<"musicians">,
+  source: DesignSource,
+  spec: RenderSpec,
+): Promise<Id<"designs">> {
+  const m = await ctx.db.get(musicianId);
+  if (!m) throw new ConvexError("no such musician");
+  if (m.role === "drums") throw new ConvexError("Drums play the kit; there's no sound to design.");
+  if (m.activeDesignId !== null) throw new ConvexError(`${m.name} is already designing a sound.`);
+  const prompt = source.kind === "prompt" ? source.text.trim().slice(0, 2000) : null;
+  if (source.kind === "prompt" && !prompt) throw new ConvexError("Describe the sound first.");
+  await discardTurn(ctx, m); // your request wins over a band turn in flight
+
+  const designId = await ctx.db.insert("designs", {
+    musicianId,
+    status: "thinking",
+    origin: source.kind,
+    target: source.kind === "wav" ? source.features : null,
+    targetInfo: source.kind === "wav" ? source.info : null,
+    targetAudioId: source.kind === "wav" ? source.audioId : null,
+    prompt,
+    renderSpec: spec,
+    iteration: 0,
+    pendingToolUseId: null,
+    pendingPresetId: null,
+    renderOwnerClientId: null,
+    renderLeaseUntil: 0,
+    renderAttemptNo: 0,
+    turnSeq: 0,
+    turnDeadline: 0,
+    noToolStrikes: 0,
+    lastError: null,
+  });
+  await ctx.db.patch(musicianId, { activeDesignId: designId });
+  await postChat(ctx, m.jamId, {
+    kind: "system",
+    text: source.kind === "wav" ? `Designing ${m.name} from ${source.info.filename}` : `Designing ${m.name}: ${prompt}`,
+    to: [m._id],
+  });
+
+  // The opening message is the original loop's, verbatim.
+  const text =
+    source.kind === "wav"
+      ? `The user uploaded "${source.info.filename}" (${source.info.durationSec.toFixed(2)}s @ ${source.info.sampleRate} Hz).\n` +
+        `Here is its feature vector:\n\n` +
+        "```json\n" +
+        JSON.stringify(source.features) +
+        "\n```\n\n" +
+        `You have ${MAX_ITERATIONS} render iterations. Pick an archetype that explains these ` +
+        `features and instantiate it, then call propose_preset. The browser will render it and return a diff.`
+      : `There is NO target sample this time. The user asked for a sound in their own words:\n\n` +
+        `"${prompt}"\n\n` +
+        `Design it from the description. Call propose_preset — the browser will render it and report ` +
+        `back the features your patch actually measures, so you can check it against what you intended. ` +
+        `There is no distance to minimise here; the user's words are the whole specification. ` +
+        `Finalize as soon as the patch matches the description — one proposal is often enough.`;
+  await appendMessage(ctx, designId, { role: "user", content: [{ type: "text", text }] });
+  await beginDesignTurn(ctx, (await ctx.db.get(designId))!, Date.now());
+  return designId;
 }

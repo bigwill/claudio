@@ -33,7 +33,7 @@ The new direction:
 
 **Headline** (the scripted demo; the keystrokes live in `docs/headline.md`):
 1. **Soundcheck.**
-   - Drop a WAV on keys *first*. The Opus 5.5 measure loop runs in keys' strip while you give drums the kit, pick bass from the library and choose your own sound.
+   - Press `4` and drop a WAV on the chat (or `＋ WAV`) *first*. The Opus 5.5 measure loop runs in keys' strip while you give drums the kit, pick bass from the library and choose your own sound.
    - Audition each strip on the keyboard.
    - Fallback if the design passes its cutoff: cancel, then pick "Glass EP (designed from electric_piano.wav)" from the library. The library is global and shows where each sound came from, so this is honest.
 2. **`Space`: the jam starts.** The starter parts play, and you play along.
@@ -327,12 +327,18 @@ Each Convex function type has one job here:
 - **bpm, key, progression, bars; "band reacts".**
 - **History:** `parts.step(m, back|forward)`, `parts.jumpTo(m, v)`, and in wave 2 `parts.undo(jamId)`. Refused for a musician that is designing; undo is refused while any design is running.
   - Stepping, jumping, picking or undoing on a **thinking** musician cancels its turn first: wave 1 bumps `turnSeq` only; wave 2 uses `cancelTurn`. Your rollback always wins.
-- **`designs.start({musicianId, wav | prompt})`** is the only way to start a design.
+- **`startDesign`** (model helper) is the only way to start a design. `designs.start({musicianId, wav | prompt})` and `chat.send`'s design route both call it, and it logs "Designing keys from x.wav" or "Designing keys: …" as a system row.
 - **`jams.start`** switches phase to jam. It is refused while any design is running.
 
 **`postChat(ctx, row)`** is the only chat writer. It takes the seq from `jamCounters`, inserts the row, then calls `drainInbox(t)` for each target.
 
 **`chat.send`**
+- `routeNote` (pure, `src/shared/route.ts`; the page shows the same answer as a chip before Enter) decides where a note goes (Will, 2026-09-22):
+  - "@keys design a glassy bell" → a measured design for that one pitched musician (at least two words of description);
+  - "@me …" → a design of your own sound;
+  - anything else → a note to the musicians it names.
+  - It refuses (the text stays in the box) for several musicians, @all or drums on a design, and for a musician already designing.
+  - A design note is a system row, never a producer row, so the musician doesn't also answer it after the design ends.
 - Parses `@name`, `@role` and `@all` into ids.
 - Sets `lastProducerSeq`, and stores the router's current `octave` on the row.
 - Sets the budget: **1** for a note to one musician, **0** for `@all` or several.
@@ -461,7 +467,7 @@ It also runs after every commit, fail, cancel and watchdog branch, and after `en
 | `,` / `.` | bpm −2 / +2 |
 | `?` | Shortcut overlay |
 
-Key, progression and bar count are changed with visible controls, not keys. Starting a design (drop a WAV, or type a description) needs the mouse. Everything else can be done from the keyboard.
+Key, progression and bar count are changed with visible controls, not keys. Everything else can be done from the keyboard, designs included. `1`–`4` aims the chat box (it reads `@keys `, or `@me ` for your strip, only while it holds nothing but a mention). `Enter` then "design a glassy bell" starts a measured design; `Tab` reaches `＋ WAV` for a file. Dropping a WAV on the chat panel designs the focused strip.
 
 ### 7. UI (`src/client/band/`; `convex.ts` stays the only module that talks to Convex)
 - **Strip:**
@@ -469,9 +475,9 @@ Key, progression and bar count are changed with visible controls, not keys. Star
   - **DOM step grid** with a playhead column: drums in 4 voice rows, pitched parts as degree rows, accents bold, ties drawn as bars;
   - **history rail** from `parts.rail`, with the label on hover. The current version is filled; a staged one is outlined, with "lands in N beats";
   - status pill; "thinking… Ns" is computed on the client (`now − (turnDeadline − LEASE[kind])`);
-  - the design rail with distances, in soundcheck and throughout the jam (Will, 2026-09-22). Mid-jam, the strip keeps playing its current sound and the new one lands at the next bar line;
+  - the design rail: a running design's progress (distance bars, newest distance, latest rationale, Cancel), in soundcheck and throughout the jam. Designs are started from the chat, not the strip (Will, 2026-09-22). Mid-jam, the strip keeps playing its current sound and the new one lands at the next bar line;
   - mute and solo.
-- **Chat:** threaded replies; nudge rows dim.
+- **Chat:** threaded replies; nudge rows dim. The box follows focus (`@keys `, `@me `), a chip under it shows where Enter will send the note ("→ note to keys", "→ new design for keys (~30s, measured)", or why it's refused), and `＋ WAV` and a drop target on the panel design the focused strip ("Drop to design keys", with the target strip lit).
 - **Library drawer:** Starters / Designed / Tweaks, newest first, with provenance.
 - **Keyboard dock:** key, octave, "+1 oct" on the top row.
 - **Overlay:** `?`.
@@ -504,7 +510,7 @@ Key, progression and bar count are changed with visible controls, not keys. Star
 | S9b | Watchdog: a turn that never reports back (fake `hang`) → past `turnDeadline`, `watchdog` reclaims it, idle with its system row | 1 |
 | S10a | History: v1–v4, `←` `←` → v2 at the next bar line, `→` → v3, a prompt adds v5, `←` from v5 → v4. No row at either end; a jump to a copy resolves; a two-call turn is one version; mute writes no part; `←` on a thinking musician discards its result; the rollback note appears in the snapshot | 1 |
 | S10b | Undo: Backspace from v5 → v3; after `jumpTo` it goes back to where you jumped from; after a recall, all 4 parts and mute revert; it walks across musicians. Cancel, then a note: the cancelled request isn't executed and held notes are delivered | 2 |
-| S11a | Keys only: S3–S6 and S10a are driven entirely from the keyboard (starting a design excepted) | 1 |
+| S11a | Keys only: S2–S6 and S10a are driven entirely from the keyboard (a WAV design still needs the file dialog) | 1 |
 | S11b | Router matrix: modifier keys do nothing; a held arrow takes one step; `Shift+[` saves A; keyup releases in chat; Space with a focused button toggles once; Enter stays in chat; `?` vs `/` | 1 (unit) / 2 (E2E) |
 | S12 | Ties: bass glide, keys merge within the bar, re-attack at a chord change, a tie across the repeat, release on promotion, stop and mute | 2 |
 | H | **The headline, steps 1–5 in order**, keyboard-first, with fake scripts matching its prompts | 1 (2 adds the reaction) |
@@ -690,3 +696,16 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **`build-starters.mjs` stays retired:** starters can be re-designed in the band UI. Revive the script on `designs.start` only if a batch rebuild is needed.
 - 2026-09-22: **Fix: white screen from another machine after slice 4.** Slice 4's render id used `crypto.randomUUID()`, which browsers only provide in secure contexts (HTTPS or localhost); over `http://<ip>:5173` it threw on load. Tests open `localhost`, which is secure, so they passed. The id now comes from `Math.random`. New E2E test: the app loads over the machine's plain-http network address with no page errors (it failed before the fix; it skips if Vite isn't bound to the network). Also removed the unused multiplayer leftovers in `protocol.ts` (nicknames, colors, `newClientId`, presence and queue constants).
 - 2026-09-22: **Design stays available through the jam (Will: "the opportunity should also persist through the experience").** The design rail (drop or pick a WAV, or describe) now shows in both phases. Mid-jam, the strip keeps playing and the new sound lands at the next bar line. Unchanged: Start is still refused while a design runs (the soundcheck gate), the pitch still frames sound design as coming first, and a running design still holds that musician's notes and blocks scene recall. New E2E test: design keys while the band plays; the new sound lands on a bar line and the transport keeps running.
+- 2026-09-22: **Design entry moves into the chat, aimed at the focused strip (Will).** Two skeptic reviews ran first: correctness/API, and product/UX. They caught double handling of design notes, `@me` for your own strip, drops navigating away, refill-after-send, and the "design" keyword trap. Will chose "design …" plus a visible route chip for descriptions. Built:
+  - `routeNote` (unit matrix) and the `chat.send` routing in one mutation. A design note is a system row, so it's never answered twice; refusals throw with the reason.
+  - The `startDesign` helper and chat log rows for both origins.
+  - The box follows focus without clobbering drafts, and clears only after a send lands.
+  - `＋ WAV` (Tab-reachable), and a chat-panel drop target with a "Drop to design keys" chip and the strip lit. Files dropped anywhere else never navigate away.
+  - Strips show design progress only.
+
+  **Frozen E2E tests rewritten (Will's instruction is the OK):**
+  - S2 now focuses keys and uses the chat's WAV control (it was the strip's file input).
+  - S2b is now `3`, `Enter`, "design a round sub…" with the chip (it was the strip's describe box).
+  - The mid-jam design test also uses the chat's WAV control.
+
+  **New:** E2E tests for focus-follow, refusal keeping your text, and dropping on the chat panel. convex-test for the design route (no band turn afterwards), `@me`, refusals writing nothing, and "already designing".
