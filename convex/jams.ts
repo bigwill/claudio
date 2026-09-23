@@ -49,9 +49,14 @@ async function upsertStarters(ctx: MutationCtx): Promise<Map<string, Id<"library
  * turn. Idempotent on slug, since the browser mints it before any round trip.
  */
 export const create = mutation({
-  args: { slug: v.string() },
+  args: {
+    slug: v.string(),
+    /** Test jams run at bpm 200 and 1 bar (plan: Testing story, layer 3). Only used at creation. */
+    bpm: v.optional(v.number()),
+    bars: v.optional(v.union(v.literal(1), v.literal(2), v.literal(4))),
+  },
   returns: v.id("jams"),
-  handler: async (ctx, { slug }) => {
+  handler: async (ctx, { slug, bpm, bars }) => {
     const existing = await jamBySlug(ctx, slug);
     if (existing) return existing._id;
     const lib = await upsertStarters(ctx);
@@ -59,10 +64,10 @@ export const create = mutation({
       slug,
       phase: "soundcheck",
       reactive: true,
-      bpm: 96,
+      bpm: bpm ? Math.min(240, Math.max(60, Math.round(bpm))) : 96,
       keyPc: 2,
       scale: "minor",
-      bars: 4,
+      bars: bars ?? 4,
       progression: [0, 5, 2, 6],
       scenes: { A: null, B: null },
     });

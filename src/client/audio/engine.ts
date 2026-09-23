@@ -85,8 +85,8 @@ export class BandEngine {
   private mailbox: Mail[] = [];
   private tracks: Record<TrackId, Track>;
   private you: { channel: Tone.Channel; inst: Instrument };
-  /** Held live notes: the synth that started each, and how many keys hold it. */
-  private held = new Map<number, { inst: Instrument; count: number }>();
+  /** Held live notes, by "channel:midi": the synth that started each, and how many keys hold it. */
+  private held = new Map<string, { inst: Instrument; midi: number; count: number }>();
   private master: Tone.Gain;
   private kick: AudioBuffer;
   private repeatId: number | null = null;
@@ -200,34 +200,61 @@ export class BandEngine {
 
   // --- your live channel -------------------------------------------------
 
-  /** immediate(), not now(): now() includes the lookahead and would make you 150ms late. */
-  liveAttack(midi: number, vel = 0.85): void {
+  /**
+   * Play a live note on your channel, or (soundcheck audition) on a band
+   * strip's instrument. immediate(), not now(): now() includes the lookahead
+   * and would make you 150ms late.
+   */
+  liveAttack(midi: number, vel = 0.85, on: "you" | "bass" | "keys" = "you"): void {
     // Two keys can map to the same note (K and Q are both degree 7): the note
     // sounds once and is released when the last of them lets go.
-    const held = this.held.get(midi);
+    const key = `${on}:${midi}`;
+    const held = this.held.get(key);
     if (held) {
       held.count++;
       return;
     }
-    const inst = this.you.inst;
-    this.held.set(midi, { inst, count: 1 });
+    const inst = this.liveInstrument(on);
+    if (!inst) return;
+    this.held.set(key, { inst, midi, count: 1 });
     inst.attack(midi, this.context.immediate(), vel);
   }
 
   /** Released on the synth that started the note, even after a sound swap. */
-  liveRelease(midi: number): void {
-    const held = this.held.get(midi);
+  liveRelease(midi: number, on: "you" | "bass" | "keys" = "you"): void {
+    const key = `${on}:${midi}`;
+    const held = this.held.get(key);
     if (!held) return;
     if (--held.count > 0) return;
-    this.held.delete(midi);
+    this.held.delete(key);
     held.inst.release(midi, this.context.immediate());
   }
 
   liveReleaseAll(): void {
-    for (const [midi, held] of [...this.held]) {
-      this.held.delete(midi);
-      held.inst.release(midi, this.context.immediate());
+    for (const [key, held] of [...this.held]) {
+      this.held.delete(key);
+      held.inst.release(held.midi, this.context.immediate());
     }
+  }
+
+  /** Soundcheck audition of a kit voice. */
+  liveHit(voice: DrumVoice, vel = 0.9): void {
+    this.liveInstrument("drums")?.hit(voice, this.context.immediate(), vel);
+  }
+
+  /** Swap your live sound now. Held notes release on the synth that started them. */
+  setYourSound(preset: ClaudioPreset): void {
+    const old = this.you.inst;
+    this.you.inst = this.wrap(buildPoly(preset, this.context, { maxPolyphony: 16, prewarm: 6 }), "you");
+    this.you.inst.output.connect(this.you.channel);
+    setTimeout(() => old.dispose(), (old.tail + 4) * 1000);
+  }
+
+  /** The instrument a live note plays: yours, or a strip's staged-or-current one. */
+  private liveInstrument(on: ChannelId): Instrument | null {
+    if (on === "you") return this.you.inst;
+    const t = this.tracks[on];
+    return t.next?.inst ?? t.inst;
   }
 
   // --- the tick ----------------------------------------------------------
