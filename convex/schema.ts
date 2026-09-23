@@ -183,4 +183,19 @@ export default defineSchema({
   })
     .index("by_session_client", ["sessionId", "clientId"])
     .index("by_session_lastSeen", ["sessionId", "lastSeen"]),
+
+  /**
+   * Scripted responses for the fake LLM (CLAUDIO_FAKE_LLM=1). In the schema on
+   * every deployment so tests and dev share one shape; every read and write
+   * through `testing:*` is refused unless the flag is set.
+   *
+   * `match` is the cue (role or "design", plus a keyword); `turnIndex` picks
+   * which turn of that cue gets `response`. `response` is v.any() for the same
+   * reason `messages.content` is: it's a test fixture, shaped by fakeClaude.
+   */
+  fakeScripts: defineTable({
+    match: v.string(),
+    turnIndex: v.number(),
+    response: v.any(),
+  }).index("by_match_turn", ["match", "turnIndex"]),
 });

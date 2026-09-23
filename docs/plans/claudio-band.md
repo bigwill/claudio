@@ -512,6 +512,7 @@ Key, progression and bar count are changed with visible controls, not keys. Star
    - `sequencer.ts`: repeats, chord-following, one promotion step, `landsAtG` equal to the countdown, the loop origin after a bar change, tempo changes, accents, and in wave 2 the S12 tie cases;
    - `planDrain`, `planCommit`, `planHistory`, `planUndo`, `mergeAdjacentRoles`, `parseMentions`, `routeKey`;
    - the existing `test:dsp`.
+   - Unit tests sit next to their source: `src/**/*.test.ts`, and `convex/**/*.unit.test.ts` for the pure `plan*` functions in `convex/`. Convex skips any file name with more than one dot, so test files are never deployed.
 2. **Backend state machine:** `convex-test` + Vitest, seconds.
    - Real mutations and actions run against a mocked backend. Fake timers plus `t.finishAllScheduledFunctions(vi.runAllTimers)` drive turns until nothing is left to do. The watchdogs are called directly (convex-test has no crons).
    - Covers S1, S2 (with scripted design rounds), S2b, S4–S8, S9a, S9b, S10, and the data half of H.
@@ -536,12 +537,14 @@ Key, progression and bar count are changed with visible controls, not keys. Star
 - Tests seed rows with `t.run` or `npx convex run testing:setScript`.
 
 ### Commands
-- **`npm run check`:** typecheck, then unit tests, then convex-test; about 15s. Run after every change.
+- **`npm run check`:** typecheck, then unit tests (plus `test:dsp`), then convex-test; about 4s at slice 0. Run after every change.
+  - The typecheck covers three projects: the root (browser app, no Node globals), `convex/` (`@types/node`; it also compiles `src/shared` through its imports) and `e2e/`.
 - **`npm run e2e`:**
   - runs `npx convex env set CLAUDIO_FAKE_LLM 1`;
   - **preflights `testing:ping`, which must return `fake:true`, and aborts otherwise**;
   - boots local Convex and Vite if they aren't running, clears the test jams, and runs Playwright.
-- **`npm run smoke:real`:** unsets the fake flag, runs, then restores it.
+- **`npm run smoke:real -- --yes`:** refuses without `--yes`. It unsets the fake flag, checks that `testing:ping` says `fake:false`, runs, then always restores the flag and re-pings to confirm.
+- **`testing:*`:** `ping` always answers. `setScript` (an upsert on `by_match_turn`), `listScripts` and `clearScripts` refuse unless `CLAUDIO_FAKE_LLM=1`.
 
 ## Build order
 
@@ -601,3 +604,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
 - 2026-09-22: Hardening: named timeouts below leases; commit fallback from the action; fake `delay` honours the timeout and new `hang`; failure copy as system rows. S9 splits into S9a (timeout) and S9b (watchdog); S9 was not yet green, so no frozen test changed.
 - 2026-09-22: Step 1 signed off by Will: layout, schema, scenario list.
 - 2026-09-22: State boundary (Will): removed `liveOctave` (now `chat.octave`), `musicians.lastError`, `statusSince`, `producerClientId` (render lease via `claimRender`); added `designs.targetAudioId`; mute is local-first. Best-practice pass: removed dead `turnJobId`, both `msgSeq` counters, `designs.jamId`; added `library.by_role_jam`; `chatSeq` kept (why not `_creationTime`/`commitTs` recorded); hygiene rules added to §1. S6 reload wording clarified.
+- 2026-09-22: **Slice 0 done.** `npx convex ai-files install` also installs `get-convex/agent-skills` (`skills-lock.json`, `.agents/skills`, `.claude/skills`), so a separate `npx skills add` wasn't needed. The typecheck is split into three projects, which clears the 2-error `process` baseline. Unit tests are colocated. `@playwright/test` brings Playwright up to 1.63 (`npx playwright install chromium`). The e2e runner kills whatever it booted by process group. It doesn't clear test jams yet, because jams arrive in slice 3. `smoke:real` needs `--yes`. `fakeScripts` has index `by_match_turn`. Rails: unit, convex-test and e2e placeholders green, `verify:loop` green. No frozen test changed.

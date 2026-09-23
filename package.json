@@ -9,12 +9,17 @@
     "dev:convex": "convex dev",
     "build": "vite build",
     "preview": "npm run build && vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p convex && tsc --noEmit -p e2e",
     "test:dsp": "node --experimental-strip-types scripts/dsp-selftest.ts",
     "analyze": "node --experimental-strip-types scripts/analyze-samples.ts",
     "deploy": "vite build && wrangler deploy",
     "deploy:prod": "convex deploy --cmd 'vite build' && wrangler deploy --env production",
-    "verify:loop": "node scripts/verify-loop.mjs"
+    "verify:loop": "node scripts/verify-loop.mjs",
+    "test:unit": "vitest run --project unit",
+    "test:convex": "vitest run --project convex",
+    "check": "npm run typecheck && npm run test:unit && npm run test:dsp && npm run test:convex",
+    "e2e": "node scripts/e2e.mjs",
+    "smoke:real": "node scripts/smoke-real.mjs"
   },
   "dependencies": {
     "convex": "^1.46.0",
@@ -22,9 +27,14 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
+    "@edge-runtime/vm": "^5.0.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "convex-test": "^0.0.59",
     "playwright": "^1.62.1",
     "typescript": "^5.9.3",
     "vite": "^8.2.1",
+    "vitest": "^4.1.11",
     "wrangler": "^4.123.0"
   },
   "allowScripts": {

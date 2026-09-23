@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["vite/client"],
@@ -13,13 +13,17 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  // scripts/ is deliberately excluded: those are Node-only dev utilities run
-  // through node's type stripper, and they'd need @types/node globals that
-  // conflict with the DOM lib set the app compiles against. They're verified by
-  // being run (npm run test:dsp / npm run analyze), not by tsc.
+  // Three TypeScript projects, all run by `npm run typecheck`:
+  //   - this one: the browser app (DOM lib, vite/client types, no Node globals);
+  //   - convex/tsconfig.json: the backend, with @types/node for `process.env`.
+  //     It also compiles src/shared through the backend's imports, so a shared
+  //     change that breaks the backend still fails the typecheck;
+  //   - e2e/tsconfig.json: Playwright specs (Node).
+  // The first two must agree on strictness and lib, since both compile
+  // src/shared.
   //
-  // convex/ IS included: its functions import src/shared, so a change there that
-  // breaks the backend should fail here rather than at push time. (The Workers
-  // types are gone with the Worker — the backend is Convex now.)
-  "include": ["src", "convex", "vite.config.ts"]
+  // scripts/ is deliberately excluded: those are Node-only dev utilities run
+  // through node's type stripper. They're verified by being run
+  // (npm run test:dsp / npm run analyze), not by tsc.
+  "include": ["src", "vite.config.ts", "vitest.config.ts"]
 }
