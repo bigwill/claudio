@@ -1,29 +1,29 @@
 {
   "model": "claude-opus-5",
-  "at": "2026-09-23T01:13:40.890Z",
+  "at": "2026-09-23T00:55:57.615Z",
   "wav": "electric_piano_jd800_soft_ep.wav",
   "outcome": "done",
-  "wallMs": 40273,
-  "slug": "QFS3CZS17PYK",
+  "wallMs": 43280,
+  "slug": "GBHGP5B5M609",
   "report": {
     "attempts": [
       {
-        "distance": 41.3,
+        "distance": 41.9,
         "isFinal": false,
         "iteration": 1,
         "name": "Soft Tine EP"
       },
       {
-        "distance": 40.1,
+        "distance": 55.1,
         "isFinal": false,
         "iteration": 2,
-        "name": "Glass Tine EP"
+        "name": "x"
       },
       {
-        "distance": 38.3,
+        "distance": 51.5,
         "isFinal": false,
         "iteration": 3,
-        "name": "x"
+        "name": "Glass Tine EP"
       },
       {
         "distance": null,
