@@ -6,7 +6,7 @@
  * e2e/spike.spec.ts through `window.__band` and `window.__spike`.
  *
  * Keys: Space start/stop · 1–4 focus (you, drums, bass, keys) · V swap the
- * focused part's variant · G next starter sound (bass/keys) · M mute focused ·
+ * focused part's variant · B next starter sound (bass/keys) · M mute focused ·
  * A–; and Q–P play your part (D minor) · Z/X octave.
  * URL: ?spike=1&bpm=96&bars=4
  */
@@ -105,7 +105,7 @@ document.head.insertAdjacentHTML(
 );
 document.body.innerHTML = `<div class="spike">
   <h2>Engine spike · D minor · <span id="bpm"></span> bpm · <span id="bars"></span> bars</h2>
-  <p class="status" id="hint"><kbd>Space</kbd> start/stop · <kbd>1</kbd>–<kbd>4</kbd> focus · <kbd>V</kbd> variant · <kbd>G</kbd> next sound · <kbd>M</kbd> mute · <kbd>A</kbd>–<kbd>;</kbd> <kbd>Q</kbd>–<kbd>P</kbd> play · <kbd>Z</kbd>/<kbd>X</kbd> octave</p>
+  <p class="status" id="hint"><kbd>Space</kbd> start/stop · <kbd>1</kbd>–<kbd>4</kbd> focus · <kbd>V</kbd> variant · <kbd>B</kbd> next sound · <kbd>M</kbd> mute · <kbd>A</kbd>–<kbd>;</kbd> <kbd>Q</kbd>–<kbd>P</kbd> play · <kbd>Z</kbd>/<kbd>X</kbd> octave</p>
   <div id="lanes"></div>
   <p class="status">g <span id="g">–</span> · missed steps <span id="missed">0</span> · you: octave <span id="oct">4</span></p>
   <div id="flood"></div>
@@ -247,7 +247,7 @@ window.addEventListener(
       const t = state.focus;
       const order = variantsOf(t);
       stageTrack(t, order[(order.indexOf(state.variant[t]) + 1) % order.length]);
-    } else if (e.code === "KeyG" && (state.focus === "bass" || state.focus === "keys")) {
+    } else if (e.code === "KeyB" && (state.focus === "bass" || state.focus === "keys")) {
       // Cycle the focused strip through its starter sounds; lands at the bar line.
       const t = state.focus;
       const all = soundsFor(t);

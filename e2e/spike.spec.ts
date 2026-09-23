@@ -181,6 +181,17 @@ test("S3: two keys on the same note: releasing one doesn't cut the other", async
   expect(end.map((c) => c.note)).toEqual([74]);
 });
 
+test("B cycles the focused strip's sound, and plays no note", async ({ page }) => {
+  await open(page);
+  await startBand(page);
+  await page.keyboard.press("Digit3"); // focus bass
+  await page.keyboard.press("KeyB");
+  await page.waitForFunction(() => window.__band.promotions.some((p) => p.track === "bass" && p.id.startsWith("bass:a:")));
+  const b = await band(page);
+  expect(b.promotions.some((p) => p.id === "bass:a:bass-sub")).toBe(true);
+  expect(b.calls.filter((c) => c.track === "you")).toEqual([]);
+});
+
 test("onset: a 1-bar part rendered through the real engine has its kicks on the grid", async ({ page }) => {
   await open(page);
   const r = await page.evaluate(() => window.__spike.onsetTest());
