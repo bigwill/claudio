@@ -641,3 +641,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **`starters.ts`:** `STARTER_SOUNDS` with provenance (the source WAV, the rationale, the designing model), `DEFAULT_SOUNDS` (bass-reso, keys-ep, you: pad-square) and `STARTER_PARTS`. The parts are the spike's "a" variants, which Will heard and passed at slice 1.
   - **Tests (written first):** unique keys, presets already in range, provenance present, the parts already clamped, none laying out.
   - **Spike page:** now plays the starters; `B` cycles the focused bass or keys strip through its starter sounds (it was `G` at first, but `G` is a playing key; `B` is the key map's library key). Waiting on Will's listen.
+- 2026-09-22: **Slice 2 done.** Will's listen passed: the starter loop sounds good on its own, with sound cycling on `B`.
