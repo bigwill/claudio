@@ -453,6 +453,7 @@ It also runs after every commit, fail, cancel and watchdog branch, and after `en
 | `Shift+←` / `Shift+→` | Jump to the oldest / newest version |
 | `Backspace` | Undo the band's newest action (wave 2) |
 | `C` | Cancel the focused musician's turn (wave 2) |
+| `V` | Ask the focused musician for a variation. Until slice 5, it shows a hint; from slice 5 it sends "@<strip> give me a variation" as a chat note |
 | `M` / `N` | Mute / solo the focused strip (instant) |
 | `B` | Library picker for the focused strip |
 | `[` / `]` | Recall scene A / B. `Shift+[` / `Shift+]` saves A / B |
@@ -673,3 +674,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - `Esc` now closes the `?` overlay before it clears the focus.
   - New E2E tests: dock keys sit in the dock side by side, and pips are readable; `Esc` leaves chat after `/` or a click and the keyboard plays again; `Esc` closes the overlay and the picker, and `?` toggles.
   - `V` stays unbound in the band (it was the spike page's variant key).
+- 2026-09-22: **Key map: `V` added (Will's choice).** It asks the focused musician for a variation; with no band strip focused it hints "press 2–4". Until band turns exist it shows a hint; slice 5 makes it a real chat note. On the spike page, `V` cycled hand-written test variants; the band has none. Also fixed: clicking out of the chat box now leaves chat mode (E2E test).

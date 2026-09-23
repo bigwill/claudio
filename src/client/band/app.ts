@@ -346,6 +346,7 @@ function renderModal(): void {
       ["Shift + ← / →", "oldest / newest version"],
       ["M / N", "mute / solo the focused strip"],
       ["B", "library: pick a sound for the focused strip"],
+      ["V", "ask the focused musician for a variation"],
       ["[ / ]", "recall scene A / B   ·   Shift saves"],
       ["\\", "band reacts on / off"],
       [", / .", "tempo −2 / +2"],
@@ -606,6 +607,11 @@ async function act(a: KeyAction): Promise<void> {
     case "overlay":
       ui.overlay = !ui.overlay;
       renderModal();
+      return;
+    case "vary":
+      // Slice 5 sends "@<strip> give me a variation" as a chat note, which the
+      // musician answers with a new part. Until band turns exist, say so.
+      toast(`Asking ${a.strip} for a variation arrives with the band's turns (slice 5).`);
       return;
     case "undo":
     case "cancel":

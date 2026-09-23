@@ -198,3 +198,10 @@ test("focus: clicking back into the main pane leaves chat, and the keyboard play
   const calls = await page.evaluate(() => (window as unknown as W).__band.calls);
   expect(calls.some((c) => c.track === "bass" && c.method === "attack")).toBe(true);
 });
+
+test("V on a band strip answers (a hint until band turns exist), and is never silent", async ({ page }) => {
+  await openJam(page);
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("KeyV");
+  await expect(page.getByTestId("toast")).toContainText(/variation/i);
+});

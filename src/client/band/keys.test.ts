@@ -91,13 +91,19 @@ describe("play mode", () => {
     expect(routeKey(down("KeyC"), "play", "bass")).toEqual({ kind: "cancel", strip: "bass" });
   });
 
+  test("V asks the focused musician for a variation; with no band strip focused, it hints", () => {
+    expect(routeKey(down("KeyV"), "play", "bass")).toEqual({ kind: "vary", strip: "bass" });
+    expect(routeKey(down("KeyV"), "play", "drums")).toEqual({ kind: "vary", strip: "drums" });
+    expect(routeKey(down("KeyV"), "play", null)).toEqual({ kind: "hint", text: "press 2–4 to pick a musician, then V" });
+    expect(routeKey(down("KeyV"), "play", "you")).toEqual({ kind: "hint", text: "press 2–4 to pick a musician, then V" });
+  });
+
   test("keyups of command keys are swallowed so Space never clicks a focused button", () => {
     expect(routeKey(up("Space"), "play", null)).toEqual({ kind: "swallow" });
     expect(routeKey(up("ArrowLeft"), "play", "bass")).toEqual({ kind: "swallow" });
   });
 
   test("unhandled keys are left alone", () => {
-    expect(routeKey(down("KeyV"), "play", null)).toBeNull();
     expect(routeKey(down("F5"), "play", null)).toBeNull();
   });
 });

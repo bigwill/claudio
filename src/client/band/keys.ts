@@ -37,6 +37,8 @@ export type KeyAction =
   | { kind: "history"; strip: Strip; move: HistoryMove }
   | { kind: "undo" }
   | { kind: "cancel"; strip: Strip }
+  /** Ask the focused musician for a variation (Will, 2026-09-22). */
+  | { kind: "vary"; strip: Exclude<Strip, "you"> }
   | { kind: "mute"; strip: Strip }
   | { kind: "solo"; strip: Strip }
   | { kind: "picker-open"; strip: Strip }
@@ -54,6 +56,7 @@ const TOP = ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "Ke
 const STRIPS: Record<string, Strip> = { Digit1: "you", Digit2: "drums", Digit3: "bass", Digit4: "keys" };
 const NEEDS_STRIP = new Set(["ArrowLeft", "ArrowRight", "KeyM", "KeyN", "KeyB", "KeyC"]);
 export const NO_STRIP_HINT = "press 1–4 to pick a strip";
+export const VARY_HINT = "press 2–4 to pick a musician, then V";
 
 /** Scale degree for a playing key (home row 0–9; top row the same an octave up), or null. */
 export function degreeOf(code: string): number | null {
@@ -91,6 +94,7 @@ function commandFor(e: KeyInput, focus: Strip | null): KeyAction | null {
   if (e.key === "?") return { kind: "overlay" };
   if (STRIPS[e.code]) return { kind: "focus", strip: STRIPS[e.code] };
   if (NEEDS_STRIP.has(e.code) && focus === null) return { kind: "hint", text: NO_STRIP_HINT };
+  if (e.code === "KeyV") return focus && focus !== "you" ? { kind: "vary", strip: focus } : { kind: "hint", text: VARY_HINT };
   switch (e.code) {
     case "Space":
       return { kind: "transport" };
