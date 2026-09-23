@@ -1,0 +1,549 @@
+{
+  "at": "2026-09-23T01:08:21.699Z",
+  "base": "https://claudio-prod.will-104.workers.dev",
+  "wallMs": 27687,
+  "id": "QPCJ8RBSZ6M8",
+  "snap": {
+    "sessionId": "QPCJ8RBSZ6M8",
+    "status": "done",
+    "target": {
+      "sampleRate": 48000,
+      "durationMs": 4000,
+      "f0Hz": 95.5,
+      "f0Confidence": 0.37,
+      "f0DriftCents": 0,
+      "amp": {
+        "attackMs": 15,
+        "decayMs": 1226,
+        "sustainLevel": 0.07,
+        "releaseMs": 783
+      },
+      "inharmonicityCents": 111,
+      "noiseRatio": 0.54,
+      "oddEvenBalance": 0.45,
+      "frames": [
+        {
+          "label": "attack",
+          "tMs": 21,
+          "rmsDb": 0,
+          "centroidRatio": 4,
+          "harmonicsDb": [
+            0,
+            -1,
+            -5,
+            -2,
+            0,
+            -11,
+            -23,
+            -17,
+            -24,
+            -30,
+            -27,
+            -32
+          ]
+        },
+        {
+          "label": "early",
+          "tMs": 811,
+          "rmsDb": -9,
+          "centroidRatio": 5.06,
+          "harmonicsDb": [
+            -5,
+            -7,
+            -21,
+            -2,
+            0,
+            -12,
+            -28,
+            -19,
+            -29,
+            -33,
+            -29,
+            -31
+          ]
+        },
+        {
+          "label": "sustain",
+          "tMs": 2197,
+          "rmsDb": -14,
+          "centroidRatio": 5.64,
+          "harmonicsDb": [
+            -3,
+            -4,
+            -11,
+            -5,
+            0,
+            -9,
+            -24,
+            -29,
+            -30,
+            -37,
+            -30,
+            -32
+          ]
+        },
+        {
+          "label": "release",
+          "tMs": 3381,
+          "rmsDb": -30,
+          "centroidRatio": 14.57,
+          "harmonicsDb": [
+            -9,
+            0,
+            -5,
+            -8,
+            -2,
+            -25,
+            -25,
+            -28,
+            -27,
+            -28,
+            -33,
+            -34
+          ]
+        }
+      ]
+    },
+    "targetInfo": {
+      "filename": "electric_piano_jd800_soft_ep.wav",
+      "durationSec": 4,
+      "sampleRate": 48000
+    },
+    "iteration": 3,
+    "maxIterations": 3,
+    "history": [
+      {
+        "presetId": "c0927fdb-fb9b-4ab9-b4f4-236a4365faf1",
+        "preset": {
+          "name": "Soft Tine EP",
+          "harmonicity": 5.03,
+          "modulationIndex": 7,
+          "carrierWave": "sine",
+          "modulatorWave": "triangle",
+          "carrierFm": {
+            "ratio": 1,
+            "index": 2
+          },
+          "modulatorFm": {
+            "ratio": 3.47,
+            "index": 1.5
+          },
+          "ampEnv": {
+            "attack": 0.015,
+            "decay": 1.23,
+            "sustain": 0.07,
+            "release": 0.78
+          },
+          "modEnv": {
+            "attack": 0.005,
+            "decay": 1.6,
+            "sustain": 0.25,
+            "release": 1.2
+          },
+          "detune": 0,
+          "gain": 0.8
+        },
+        "rationale": "Archetype: struck electric-piano tine — fast attack, ~1.2s decay, near-zero sustain, inharmonic (111 cents) with the 5th harmonic dominating each frame, so harmonicity near 5 but off-integer. Slightly slow modEnv decay keeps brightness rising like the target's climbing centroid.",
+        "features": {
+          "sampleRate": 48000,
+          "durationMs": 2500,
+          "f0Hz": 95.5,
+          "f0Confidence": 1,
+          "f0DriftCents": 2,
+          "amp": {
+            "attackMs": 12,
+            "decayMs": 337,
+            "sustainLevel": 0.05,
+            "releaseMs": 4000
+          },
+          "inharmonicityCents": 8,
+          "noiseRatio": 0.46,
+          "oddEvenBalance": 0.36,
+          "frames": [
+            {
+              "label": "attack",
+              "tMs": 21,
+              "rmsDb": -1,
+              "centroidRatio": 4.6,
+              "harmonicsDb": [
+                -8,
+                0,
+                -4,
+                -16,
+                -30,
+                -26,
+                -13,
+                -17,
+                -21,
+                -29,
+                -30,
+                -27
+              ]
+            },
+            {
+              "label": "early",
+              "tMs": 512,
+              "rmsDb": -20,
+              "centroidRatio": 3.24,
+              "harmonicsDb": [
+                -7,
+                0,
+                -7,
+                -13,
+                -25,
+                -32,
+                -20,
+                -22,
+                -28,
+                -39,
+                -44,
+                -52
+              ]
+            },
+            {
+              "label": "sustain",
+              "tMs": 1376,
+              "rmsDb": -23,
+              "centroidRatio": 3.04,
+              "harmonicsDb": [
+                -8,
+                0,
+                -5,
+                -15,
+                -27,
+                -35,
+                -23,
+                -25,
+                -31,
+                -39,
+                -42,
+                -47
+              ]
+            },
+            {
+              "label": "release",
+              "tMs": 2112,
+              "rmsDb": -23,
+              "centroidRatio": 2.98,
+              "harmonicsDb": [
+                -8,
+                0,
+                -5,
+                -15,
+                -27,
+                -42,
+                -23,
+                -26,
+                -31,
+                -41,
+                -42,
+                -47
+              ]
+            }
+          ]
+        },
+        "distance": 42.1
+      },
+      {
+        "presetId": "1f3d8840-48e7-483e-bec4-b0dbb463aedb",
+        "preset": {
+          "name": "Glass Tine EP",
+          "harmonicity": 7.13,
+          "modulationIndex": 14,
+          "carrierWave": "sine",
+          "modulatorWave": "triangle",
+          "carrierFm": {
+            "ratio": 1,
+            "index": 2
+          },
+          "modulatorFm": {
+            "ratio": 3.47,
+            "index": 3
+          },
+          "ampEnv": {
+            "attack": 0.015,
+            "decay": 1.23,
+            "sustain": 0.18,
+            "release": 0.78
+          },
+          "modEnv": {
+            "attack": 0.005,
+            "decay": 1.6,
+            "sustain": 0.55,
+            "release": 1.2
+          },
+          "detune": 0,
+          "gain": 0.8
+        },
+        "rationale": "Attacking the two biggest errors: inharmonicity (harmonicity 5.03 -> 7.13) and overall brightness/upper harmonics (modulationIndex 7 -> 14, modulatorFm.index 3, modEnv.sustain 0.55), plus ampEnv.sustain 0.18 and release 0.78 to fix the decay/release timing.",
+        "features": {
+          "sampleRate": 48000,
+          "durationMs": 2500,
+          "f0Hz": 96.4,
+          "f0Confidence": 0.96,
+          "f0DriftCents": 3,
+          "amp": {
+            "attackMs": 12,
+            "decayMs": 565,
+            "sustainLevel": 0.15,
+            "releaseMs": 4000
+          },
+          "inharmonicityCents": 14,
+          "noiseRatio": 0.55,
+          "oddEvenBalance": 0.41,
+          "frames": [
+            {
+              "label": "attack",
+              "tMs": 21,
+              "rmsDb": -1,
+              "centroidRatio": 9.44,
+              "harmonicsDb": [
+                -6,
+                0,
+                -6,
+                -10,
+                -8,
+                -23,
+                -28,
+                -21,
+                -9,
+                -12,
+                -18,
+                -25
+              ]
+            },
+            {
+              "label": "early",
+              "tMs": 512,
+              "rmsDb": -13,
+              "centroidRatio": 6.76,
+              "harmonicsDb": [
+                -7,
+                0,
+                -5,
+                -10,
+                -13,
+                -25,
+                -40,
+                -26,
+                -13,
+                -16,
+                -23,
+                -37
+              ]
+            },
+            {
+              "label": "sustain",
+              "tMs": 1376,
+              "rmsDb": -14,
+              "centroidRatio": 7.36,
+              "harmonicsDb": [
+                -7,
+                0,
+                -7,
+                -18,
+                -14,
+                -25,
+                -40,
+                -27,
+                -13,
+                -15,
+                -20,
+                -28
+              ]
+            },
+            {
+              "label": "release",
+              "tMs": 2112,
+              "rmsDb": -14,
+              "centroidRatio": 7.06,
+              "harmonicsDb": [
+                -7,
+                0,
+                -6,
+                -13,
+                -14,
+                -29,
+                -38,
+                -26,
+                -14,
+                -16,
+                -22,
+                -31
+              ]
+            }
+          ]
+        },
+        "distance": 38.7
+      },
+      {
+        "presetId": "503e4d2a-5e28-4b3a-8219-e7862965667e",
+        "preset": {
+          "name": "Glass Tine EP",
+          "harmonicity": 5.47,
+          "modulationIndex": 9,
+          "carrierWave": "sine",
+          "modulatorWave": "triangle",
+          "carrierFm": {
+            "ratio": 2.41,
+            "index": 2.5
+          },
+          "modulatorFm": {
+            "ratio": 3.47,
+            "index": 3
+          },
+          "ampEnv": {
+            "attack": 0.015,
+            "decay": 1.23,
+            "sustain": 0.12,
+            "release": 0.4
+          },
+          "modEnv": {
+            "attack": 0.005,
+            "decay": 1.2,
+            "sustain": 0.4,
+            "release": 1.5
+          },
+          "detune": 0,
+          "gain": 0.8
+        },
+        "rationale": "Attack centroid was too high and the 5th harmonic still weak: drop modulationIndex to 9 and pull harmonicity to 5.47 (still inharmonic, but centred on the target's dominant 5th). Shorter ampEnv.release and lower sustain fix the overlong release; longer modEnv.release keeps the bright tail.",
+        "features": {
+          "sampleRate": 48000,
+          "durationMs": 2500,
+          "f0Hz": 108.2,
+          "f0Confidence": 0.64,
+          "f0DriftCents": 6,
+          "amp": {
+            "attackMs": 11,
+            "decayMs": 442,
+            "sustainLevel": 0.1,
+            "releaseMs": 4000
+          },
+          "inharmonicityCents": 35,
+          "noiseRatio": 0.23,
+          "oddEvenBalance": 0.59,
+          "frames": [
+            {
+              "label": "attack",
+              "tMs": 21,
+              "rmsDb": 0,
+              "centroidRatio": 6,
+              "harmonicsDb": [
+                0,
+                -14,
+                -7,
+                -17,
+                -22,
+                -18,
+                -23,
+                -12,
+                -28,
+                -21,
+                -28,
+                -33
+              ]
+            },
+            {
+              "label": "early",
+              "tMs": 512,
+              "rmsDb": -15,
+              "centroidRatio": 4.56,
+              "harmonicsDb": [
+                0,
+                -19,
+                -5,
+                -25,
+                -17,
+                -25,
+                -35,
+                -17,
+                -31,
+                -25,
+                -38,
+                -38
+              ]
+            },
+            {
+              "label": "sustain",
+              "tMs": 1376,
+              "rmsDb": -18,
+              "centroidRatio": 4.22,
+              "harmonicsDb": [
+                0,
+                -20,
+                -5,
+                -25,
+                -16,
+                -25,
+                -34,
+                -18,
+                -33,
+                -25,
+                -37,
+                -38
+              ]
+            },
+            {
+              "label": "release",
+              "tMs": 2112,
+              "rmsDb": -18,
+              "centroidRatio": 4.06,
+              "harmonicsDb": [
+                0,
+                -21,
+                -5,
+                -24,
+                -17,
+                -24,
+                -38,
+                -19,
+                -33,
+                -26,
+                -38,
+                -38
+              ]
+            }
+          ]
+        },
+        "distance": 45.9
+      },
+      {
+        "presetId": "3cca7ebb-1b6e-405d-82c1-c69bca923562",
+        "preset": {
+          "name": "Glass Tine EP",
+          "harmonicity": 7.13,
+          "modulationIndex": 14,
+          "carrierWave": "sine",
+          "modulatorWave": "triangle",
+          "carrierFm": {
+            "ratio": 1,
+            "index": 2
+          },
+          "modulatorFm": {
+            "ratio": 3.47,
+            "index": 3
+          },
+          "ampEnv": {
+            "attack": 0.015,
+            "decay": 1.23,
+            "sustain": 0.18,
+            "release": 0.78
+          },
+          "modEnv": {
+            "attack": 0.005,
+            "decay": 1.6,
+            "sustain": 0.55,
+            "release": 1.2
+          },
+          "detune": 0,
+          "gain": 0.8
+        },
+        "rationale": "A soft, glassy tine electric piano: quick strike, long bell-tinged decay, bright shimmering tail. The sampled JD-800's breathy noise floor and its exact inharmonic partial spread aren't reachable with four operators, but the register, attack and tine character are there.",
+        "features": null,
+        "distance": null
+      }
+    ],
+    "bestPresetId": "1f3d8840-48e7-483e-bec4-b0dbb463aedb"
+  }
+}

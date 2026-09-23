@@ -83,7 +83,7 @@ export const runTurn = internalAction({
         ctx.runMutation(internal.turn.commit, {
           sessionId: args.sessionId,
           turnSeq: args.turnSeq,
-          content: fake.content,
+          content: JSON.stringify(fake.content),
           stopReason: fake.stop_reason,
         }),
       );
@@ -113,7 +113,7 @@ export const runTurn = internalAction({
       ctx.runMutation(internal.turn.commit, {
         sessionId: args.sessionId,
         turnSeq: args.turnSeq,
-        content: message.content,
+        content: JSON.stringify(message.content),
         stopReason: message.stop_reason,
       }),
     );

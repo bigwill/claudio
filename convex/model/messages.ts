@@ -25,6 +25,22 @@ export interface MessageParam {
   content: unknown;
 }
 
+/**
+ * The log stores each message's content as its JSON TEXT, not as a Convex
+ * object. Convex sorts object fields by key, so a stored tool_use input came
+ * back alphabetized while the strict schema made the model write it in schema
+ * order; replaying the reordered calls made later design turns stub the leading
+ * fields ("x", 0, "placeholder"). JSON text keeps the log exactly as returned.
+ * Rows written before this change hold objects and still decode.
+ */
+export function encodeContent(content: unknown): string {
+  return JSON.stringify(content);
+}
+
+export function decodeContent(stored: unknown): unknown {
+  return typeof stored === "string" ? JSON.parse(stored) : stored;
+}
+
 /** What the diff needs to look like to be serialized into a tool_result. */
 type DiffForPrompt = Pick<
   FeatureDiff,
@@ -49,7 +65,7 @@ export async function appendMessage(
     sessionId: session._id,
     seq,
     role: message.role,
-    content: message.content,
+    content: encodeContent(message.content),
   });
   await ctx.db.patch(session._id, { msgSeq: seq + 1 });
   // Keep the caller's copy usable for further appends in the same transaction.
@@ -66,7 +82,7 @@ export async function loadMessages(
     .withIndex("by_session_seq", (q) => q.eq("sessionId", sessionId))
     .order("asc")
     .collect();
-  return rows.map((r) => ({ role: r.role, content: r.content }) as MessageParam);
+  return rows.map((r) => ({ role: r.role, content: decodeContent(r.content) }) as MessageParam);
 }
 
 export async function tailMessage(
@@ -105,8 +121,9 @@ export async function clearMessages(
  * submitRenderError) must NOT use this — they have a real result to give.
  */
 export function healBlocks(tail: Doc<"messages"> | null): Anthropic.ToolResultBlockParam[] {
-  if (!tail || tail.role !== "assistant" || !Array.isArray(tail.content)) return [];
-  return (tail.content as unknown[])
+  const content = tail ? decodeContent(tail.content) : null;
+  if (!tail || tail.role !== "assistant" || !Array.isArray(content)) return [];
+  return (content as unknown[])
     .filter(
       (b): b is Anthropic.ToolUseBlockParam =>
         typeof b === "object" && b !== null && (b as { type?: string }).type === "tool_use",

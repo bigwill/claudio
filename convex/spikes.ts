@@ -18,6 +18,7 @@ import { v } from "convex/values";
 import { clampPattern, summarizePattern, type PitchedRole } from "../src/shared/pattern";
 import { internalAction, internalQuery } from "./_generated/server";
 import { fakeLlmEnabled } from "./fakeClaude";
+import { decodeContent } from "./model/messages";
 
 const BAND_MODEL = "claude-sonnet-5";
 const BAND_TIMEOUT_MS = 30_000;
@@ -141,7 +142,8 @@ export const designReport = internalQuery({
     const turns = messages
       .filter((m) => m.role === "assistant")
       .map((m) => {
-        const blocks = Array.isArray(m.content) ? (m.content as Array<{ type: string; name?: string }>) : [];
+        const content = decodeContent(m.content);
+        const blocks = Array.isArray(content) ? (content as Array<{ type: string; name?: string }>) : [];
         return blocks.find((b) => b.type === "tool_use")?.name ?? "none";
       });
     const attempts = await ctx.db

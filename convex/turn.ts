@@ -26,6 +26,7 @@ import {
   finalizeToolResult,
   loadMessages,
   unknownToolResult,
+  decodeContent,
 } from "./model/messages";
 import { readAssistantTurn, readToolInput } from "./model/tools";
 import { presentClients } from "./model/presence";
@@ -83,7 +84,10 @@ export const commit = internalMutation({
     if (!session || session.turnSeq !== args.turnSeq) return null; // FENCE
     const now = Date.now();
 
-    const { text, call } = readAssistantTurn(args.content);
+    // The action passes the model's content as JSON text: Convex arguments sort
+    // object keys the same way stored documents do (see model/messages.ts).
+    const content = decodeContent(args.content);
+    const { text, call } = readAssistantTurn(content);
 
     /**
      * Truncation guard, BEFORE anything is persisted.
@@ -116,7 +120,7 @@ export const commit = internalMutation({
 
     // Persist the assistant turn VERBATIM — thinking blocks and tool_use blocks
     // included. Editing or dropping them breaks the next turn.
-    await appendMessage(ctx, session, { role: "assistant", content: args.content });
+    await appendMessage(ctx, session, { role: "assistant", content });
 
     // ---- propose_preset: the turn pauses here until a browser reports back ---
     if (call && call.name === "propose_preset") {

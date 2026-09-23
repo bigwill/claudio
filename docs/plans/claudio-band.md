@@ -144,7 +144,7 @@ erDiagram
   musicians { id jamId  string kind  string role  string name  bool muted  string status  string turnCause  number turnSeq  number turnDeadline  number chatCursor  id activeDesignId }
   parts { id musicianId  id jamId  number version  number basedOn  number prev  bool prevMuted  string txn  string undoes  string source  string label  number lengthBars  array notes  id libraryId }
   designs { id musicianId  string status  string origin  object target  id targetAudioId  string prompt  object renderSpec  number iteration  string pendingToolUseId  string pendingPresetId  string renderOwnerClientId  number renderLeaseUntil  number renderAttemptNo  number turnSeq  number turnDeadline  number noToolStrikes  string lastError }
-  messages { id convoId  number seq  string role  any content }
+  messages { id convoId  number seq  string role  string content }
   attempts { id designId  string presetId  number iteration  object preset  string rationale  object features  number distance  bool isFinal }
   chat { id jamId  number seq  string kind  id fromMusicianId  array to  id reactor  number replyToSeq  string text  number octave }
   library { string name  string role  object preset  object features  string origin  string source  id designId  id fromJamId  string starterKey }
@@ -189,7 +189,7 @@ erDiagram
   - `targetAudioId` (nullable storage id): the target WAV, for the rail's preview and audition after a reload.
   - "Any design running" checks read `activeDesignId` on the jam's 4 musicians, so `designs` needs no `jamId`.
   - Indexes: `by_musician`, `by_status_deadline`, `by_render_lease`.
-- **messages:** index `by_convo_seq`. The next `seq` is read newest-first from it, plus one (no counter on the subscribed `musicians`/`designs` rows). `seq` itself stays, because a turn inserts two rows in one mutation.
+- **messages:** `content` is stored as its **JSON text**, not a Convex object. Convex sorts object fields by key, and replaying the model's tool calls re-sorted broke later design turns (see the change log). Index `by_convo_seq`. The next `seq` is read newest-first from it, plus one (no counter on the subscribed `musicians`/`designs` rows). `seq` itself stays, because a turn inserts two rows in one mutation.
 - **attempts:** indexes `by_design_iteration`, `by_design_preset`.
 - **chat**
   - `kind`: producer, musician, system or nudge.
@@ -623,3 +623,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **Audit against the Worker era (`4c53d86`).** Model, `max_tokens`, thinking, the effort schedule, `tool_choice`, tools and schema, the first message and the render `tool_result` fields are all identical. The system prompt only gained rule 10 (multiplayer speaker names).
   - **Finding.** The stubbed fields are exactly the first ones the strict schema emits (`preset.name`, `harmonicity`, `modulationIndex`), and `rationale` comes after the preset. No Opus 5 turn produced a thinking block. The model starts the tool call before deciding. Also, `clampPreset` silently turns out-of-range values (`harmonicity 0`) into legal ones, although the prompt says they are rejected.
   - Candidate fixes are awaiting Will's call; see the session report.
+- 2026-09-22: **Root cause of the placeholder presets found and fixed.** The live Worker-era original (`claudio-prod`), run on today's Opus 5 with the same WAV, was clean: no placeholders, 42.1 → 38.7 on iteration 2 (`docs/spikes/1b-design-original-prod.json`). The one input difference is that **Convex sorts stored object keys**. The model's earlier `propose_preset` calls were replayed alphabetized (`ampEnv…name`), while the strict schema makes it write `name, harmonicity, modulationIndex…`. The stubbed fields were exactly those leading ones, and only on replayed turns. Fix: `messages.content` holds JSON text (`encodeContent`/`decodeContent`), and the action passes the model's content to `commit` as text, because Convex arguments sort keys too. Tests in `convex/messagesLog.test.ts` fail without the fix. The live backend now stores text in model order. §1 and the ER diagram are updated. Paid re-verification is pending Will's go-ahead.
