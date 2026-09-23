@@ -1,0 +1,250 @@
+{
+  "model": "claude-opus-5-5",
+  "slug": "NWR9AGRW588G",
+  "beforeSeq": 3,
+  "samples": 5,
+  "at": "2026-09-23T01:17:51.874Z",
+  "conditions": {
+    "A": {
+      "placeholderRate": "0/5",
+      "rows": [
+        {
+          "ms": 7419,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Soft Tine EP",
+          "harmonicity": 4.5,
+          "modulationIndex": 7,
+          "rationale": "Targeting spectrum + inharmonicity: harmonicity 4.5 puts sidebands near h3.5/h5.5 (inharmonic tine e",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3101,
+            "out": 586
+          }
+        },
+        {
+          "ms": 5737,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "JD Glass Tine",
+          "harmonicity": 4.1,
+          "modulationIndex": 7,
+          "rationale": "Move energy to h4/h5 and add inharmonicity: harmonicity 4.1 (slightly detuned tine partials), index ",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3101,
+            "out": 510
+          }
+        },
+        {
+          "ms": 6373,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Soft Tine EP",
+          "harmonicity": 1,
+          "modulationIndex": 9,
+          "rationale": "Brightness and h4/h5 too weak: index 4→9, modEnv sustain 0.6, carrierFm moved to a slightly detuned ",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3101,
+            "out": 592
+          }
+        },
+        {
+          "ms": 6190,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Glassy Tine EP",
+          "harmonicity": 4.1,
+          "modulationIndex": 8,
+          "rationale": "Harmonicity 4.1 puts energy around h3-h5 with inharmonic detuning; higher index and modEnv sustain l",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3101,
+            "out": 569
+          }
+        },
+        {
+          "ms": 6073,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Glassy Tine EP",
+          "harmonicity": 4.07,
+          "modulationIndex": 6,
+          "rationale": "Slightly-off harmonicity 4.07 places strong sidebands near h3/h5 with inharmonic beating (targets h4",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3101,
+            "out": 531
+          }
+        }
+      ]
+    },
+    "B": {
+      "placeholderRate": "0/5",
+      "rows": [
+        {
+          "ms": 7525,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Soft Tine EP",
+          "harmonicity": 1,
+          "modulationIndex": 7,
+          "rationale": "Brightness and inharmonicity were short: raised modulationIndex 4→7, modEnv sustain 0.3→0.5, carrier",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3101,
+            "out": 618
+          }
+        },
+        {
+          "ms": 5811,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Chorus Tine EP",
+          "harmonicity": 1.01,
+          "modulationIndex": 9,
+          "rationale": "Raised modulationIndex 4→9 and carrierFm index 1.2→3 (ratio 4.03) to lift h4/h5. Slightly detuned ra",
+          "placeholder": false,
+          "thinking": false,
+          "usage": {
+            "in": 3101,
+            "out": 436
+          }
+        },
+        {
+          "ms": 6776,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Soft Tine EP",
+          "harmonicity": 1,
+          "modulationIndex": 7,
+          "rationale": "Targeting the weak h4/h5 and missing inharmonicity: carrierFm moved to a detuned 4.13 ratio at highe",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3101,
+            "out": 537
+          }
+        },
+        {
+          "ms": 5547,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Glass Tine EP",
+          "harmonicity": 4.03,
+          "modulationIndex": 9,
+          "rationale": "Harmonicity 4.03 puts energy around h3–h5 with slight detuning for the inharmonicity; carrierFm rati",
+          "placeholder": false,
+          "thinking": false,
+          "usage": {
+            "in": 3101,
+            "out": 395
+          }
+        },
+        {
+          "ms": 5345,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "JD Glass Tine",
+          "harmonicity": 4.02,
+          "modulationIndex": 8,
+          "rationale": "Harmonicity ~4 puts energy on h3/h5 with a slight detune for inharmonicity; index 8 plus higher modE",
+          "placeholder": false,
+          "thinking": false,
+          "usage": {
+            "in": 3101,
+            "out": 410
+          }
+        }
+      ]
+    },
+    "C": {
+      "placeholderRate": "0/5",
+      "rows": [
+        {
+          "ms": 14860,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Crystal Tine EP",
+          "harmonicity": 1,
+          "modulationIndex": 8,
+          "rationale": "Targeting brightness and decay: modulationIndex 4→8 with modEnv sustain 0.5 to lift h4–h6, modulator",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3102,
+            "out": 538
+          }
+        },
+        {
+          "ms": 14449,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Soft Tine EP",
+          "harmonicity": 4.04,
+          "modulationIndex": 9,
+          "rationale": "Spectrum is the big miss: harmonicity 1→4.04 (slightly off-integer, puts energy near h3–h5 with some",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3102,
+            "out": 473
+          }
+        },
+        {
+          "ms": 14891,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Soft Tine EP",
+          "harmonicity": 4.1,
+          "modulationIndex": 6,
+          "rationale": "Target energy sits in h4-h5 and is inharmonic: harmonicity 4.1 (slightly off-integer), index 6, modE",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3102,
+            "out": 548
+          }
+        },
+        {
+          "ms": 14472,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Glass Tine EP",
+          "harmonicity": 4.1,
+          "modulationIndex": 8,
+          "rationale": "Spectrum is the biggest problem: h4–h5 are too quiet and the partials too harmonic. I moved harmonic",
+          "placeholder": false,
+          "thinking": true,
+          "usage": {
+            "in": 3102,
+            "out": 499
+          }
+        },
+        {
+          "ms": 13962,
+          "stop": "tool_use",
+          "tool": "propose_preset",
+          "name": "Soft Tine EP",
+          "harmonicity": 4.03,
+          "modulationIndex": 9,
+          "rationale": "Spectrum is the main error: raise modulationIndex 4→9 and modEnv sustain 0.3→0.5 for brightness; har",
+          "placeholder": false,
+          "thinking": false,
+          "usage": {
+            "in": 3102,
+            "out": 430
+          }
+        }
+      ]
+    }
+  },
+  "costUsd": 0.34
+}

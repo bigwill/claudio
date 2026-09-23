@@ -12,6 +12,7 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 
+import { internal } from "./_generated/api";
 import schema from "./schema";
 import { appendMessage, loadMessages } from "./model/messages";
 
@@ -50,6 +51,22 @@ test("loadMessages replays the content with the model's key order intact", async
   });
   expect(loaded.json).toBe(JSON.stringify(assistantTurn));
   expect(loaded.keys).toEqual(["name", "harmonicity", "modulationIndex", "ampEnv"]);
+});
+
+test("planForAction hands the action the log as JSON text, key order intact", async () => {
+  // Query return values cross into the action through Convex's value encoding,
+  // which sorts keys; the log must travel as text or the API sees it reordered.
+  const t = convexTest(schema, modules);
+  const sessionId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("sessions", { ...sessionFixture(), status: "thinking" as const, turnSeq: 7 });
+    const session = (await ctx.db.get(id))!;
+    await appendMessage(ctx, session, { role: "assistant", content: assistantTurn });
+    return id;
+  });
+  const plan = (await t.query(internal.turn.planForAction, { sessionId, turnSeq: 7 })) as { messagesJson: unknown } | null;
+  expect(typeof plan?.messagesJson).toBe("string");
+  const messages = JSON.parse(plan!.messagesJson as string) as Array<{ content: typeof assistantTurn }>;
+  expect(Object.keys(messages[0].content[0].input.preset)).toEqual(["name", "harmonicity", "modulationIndex", "ampEnv"]);
 });
 
 function sessionFixture() {

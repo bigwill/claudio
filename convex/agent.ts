@@ -70,10 +70,12 @@ export const runTurn = internalAction({
   args: { sessionId: v.id("sessions"), turnSeq: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const plan = await ctx.runQuery(internal.turn.planForAction, args);
+    const planned = await ctx.runQuery(internal.turn.planForAction, args);
     // Superseded: the session moved on while this action was starting. Not an
     // error — stop, and leave whoever owns the session now alone.
-    if (!plan) return null;
+    if (!planned) return null;
+    // Parsed here, not in the query: see planForAction's messagesJson.
+    const plan = { ...planned, messages: JSON.parse(planned.messagesJson) as Anthropic.MessageParam[] };
 
     // Offline mode: skip the network entirely. Checked BEFORE the key lookup so
     // a machine with no ANTHROPIC_API_KEY still runs the full loop.

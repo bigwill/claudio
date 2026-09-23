@@ -43,7 +43,12 @@ export const planForAction = internalQuery({
   returns: v.union(
     v.null(),
     v.object({
-      messages: v.any(),
+      /**
+       * The log as JSON text. A query's return value reaches the action through
+       * Convex's value encoding, which sorts object keys; as an object, the
+       * model's own earlier tool calls would be sent back to it reordered.
+       */
+      messagesJson: v.string(),
       force: v.boolean(),
       isFirstProposal: v.boolean(),
     }),
@@ -52,7 +57,7 @@ export const planForAction = internalQuery({
     const s = await ctx.db.get(args.sessionId);
     if (!s || s.turnSeq !== args.turnSeq || s.status !== "thinking") return null;
     return {
-      messages: await loadMessages(ctx, args.sessionId),
+      messagesJson: JSON.stringify(await loadMessages(ctx, args.sessionId)),
       force: s.turnForce,
       isFirstProposal: s.turnIsFirstProposal,
     };
