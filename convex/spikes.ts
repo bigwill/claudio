@@ -295,3 +295,22 @@ export const replayTurn = internalAction({
     return JSON.stringify(results);
   },
 });
+
+/** The finalized preset of a design session, as JSON text (see model/messages on key order). */
+export const finalPreset = internalQuery({
+  args: { slug: v.string() },
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx, { slug }) => {
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!session) return null;
+    const attempts = await ctx.db
+      .query("attempts")
+      .withIndex("by_session_iteration", (q) => q.eq("sessionId", session._id))
+      .take(50);
+    const final = attempts.find((a) => a.isFinal);
+    return final ? JSON.stringify({ preset: final.preset, rationale: final.rationale }) : null;
+  },
+});

@@ -635,3 +635,9 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **Design wall time:** p50 ≈ 34s from the clean runs (n=2). The headline cutoff is set at slice 6 from the smoke runs; ~60s is a reasonable starting point.
   - **Still open for 1b:** Will's listen of Sonnet's parts (`s1`–`s6` on `?spike=1`).
 - 2026-09-22: **Spend rule (Will):** API spend under $50 no longer needs a go-ahead. Run it, then report the actual cost. Testing story layer 4 is updated.
+- 2026-09-22: **Slice 1b done.** Will's listen of Sonnet's parts (`s1`–`s6`) passed. Both 1b bars are met: Sonnet p50 3.2s with parts that sound like parts; Opus 5.5 finishes and refines a design, with wall time recorded (~34s).
+- 2026-09-22: **Slice 2 (code): the starter library and starter parts.**
+  - **Sounds:** `scripts/build-starters.mjs` ran today's loop (Opus 5.5) over 5 WAVs, into the generated `src/shared/starterSounds.ts`. That's the plan's bass, EP and pad, plus one extra bass (Juno sub) and one extra keys sound (JD-800 organ), so "pick bass from the library" has a choice. All 5 were clean, ~35s each, ~$2.50 total: Monopoly Thump, Juno Sub Round, Velvet Tine EP, Drawbar Glass, Fat Square Pad.
+  - **`starters.ts`:** `STARTER_SOUNDS` with provenance (the source WAV, the rationale, the designing model), `DEFAULT_SOUNDS` (bass-reso, keys-ep, you: pad-square) and `STARTER_PARTS`. The parts are the spike's "a" variants, which Will heard and passed at slice 1.
+  - **Tests (written first):** unique keys, presets already in range, provenance present, the parts already clamped, none laying out.
+  - **Spike page:** now plays the starters; `G` cycles the focused bass or keys strip through its starter sounds. Waiting on Will's listen.

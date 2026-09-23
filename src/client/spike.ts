@@ -6,7 +6,7 @@
  * e2e/spike.spec.ts through `window.__band` and `window.__spike`.
  *
  * Keys: Space start/stop · 1–4 focus (you, drums, bass, keys) · V swap the
- * focused part's variant · G glass keys sound · M mute focused ·
+ * focused part's variant · G next starter sound (bass/keys) · M mute focused ·
  * A–; and Q–P play your part (D minor) · Z/X octave.
  * URL: ?spike=1&bpm=96&bars=4
  */
@@ -14,48 +14,17 @@
 import * as Tone from "tone";
 
 import { degreeToMidi, type DrumHit, type Pattern, type PitchedNote } from "../shared/pattern";
-import { DEFAULT_PRESET, type ClaudioPreset } from "../shared/preset";
+import type { ClaudioPreset } from "../shared/preset";
+import { DEFAULT_SOUNDS, STARTER_PARTS, STARTER_SOUNDS } from "../shared/starters";
 import { renderPreset, specForPrompt } from "./audio";
 import { BandEngine, loadKick, type ChannelId } from "./audio/engine";
 import type { Harmony, PartRef, TrackId } from "./audio/sequencer";
 
-// --- sounds ------------------------------------------------------------------
+// --- sounds: the slice 2 starter library ------------------------------------
 
-const preset = (name: string, p: Partial<ClaudioPreset>): ClaudioPreset => ({ ...DEFAULT_PRESET, name, ...p });
-
-const SOUNDS: Record<string, ClaudioPreset> = {
-  "rubber-bass": preset("Rubber Bass", {
-    harmonicity: 1,
-    modulationIndex: 5,
-    ampEnv: { attack: 0.004, decay: 0.3, sustain: 0.5, release: 0.1 },
-    modEnv: { attack: 0.004, decay: 0.14, sustain: 0.15, release: 0.1 },
-    gain: 0.9,
-  }),
-  "spike-ep": preset("Spike EP", {
-    harmonicity: 1,
-    modulationIndex: 3,
-    carrierFm: { ratio: 14, index: 0.4 },
-    ampEnv: { attack: 0.004, decay: 1.2, sustain: 0.2, release: 0.5 },
-    modEnv: { attack: 0.004, decay: 0.5, sustain: 0.1, release: 0.4 },
-    gain: 0.7,
-  }),
-  "glass-ep": preset("Glass EP", {
-    harmonicity: 3.5,
-    modulationIndex: 7,
-    carrierFm: { ratio: 7, index: 1 },
-    ampEnv: { attack: 0.004, decay: 1.5, sustain: 0.15, release: 0.8 },
-    modEnv: { attack: 0.004, decay: 0.3, sustain: 0.05, release: 0.5 },
-    gain: 0.6,
-  }),
-  "soft-pad": preset("Soft Pad", {
-    harmonicity: 2,
-    modulationIndex: 2,
-    carrierWave: "triangle",
-    ampEnv: { attack: 0.03, decay: 0.6, sustain: 0.7, release: 0.6 },
-    modEnv: { attack: 0.2, decay: 1, sustain: 0.5, release: 0.6 },
-    gain: 0.6,
-  }),
-};
+const SOUNDS: Record<string, ClaudioPreset> = Object.fromEntries(STARTER_SOUNDS.map((x) => [x.starterKey, x.preset]));
+const soundName = (key: string) => STARTER_SOUNDS.find((x) => x.starterKey === key)?.name ?? key;
+const soundsFor = (role: "bass" | "keys") => STARTER_SOUNDS.filter((x) => x.role === role).map((x) => x.starterKey);
 
 // --- parts -------------------------------------------------------------------
 
@@ -73,15 +42,15 @@ const chord = (steps: number[], len: number) => steps.flatMap((s) => [0, 2, 4].m
 
 const VARIANTS: Record<TrackId, Record<string, Pattern>> = {
   drums: {
-    a: kit({ kick: [0, 8, 10], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12], openhat: [14] }, [0]),
+    a: STARTER_PARTS.drums,
     busy: kit({ kick: [0, 3, 6, 8, 11], snare: [4, 12], hat: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15], openhat: [14] }, [0, 4, 8, 12]),
   },
   bass: {
-    a: notes([[0, 0, 3, true], [6, 0, 2], [8, 0, 3], [14, 4, 2]]),
+    a: STARTER_PARTS.bass,
     busy: notes([[0, 0, 1, true], [2, 0, 1], [4, 7, 1], [6, 0, 1], [8, 0, 1, true], [10, 4, 1], [12, 0, 1], [14, 2, 1]]),
   },
   keys: {
-    a: notes(chord([0], 3).concat(chord([6], 2), chord([12], 2))),
+    a: STARTER_PARTS.keys,
     busy: notes(chord([2, 6, 10, 14], 1)),
   },
 };
@@ -136,7 +105,7 @@ document.head.insertAdjacentHTML(
 );
 document.body.innerHTML = `<div class="spike">
   <h2>Engine spike · D minor · <span id="bpm"></span> bpm · <span id="bars"></span> bars</h2>
-  <p class="status" id="hint"><kbd>Space</kbd> start/stop · <kbd>1</kbd>–<kbd>4</kbd> focus · <kbd>V</kbd> variant · <kbd>G</kbd> glass keys · <kbd>M</kbd> mute · <kbd>A</kbd>–<kbd>;</kbd> <kbd>Q</kbd>–<kbd>P</kbd> play · <kbd>Z</kbd>/<kbd>X</kbd> octave</p>
+  <p class="status" id="hint"><kbd>Space</kbd> start/stop · <kbd>1</kbd>–<kbd>4</kbd> focus · <kbd>V</kbd> variant · <kbd>G</kbd> next sound · <kbd>M</kbd> mute · <kbd>A</kbd>–<kbd>;</kbd> <kbd>Q</kbd>–<kbd>P</kbd> play · <kbd>Z</kbd>/<kbd>X</kbd> octave</p>
   <div id="lanes"></div>
   <p class="status">g <span id="g">–</span> · missed steps <span id="missed">0</span> · you: octave <span id="oct">4</span></p>
   <div id="flood"></div>
@@ -158,15 +127,16 @@ for (const id of LANES) {
 
 const state = {
   variant: { drums: "a", bass: "a", keys: "a" } as Record<TrackId, string>,
-  keysSound: "spike-ep",
+  sound: { bass: DEFAULT_SOUNDS.bass as string, keys: DEFAULT_SOUNDS.keys as string },
   focus: "drums" as ChannelId,
   muted: new Set<ChannelId>(),
   octave: 4,
 };
 
 function partFor(track: TrackId, variant: string): PartRef {
-  const sound = track === "drums" ? null : track === "bass" ? "rubber-bass" : state.keysSound;
-  return { id: sound && track === "keys" ? `${track}:${variant}:${sound}` : `${track}:${variant}`, sound, role: track, pattern: VARIANTS[track][variant] };
+  const sound = track === "drums" ? null : state.sound[track];
+  const isDefault = track === "drums" || sound === DEFAULT_SOUNDS[track];
+  return { id: isDefault ? `${track}:${variant}` : `${track}:${variant}:${sound}`, sound, role: track, pattern: VARIANTS[track][variant] };
 }
 
 function drawGrid(id: ChannelId): void {
@@ -188,11 +158,11 @@ function drawStatus(): void {
     el.classList.toggle("muted", state.muted.has(id));
     const st = document.getElementById(`st-${id}`)!;
     if (id === "you") {
-      st.textContent = `LIVE · ${SOUNDS["soft-pad"].name}${state.muted.has(id) ? " · muted" : ""}`;
+      st.textContent = `LIVE · ${soundName(DEFAULT_SOUNDS.you)}${state.muted.has(id) ? " · muted" : ""}`;
       continue;
     }
     const n = engine.landsIn(id);
-    const sound = id === "drums" ? "Kit" : id === "bass" ? SOUNDS["rubber-bass"].name : SOUNDS[state.keysSound].name;
+    const sound = id === "drums" ? "Kit" : soundName(state.sound[id]);
     const why = sonnetNotes[`${id}:${state.variant[id]}`];
     st.textContent = `${sound} · ${state.variant[id]}${why ? ` · ${why}` : ""}${n !== null && engine.running ? ` · lands in ${Math.ceil(n / 4)} beats` : ""}${state.muted.has(id) ? " · muted" : ""}`;
   }
@@ -215,7 +185,7 @@ function onStep(g: number): void {
 // --- engine --------------------------------------------------------------------
 
 const kick = await loadKick();
-const engine = new BandEngine({ harmony, kick, yourSound: SOUNDS["soft-pad"], spy: true, onStep });
+const engine = new BandEngine({ harmony, kick, yourSound: SOUNDS[DEFAULT_SOUNDS.you], spy: true, onStep });
 
 function stageTrack(track: TrackId, variant: string): void {
   if (!VARIANTS[track][variant]) throw new Error(`no variant ${variant} for ${track}`);
@@ -277,9 +247,12 @@ window.addEventListener(
       const t = state.focus;
       const order = variantsOf(t);
       stageTrack(t, order[(order.indexOf(state.variant[t]) + 1) % order.length]);
-    } else if (e.code === "KeyG") {
-      state.keysSound = state.keysSound === "spike-ep" ? "glass-ep" : "spike-ep";
-      stageTrack("keys", state.variant.keys);
+    } else if (e.code === "KeyG" && (state.focus === "bass" || state.focus === "keys")) {
+      // Cycle the focused strip through its starter sounds; lands at the bar line.
+      const t = state.focus;
+      const all = soundsFor(t);
+      state.sound[t] = all[(all.indexOf(state.sound[t]) + 1) % all.length];
+      stageTrack(t, state.variant[t]);
     } else return;
     e.preventDefault();
     document.getElementById("oct")!.textContent = String(state.octave);
@@ -321,7 +294,7 @@ async function onsetTest() {
       const eng = new BandEngine({
         harmony: { bpm, keyPc: 2, scale: "minor", progression: [0], bars: 1 },
         kick,
-        yourSound: SOUNDS["soft-pad"],
+        yourSound: SOUNDS[DEFAULT_SOUNDS.you],
         context: ctx,
       });
       eng.stage(
@@ -373,7 +346,7 @@ Object.assign(window, {
     },
     async designRender() {
       const t0 = performance.now();
-      await renderPreset(SOUNDS["glass-ep"], specForPrompt());
+      await renderPreset(SOUNDS[DEFAULT_SOUNDS.keys], specForPrompt());
       return performance.now() - t0;
     },
     now: () => engine.context.currentTime,

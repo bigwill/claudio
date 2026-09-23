@@ -11,9 +11,8 @@
  *   Records wall time and no-tool turns to docs/spikes/1b-design.json.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { chromium } from "playwright";
-
-import { APP_URL, convex, ensureVite, withRealModel } from "./devstack.mjs";
+import { runDesign } from "./design-run.mjs";
+import { convex, withRealModel } from "./devstack.mjs";
 
 if (!process.argv.includes("--yes")) {
   console.error("[spike-1b] spends real API money. Re-run with --yes once approved.");
@@ -67,39 +66,11 @@ async function band() {
 }
 
 async function design() {
-  await ensureVite();
-  const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });
-  const page = await browser.newPage();
-  const log = [];
-  page.on("pageerror", (e) => log.push(`pageerror ${e.message}`));
-  await page.goto(APP_URL, { waitUntil: "networkidle" });
-  await page.waitForTimeout(1500);
-  const t0 = Date.now();
-  await page.setInputFiles("#file", "samples/electric_piano_jd800_soft_ep.wav");
-  const deadline = t0 + 10 * 60_000;
-  let status = "";
-  let outcome = "timeout";
-  while (Date.now() < deadline) {
-    const body = ((await page.textContent("body")) ?? "").replace(/\s+/g, " ");
-    const s = body.match(/(Done —[^·]*|Thinking[^·]*|Rendering[^·]*|Ready\.|Waiting for a sample\.|The agent hit[^.]*\.|Claude call failed[^.]*)/)?.[0] ?? "";
-    if (s !== status) {
-      status = s;
-      console.log(`[design] +${((Date.now() - t0) / 1000).toFixed(1)}s ${s}`);
-    }
-    if (/Done —/.test(s)) { outcome = "done"; break; }
-    if (/hit its output|call failed/.test(s)) { outcome = "failed"; break; }
-    // A no-tool turn in the refine loop stalls at "Ready." with no finalize (no guard until slice 4).
-    if (/^Ready\./.test(s) && Date.now() - t0 > 15_000) { outcome = "stalled"; break; }
-    await page.waitForTimeout(1000);
-  }
-  const wallMs = Date.now() - t0;
-  const slug = new URL(page.url()).pathname.split("/").filter(Boolean)[0];
-  await page.screenshot({ path: `docs/spikes/1b-design-${designModel}.png`, fullPage: true });
-  await browser.close();
-  const report = slug ? JSON.parse(convex("run", "spikes:designReport", JSON.stringify({ slug }))) : null;
-  const out = { model: designModel, at: new Date().toISOString(), wav: "electric_piano_jd800_soft_ep.wav", outcome, wallMs, slug, report, log };
+  const wav = "samples/electric_piano_jd800_soft_ep.wav";
+  const r = await runDesign({ wav, screenshot: `docs/spikes/1b-design-${designModel}.png` });
+  const out = { model: designModel, at: new Date().toISOString(), wav: "electric_piano_jd800_soft_ep.wav", ...r };
   writeFileSync(`docs/spikes/1b-design-${designModel}.json`, JSON.stringify(out, null, 2) + "\n");
-  console.log(`[design] ${outcome} in ${(wallMs / 1000).toFixed(1)}s; turns ${report?.turns?.join(",")}; no-tool turns ${report?.noToolTurns}`);
+  console.log(`[design] ${r.outcome} in ${(r.wallMs / 1000).toFixed(1)}s; turns ${r.report?.turns?.join(",")}; no-tool turns ${r.report?.noToolTurns}`);
   return out;
 }
 
