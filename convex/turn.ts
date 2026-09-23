@@ -10,7 +10,10 @@
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery } from "./_generated/server";
-import { designNote, openRenderWindow, reopenOrAbandonRender } from "./model/design";
+import { beginDesignTurn, endDesign, openRenderWindow, reopenOrAbandonRender } from "./model/design";
+
+/** The no-tool guard's nudge (plan §4). */
+export const NO_TOOL_NUDGE = "Call propose_preset or finalize now.";
 import { appendMessage, decodeContent, finalizeToolResult, loadMessages, unknownToolResult } from "./model/messages";
 import { readAssistantTurn, readToolInput } from "./model/tools";
 
@@ -67,16 +70,15 @@ export const commit = internalMutation({
     const content = decodeContent(args.content);
     const { call } = readAssistantTurn(content);
 
-    // Truncation guard, BEFORE anything is persisted: thinking can consume the
-    // budget and leave no complete tool call.
+    // Guards, BEFORE anything is persisted (plan §4): a refusal or a turn cut
+    // off by max_tokens saves nothing and ends the design. A reasoning_extraction
+    // refusal in particular must not be retried.
+    if (args.stopReason === "refusal") {
+      await endDesign(ctx, design, { kind: "failed", why: "the designer declined this one" });
+      return null;
+    }
     if (args.stopReason === "max_tokens" && !call) {
-      await ctx.db.patch(design._id, {
-        status: "failed",
-        turnSeq: design.turnSeq + 1,
-        turnDeadline: 0,
-        lastError: "The designer hit its output limit before finishing a preset.",
-      });
-      await designNote(ctx, design, "The sound design stopped: the designer hit its output limit.");
+      await endDesign(ctx, design, { kind: "failed", why: "the designer hit its output limit" });
       return null;
     }
 
@@ -114,7 +116,7 @@ export const commit = internalMutation({
     if (call && call.name === "finalize") {
       const { preset, rationale } = readToolInput(call.input);
       await appendMessage(ctx, design._id, { role: "user", content: [finalizeToolResult(call.id)] });
-      await ctx.db.insert("attempts", {
+      const attemptId = await ctx.db.insert("attempts", {
         designId: design._id,
         presetId: call.id,
         iteration: design.iteration,
@@ -124,16 +126,7 @@ export const commit = internalMutation({
         distance: null,
         isFinal: true,
       });
-      await ctx.db.patch(design._id, {
-        status: "done",
-        pendingToolUseId: null,
-        pendingPresetId: null,
-        renderOwnerClientId: null,
-        renderLeaseUntil: 0,
-        turnSeq: design.turnSeq + 1,
-        turnDeadline: 0,
-      });
-      // Slice 4's endDesign: library row, design part, free the musician, drain.
+      await endDesign(ctx, design, { kind: "done", attempt: (await ctx.db.get(attemptId))! });
       return null;
     }
 
@@ -142,15 +135,16 @@ export const commit = internalMutation({
       await appendMessage(ctx, design._id, { role: "user", content: [unknownToolResult(call.id, call.name)] });
     }
 
-    // ---- no usable tool call. Slice 4 turns this into the two-strike guard. --
-    await ctx.db.patch(design._id, {
-      status: "failed",
-      turnSeq: design.turnSeq + 1,
-      turnDeadline: 0,
-      noToolStrikes: design.noToolStrikes + 1,
-      lastError: "The designer replied without proposing a preset.",
-    });
-    await designNote(ctx, design, "The sound design stopped: the designer replied without proposing a preset.");
+    // ---- no-tool guard (plan §4): the turn is saved as returned above; nudge
+    // and go again, and on the second strike end the design.
+    const strikes = design.noToolStrikes + 1;
+    await ctx.db.patch(design._id, { noToolStrikes: strikes });
+    if (strikes >= 2) {
+      await endDesign(ctx, design, { kind: "failed", why: "the designer twice replied without proposing a preset" });
+      return null;
+    }
+    await appendMessage(ctx, design._id, { role: "user", content: [{ type: "text", text: NO_TOOL_NUDGE }] });
+    await beginDesignTurn(ctx, design, now);
     return null;
   },
 });
@@ -165,13 +159,7 @@ export const fail = internalMutation({
   handler: async (ctx, args) => {
     const design = await ctx.db.get(args.designId);
     if (!design || design.turnSeq !== args.turnSeq) return null; // FENCE
-    await ctx.db.patch(design._id, {
-      status: "failed",
-      turnSeq: design.turnSeq + 1,
-      turnDeadline: 0,
-      lastError: args.message,
-    });
-    await designNote(ctx, design, `The sound design stopped: ${args.message}`);
+    await endDesign(ctx, design, { kind: "failed", why: args.message });
     return null;
   },
 });
@@ -190,15 +178,8 @@ export const watchdog = internalMutation({
       .query("designs")
       .withIndex("by_status_deadline", (q) => q.eq("status", "thinking").lt("turnDeadline", now))
       .take(25);
-    for (const d of stuckTurns) {
-      await ctx.db.patch(d._id, {
-        status: "failed",
-        turnSeq: d.turnSeq + 1, // fence the presumed-dead action out
-        turnDeadline: 0,
-        lastError: "The design turn stopped responding and was reclaimed.",
-      });
-      await designNote(ctx, d, "The sound design stopped responding and was reclaimed.");
-    }
+    // endDesign bumps turnSeq, which fences the presumed-dead action out.
+    for (const d of stuckTurns) await endDesign(ctx, d, { kind: "failed", why: "the designer stopped responding" });
 
     const stuckRenders = await ctx.db
       .query("designs")

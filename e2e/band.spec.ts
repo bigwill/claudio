@@ -23,8 +23,10 @@ interface BandApi {
   view(): {
     phase: string;
     activeScene: string | null;
-    strips: Array<{ role: string; sound: string | null; basedOn: number; muted: boolean }>;
+    strips: Array<{ role: string; sound: string | null; basedOn: number; muted: boolean; designing: boolean }>;
   } | null;
+  /** designId → the most measured iterations the page saw, and how it ended. */
+  designLog(): Record<string, { role: string; measured: number; ended: boolean }>;
 }
 /** The page's test interface; a local cast, since spike.spec declares its own. */
 type W = { __band: BandApi };
@@ -204,4 +206,47 @@ test("V on a band strip answers (a hint until band turns exist), and is never si
   await page.keyboard.press("Digit3");
   await page.keyboard.press("KeyV");
   await expect(page.getByTestId("toast")).toContainText(/variation/i);
+});
+
+test("S2: drop a WAV on keys in soundcheck: it iterates with distances, finalizes, the keys sound swaps; Start is refused meanwhile", async ({ page }) => {
+  test.setTimeout(60_000);
+  const { errors } = await openJam(page);
+  const before = (await strip(page, "keys")).sound;
+  await page.getByTestId("design-file-keys").setInputFiles("samples/electric_piano_jd800_soft_ep.wav");
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing);
+  await expect(page.getByTestId("design-rail-keys")).toBeVisible();
+
+  await page.keyboard.press("Space"); // refused while designing
+  await expect(page.getByTestId("toast")).toContainText(/design/i);
+  expect((await view(page)).phase).toBe("soundcheck");
+
+  await page.waitForFunction(
+    () => {
+      const k = (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!;
+      return !k.designing;
+    },
+    undefined,
+    { timeout: 45_000 },
+  );
+  const log = Object.values(await page.evaluate(() => (window as unknown as W).__band.designLog()));
+  expect(log).toHaveLength(1);
+  expect(log[0].measured).toBeGreaterThanOrEqual(2);
+  const after = (await strip(page, "keys")).sound;
+  expect(after).not.toBe(before);
+  await expect(page.getByTestId("chat")).toContainText(`keys now plays ${after}`);
+  expect(errors).toEqual([]);
+});
+
+test("S2b: typing a description types (no notes), Enter starts the design, and it finalizes", async ({ page }) => {
+  await openJam(page);
+  await page.getByTestId("design-describe-bass").click();
+  await expect(page.getByTestId("mode")).toHaveText("CHAT");
+  await page.keyboard.type("a round sub with a slow attack");
+  const notes = (await page.evaluate(() => (window as unknown as W).__band.calls)).filter((c) => c.method === "attack");
+  expect(notes).toEqual([]);
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.designing);
+  await expect(page.getByTestId("mode")).toHaveText("PLAY");
+  await page.waitForFunction(() => !(window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.designing, undefined, { timeout: 30_000 });
+  await expect(page.getByTestId("chat")).toContainText("bass now plays");
 });

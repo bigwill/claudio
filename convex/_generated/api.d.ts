@@ -11,6 +11,7 @@
 import type * as agent from "../agent.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
+import type * as designs from "../designs.js";
 import type * as fakeClaude from "../fakeClaude.js";
 import type * as jams from "../jams.js";
 import type * as library from "../library.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   chat: typeof chat;
   crons: typeof crons;
+  designs: typeof designs;
   fakeClaude: typeof fakeClaude;
   jams: typeof jams;
   library: typeof library;

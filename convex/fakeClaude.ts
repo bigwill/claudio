@@ -68,6 +68,22 @@ const NOTES = [
 
 const SUGGESTIONS = ["glassier", "more punch", "hollow it out", "make it a bass", "let it breathe"];
 
+/** iterations_remaining from the newest render tool_result, or null. */
+function lastIterationsRemaining(messages: unknown[]): number | null {
+  const last = messages[messages.length - 1] as { role?: string; content?: unknown } | undefined;
+  if (!last || last.role !== "user" || !Array.isArray(last.content)) return null;
+  for (const b of last.content as Array<{ type?: string; content?: unknown }>) {
+    if (b.type !== "tool_result" || typeof b.content !== "string") continue;
+    try {
+      const r = JSON.parse(b.content) as { iterations_remaining?: number };
+      if (typeof r.iterations_remaining === "number") return r.iterations_remaining;
+    } catch {
+      // not JSON: not a render result
+    }
+  }
+  return null;
+}
+
 /**
  * Build a fake Anthropic message.
  *
@@ -87,6 +103,22 @@ export function fakeClaudeMessage(plan: FakePlan): { content: unknown; stop_reas
     type: "text",
     text: `[fake-llm] turn ${turn} — offline stub, no model was called.`,
   };
+
+  // The iteration budget is spent: finalize, as the real prompt demands.
+  if (lastIterationsRemaining(plan.messages) === 0) {
+    return {
+      content: [
+        text,
+        {
+          type: "tool_use",
+          id: fakeToolUseId(turn),
+          name: "finalize",
+          input: { preset: presetForTurn(turn), rationale: "Settling: this one sounded the most coherent.", suggestions: SUGGESTIONS.slice(0, SUGGESTION_COUNT) },
+        },
+      ],
+      stop_reason: "tool_use",
+    };
+  }
 
   if (!plan.force && turn % 4 === 3) {
     // Chat turn answering in prose — no tool call. Exercises the branch where

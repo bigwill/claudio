@@ -32,7 +32,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, type ActionCtx } from "./_generated/server";
-import { MAX_TOKENS, MODEL, MUST_CALL_TOOL_RULE, SYSTEM_BLOCKS, TOOLS } from "./prompt";
+import { MAX_TOKENS, MUST_CALL_TOOL_RULE, SYSTEM_BLOCKS, TOOLS } from "./prompt";
 import { TURN_LEASE_MS } from "../src/shared/protocol";
 
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -57,8 +57,10 @@ const REQUEST_TIMEOUT_MS = Math.floor(TURN_LEASE_MS * 0.6);
  * claude-opus-5 keeps the old "any" branch.
  */
 function designModel(): string {
-  return process.env.DESIGN_MODEL || MODEL;
+  return process.env.DESIGN_MODEL || DEFAULT_DESIGN_MODEL;
 }
+/** Plan §4: design jobs run on Opus 5.5; DESIGN_MODEL=claude-opus-5 is the fallback. */
+const DEFAULT_DESIGN_MODEL = "claude-opus-5-5";
 const FORCED_TOOL_CHOICE_UNSUPPORTED = new Set(["claude-opus-5-5"]);
 
 interface AnthropicResponse {
@@ -80,7 +82,13 @@ export const runTurn = internalAction({
     // Offline mode: skip the network entirely. Checked BEFORE the key lookup so
     // a machine with no ANTHROPIC_API_KEY still runs the full loop.
     if (fakeLlmEnabled()) {
-      const fake = fakeClaudeMessage(plan as PlanForAction);
+      // A scripted response (fakeScripts, keyed by how many assistant turns
+      // came before) wins; otherwise the deterministic stub.
+      const turnIndex = plan.messages.filter((m) => m.role === "assistant").length;
+      const scripted = await ctx.runQuery(internal.testing.scriptFor, { match: "design", turnIndex });
+      const fake = scripted
+        ? (JSON.parse(scripted) as { content: unknown; stop_reason: string | null })
+        : fakeClaudeMessage(plan as PlanForAction);
       await commitOrFail(ctx, args, () =>
         ctx.runMutation(internal.turn.commit, {
           designId: args.designId,

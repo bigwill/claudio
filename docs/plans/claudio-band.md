@@ -675,3 +675,16 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - New E2E tests: dock keys sit in the dock side by side, and pips are readable; `Esc` leaves chat after `/` or a click and the keyboard plays again; `Esc` closes the overlay and the picker, and `?` toggles.
   - `V` stays unbound in the band (it was the spike page's variant key).
 - 2026-09-22: **Key map: `V` added (Will's choice).** It asks the focused musician for a variation; with no band strip focused it hints "press 2–4". Until band turns exist it shows a hint; slice 5 makes it a real chat note. On the spike page, `V` cycled hand-written test variants; the band has none. Also fixed: clicking out of the chat box now leaves chat mode (E2E test).
+- 2026-09-22: **Slice 4 done: design jobs.**
+  - **Rails.** convex-test S2, S2b, S8 (refusal, `max_tokens`, two no-tool strikes, the held note waiting in the inbox) and the design watchdog. A mutation that stopped `endDesign` freeing the musician failed 7 of 10. E2E S2 (a WAV dropped on keys, Start refused meanwhile, ≥2 measured iterations, the sound swaps) and S2b (typing a description types rather than playing notes; Enter starts it).
+  - **Real run (Opus 5.5 through the band UI, ~$0.50):** 29.9s; 47.3 → 39.5 → 39.7; finalized "Soft Tine EP"; no placeholder fields.
+  - **What changed:**
+    - `designs.start` (WAV or prompt), `cancel`, `generateUploadUrl` and `renderJob`.
+    - `endDesign` is the one terminal path. On finalize it adds a `designed` library row (the producer's designs file under keys) and a `design` part with the same notes. It always frees the musician and posts "X now plays Y" or the reason it stopped.
+    - A refusal or `max_tokens` saves nothing and fails. The no-tool guard saves the turn, nudges "Call propose_preset or finalize now." and fails on the second strike. The default design model is `claude-opus-5-5`.
+    - The fake LLM finalizes when the iterations run out and reads `fakeScripts` (`match: "design"`, indexed by assistant turns).
+    - The browser claims, renders, measures and submits proposals.
+    - The design rail sits in the strip during soundcheck: drop or pick a WAV, or describe one; while it runs, distance bars, the newest distance, the latest rationale, Cancel. Description boxes type like chat; `Esc` or clicking away returns to play.
+  - **Held inbox:** notes to a designing musician wait. After `endDesign`, `drainInbox` finds them as a turn; slice 5 starts that turn.
+  - **Process lapse:** `e2e/tsconfig.json` lacked `DOM.Iterable`, so the typecheck was red for three commits (`30fa291`, `21b9887`, `6a46b96`). My grep for "ALL CHECKS" returned nothing and I read that as clean. Fixed here; from now on I read `check`'s output tail.
+  - **`build-starters.mjs` stays retired:** starters can be re-designed in the band UI. Revive the script on `designs.start` only if a batch rebuild is needed.

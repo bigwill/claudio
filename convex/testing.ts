@@ -8,7 +8,7 @@
  */
 import { v } from "convex/values";
 
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { fakeLlmEnabled } from "./fakeClaude";
 
 function requireFake(): void {
@@ -39,6 +39,21 @@ export const setScript = mutation({
       await ctx.db.insert("fakeScripts", args);
     }
     return null;
+  },
+});
+
+/** The fake LLM's lookup: the scripted response for (match, turnIndex), if any. */
+export const scriptFor = internalQuery({
+  args: { match: v.string(), turnIndex: v.number() },
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx, args) => {
+    requireFake();
+    const row = await ctx.db
+      .query("fakeScripts")
+      .withIndex("by_match_turn", (q) => q.eq("match", args.match).eq("turnIndex", args.turnIndex))
+      .unique();
+    // JSON text: a scripted tool_use must keep its key order, like a real one.
+    return row ? JSON.stringify(row.response) : null;
   },
 });
 

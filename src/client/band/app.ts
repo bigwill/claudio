@@ -13,7 +13,8 @@ import * as Tone from "tone";
 
 import { BandEngine, loadKick, type ChannelId } from "../audio/engine";
 import type { Harmony, PartRef, TrackId } from "../audio/sequencer";
-import { band, convexUrl, errorText, type ChatRow, type JamState, type LibraryRow, type Pip, type Strip } from "../convex";
+import { analyzeTarget, encodePreparedAudio, evaluateWithSpec, specForPrompt, specForTarget } from "../audio";
+import { band, convexUrl, design, errorText, type ChatRow, type JamState, type LibraryRow, type Pip, type Strip } from "../convex";
 import { DRUM_VOICES, ROLE_OCTAVE, STEPS_PER_BAR, degreeToMidi } from "../../shared/pattern";
 import type { DrumHit, Pattern, PitchedNote, Scale } from "../../shared/pattern";
 import { newSessionId } from "../../shared/protocol";
@@ -167,6 +168,21 @@ function chordName(keyPc: number, scale: Scale, deg: number): string {
 }
 
 function renderStrips(): void {
+  // A description being typed survives the re-render (value, focus, caret).
+  const typing = document.activeElement as HTMLInputElement | null;
+  const keep = typing?.dataset?.describe ? { role: typing.dataset.describe, value: typing.value, at: typing.selectionStart ?? 0 } : null;
+  renderStripsInner();
+  if (keep) {
+    const input = document.querySelector<HTMLInputElement>(`[data-describe="${keep.role}"]`);
+    if (input) {
+      input.value = keep.value;
+      input.focus();
+      input.setSelectionRange(keep.at, keep.at);
+    }
+  }
+}
+
+function renderStripsInner(): void {
   const host = $("strips");
   const strips = stripsInOrder();
   for (const [i, m] of strips.entries()) {
@@ -187,10 +203,41 @@ function renderStrips(): void {
         </div>
         <span class="pill" data-pill="${m.role}"></span>
         <div class="rail" data-rail="${m.role}">${railHtml(m)}</div>
+        ${designRailHtml(m)}
       </div>
       <div class="gwrap">${m.role === "producer" ? liveHtml() : gridHtml(m)}</div>`;
   }
   updatePills();
+}
+
+/**
+ * The design rail (plan §7): in soundcheck, pitched strips and yours can be
+ * designed from a WAV (drop it on the strip, or pick a file) or a description.
+ * While a design runs: distance bars, the newest distance, the latest
+ * rationale, and Cancel.
+ */
+function designRailHtml(m: Strip): string {
+  if (m.role === "drums") return "";
+  const d = m.design;
+  if (d) {
+    const measured = d.attempts.filter((a) => a.distance !== null);
+    const max = Math.max(60, ...measured.map((a) => a.distance!));
+    const bars = measured.map((a) => `<i data-testid="design-dist" style="height:${Math.max(3, Math.round((a.distance! / max) * 22))}px"></i>`).join("");
+    const newest = measured.at(-1);
+    const why = d.attempts.at(-1)?.rationale ?? "";
+    const status = d.status === "awaiting_render" ? "rendering" : "thinking";
+    return `<div class="drail" data-testid="design-rail-${m.role}">
+      <div class="drow"><span class="dist">${bars}</span><span class="dnum">${newest ? `d=${newest.distance!.toFixed(1)}` : ""}</span>
+        <span class="hint">iter ${d.iteration}/3 · ${status}</span>
+        <button class="mini" data-cancel="${d._id}" data-testid="design-cancel-${m.role}">Cancel</button></div>
+      ${why ? `<div class="why">${esc(why.slice(0, 160))}</div>` : ""}
+    </div>`;
+  }
+  if (state?.jam.phase !== "soundcheck") return "";
+  return `<div class="drail">
+    <label class="drop">drop a WAV, or <u>pick one</u><input type="file" accept="audio/*" hidden data-design-file="${m.role}" data-testid="design-file-${ROLE_KEY[m.role] === "you" ? "you" : m.role}" /></label>
+    <input class="describe" data-typing data-describe="${m.role}" data-testid="design-describe-${ROLE_KEY[m.role] === "you" ? "you" : m.role}" placeholder="or describe it, then Enter" />
+  </div>`;
 }
 
 function railHtml(m: Strip): string {
@@ -643,8 +690,8 @@ function setMode(mode: Mode): void {
     }
   }
   if (mode !== "picker") ui.picker = null;
-  if (mode !== "chat") $<HTMLInputElement>("chatin").blur();
-  ui.mode = mode;
+  ui.mode = mode; // before blurring: the focusout handler reads it
+  if (mode !== "chat") (document.activeElement as HTMLElement | null)?.blur?.();
   ui.overlay = false;
   renderDock();
   renderModal();
@@ -682,6 +729,25 @@ $<HTMLInputElement>("chatin").addEventListener("keydown", (e) => {
   input.value = "";
   void run(band.send(state.jam._id, text, ui.octave)); // Enter sends and stays in chat
 });
+document.addEventListener("focusin", (e) => {
+  if ((e.target as HTMLElement).hasAttribute?.("data-typing") && ui.mode !== "chat") setMode("chat");
+});
+document.addEventListener("focusout", (e) => {
+  if ((e.target as HTMLElement).hasAttribute?.("data-typing") && ui.mode === "chat") setMode("play");
+});
+document.addEventListener("keydown", (e) => {
+  const input = e.target as HTMLInputElement;
+  const role = input.dataset?.describe as Strip["role"] | undefined;
+  if (!role || e.key !== "Enter" || !state) return;
+  e.preventDefault();
+  const text = input.value.trim();
+  const m = state.musicians.find((x) => x.role === role);
+  if (!text || !m) return;
+  input.value = "";
+  input.blur();
+  void run(design.startPrompt(m._id, text, specForPrompt()));
+});
+
 $<HTMLInputElement>("chatin").addEventListener("focus", () => {
   if (ui.mode !== "chat") setMode("chat");
 });
@@ -697,6 +763,11 @@ document.addEventListener("click", (e) => {
   if (pick && !pick.hasAttribute("disabled")) {
     ui.focus = ROLE_KEY[pick.dataset.pick as Strip["role"]];
     void act({ kind: "picker-open", strip: ui.focus });
+    return;
+  }
+  const cancel = t.closest<HTMLElement>("[data-cancel]");
+  if (cancel) {
+    void run(design.cancel(cancel.dataset.cancel as Parameters<typeof design.cancel>[0]));
     return;
   }
   const jump = t.closest<HTMLElement>("[data-jump]");
@@ -744,8 +815,15 @@ Object.assign(window, {
       state && {
         phase: state.jam.phase,
         activeScene: state.jam.activeScene,
-        strips: state.musicians.map((m) => ({ role: m.role, sound: m.part.sound?.name ?? null, basedOn: m.part.basedOn, muted: m.muted })),
+        strips: state.musicians.map((m) => ({
+          role: m.role,
+          sound: m.part.sound?.name ?? null,
+          basedOn: m.part.basedOn,
+          muted: m.muted,
+          designing: m.activeDesignId !== null,
+        })),
       },
+    designLog: () => Object.fromEntries(designLog),
   },
 });
 
@@ -774,6 +852,7 @@ async function boot(): Promise<void> {
     state = s;
     await ensureEngine(s);
     reconcile(s);
+    trackDesigns(s);
     for (const m of s.musicians) {
       if (railSubs.has(m._id)) continue;
       railSubs.set(
@@ -794,6 +873,80 @@ async function boot(): Promise<void> {
   });
 }
 let chatSub: (() => void) | null = null;
+
+// ---------------------------------------------------------------------------
+// Designs: starting them, and rendering their proposals in this browser
+// ---------------------------------------------------------------------------
+
+const designLog = new Map<string, { role: string; measured: number; ended: boolean }>();
+const rendered = new Set<string>();
+
+function trackDesigns(s: JamState): void {
+  for (const [id, entry] of designLog) {
+    if (!s.musicians.some((m) => m.design?._id === id)) entry.ended = true;
+  }
+  for (const m of s.musicians) {
+    const d = m.design;
+    if (!d) continue;
+    const entry = designLog.get(d._id) ?? { role: m.role, measured: 0, ended: false };
+    entry.measured = Math.max(entry.measured, d.attempts.filter((a) => a.distance !== null).length);
+    designLog.set(d._id, entry);
+    if (d.status === "awaiting_render" && d.pendingPresetId) void renderProposal(d._id, d.pendingPresetId, d.renderAttemptNo);
+  }
+}
+
+/**
+ * Render a pending proposal here if nobody else holds the lease: claim it
+ * (first caller wins), render offline against the design's pinned spec,
+ * measure, and submit. Deduped per preset and lease generation.
+ */
+async function renderProposal(designId: string, presetId: string, attemptNo: number): Promise<void> {
+  const key = `${presetId}#${attemptNo}`;
+  if (rendered.has(key)) return;
+  rendered.add(key);
+  const id = designId as Parameters<typeof design.renderJob>[0];
+  const job = await design.renderJob(id);
+  if (!job || job.presetId !== presetId) return;
+  if (job.ownerClientId && Date.now() < job.leaseUntil) return; // someone else is on it
+  const claim = await design.claim(id, presetId);
+  if (!claim.granted) return;
+  rendered.add(`${presetId}#${claim.attemptNo}`);
+  try {
+    const ev = await evaluateWithSpec(job.preset, job.spec, job.target);
+    await design.submit(id, presetId, ev.features, ev.diff);
+  } catch (e) {
+    await run(design.renderError(id, presetId, errorText(e)));
+  }
+}
+
+async function startWavDesign(role: Strip["role"], file: File): Promise<void> {
+  const m = state?.musicians.find((x) => x.role === role);
+  if (!m) return;
+  try {
+    const target = await analyzeTarget(file);
+    const audioId = await design.upload(encodePreparedAudio(target.prepared)).catch(() => null);
+    await design.startWav(m._id, target.features, target.info, audioId, specForTarget(target));
+  } catch (e) {
+    toast(`Couldn't start the design: ${errorText(e)}`);
+  }
+}
+
+document.addEventListener("change", (e) => {
+  const input = e.target as HTMLInputElement;
+  const role = input.dataset?.designFile as Strip["role"] | undefined;
+  if (role && input.files?.[0]) void startWavDesign(role, input.files[0]);
+});
+document.addEventListener("dragover", (e) => {
+  if ((e.target as HTMLElement).closest?.(".strip")) e.preventDefault();
+});
+document.addEventListener("drop", (e) => {
+  const strip = (e.target as HTMLElement).closest?.<HTMLElement>(".strip");
+  const file = e.dataTransfer?.files?.[0];
+  if (!strip || !file) return;
+  e.preventDefault();
+  const role = strip.id.replace("strip-", "") as Strip["role"];
+  if (role !== "drums" && state?.jam.phase === "soundcheck") void startWavDesign(role, file);
+});
 
 void boot();
 export {};
