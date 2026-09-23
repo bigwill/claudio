@@ -32,7 +32,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, type ActionCtx } from "./_generated/server";
-import { MAX_TOKENS, MODEL, SYSTEM_BLOCKS, TOOLS } from "./prompt";
+import { MAX_TOKENS, MODEL, MUST_CALL_TOOL_RULE, SYSTEM_BLOCKS, TOOLS } from "./prompt";
 import { TURN_LEASE_MS } from "../src/shared/protocol";
 
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -48,6 +48,18 @@ const API_VERSION = "2023-06-01";
  * watchdog reclaims the turn underneath it.
  */
 const REQUEST_TIMEOUT_MS = Math.floor(TURN_LEASE_MS * 0.6);
+
+/**
+ * The design model, switchable per deployment (plan slice 1b):
+ *   npx convex env set DESIGN_MODEL claude-opus-5-5
+ * Opus 5.5 rejects forced tool_choice ("any") with a 400, so on that model a
+ * forced turn runs with "auto" plus a system rule that it must call a tool.
+ * claude-opus-5 keeps the old "any" branch.
+ */
+function designModel(): string {
+  return process.env.DESIGN_MODEL || MODEL;
+}
+const FORCED_TOOL_CHOICE_UNSUPPORTED = new Set(["claude-opus-5-5"]);
 
 interface AnthropicResponse {
   content: unknown;
@@ -118,6 +130,10 @@ interface PlanForAction {
 async function callClaude(apiKey: string, plan: PlanForAction): Promise<AnthropicResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const model = designModel();
+  const canForce = !FORCED_TOOL_CHOICE_UNSUPPORTED.has(model);
+  const system =
+    plan.force && !canForce ? [...SYSTEM_BLOCKS, { type: "text" as const, text: MUST_CALL_TOOL_RULE }] : SYSTEM_BLOCKS;
 
   try {
     const res = await fetch(API_URL, {
@@ -129,15 +145,16 @@ async function callClaude(apiKey: string, plan: PlanForAction): Promise<Anthropi
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: MODEL,
+        model,
         max_tokens: MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: plan.isFirstProposal ? "medium" : "low" },
-        system: SYSTEM_BLOCKS,
+        system,
         tools: TOOLS,
-        tool_choice: plan.force
-          ? { type: "any", disable_parallel_tool_use: true }
-          : { type: "auto", disable_parallel_tool_use: true },
+        tool_choice:
+          plan.force && canForce
+            ? { type: "any", disable_parallel_tool_use: true }
+            : { type: "auto", disable_parallel_tool_use: true },
         messages: plan.messages,
       }),
     });

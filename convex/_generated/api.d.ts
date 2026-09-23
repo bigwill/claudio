@@ -21,6 +21,7 @@ import type * as presence from "../presence.js";
 import type * as prompt from "../prompt.js";
 import type * as render from "../render.js";
 import type * as sessions from "../sessions.js";
+import type * as spikes from "../spikes.js";
 import type * as testing from "../testing.js";
 import type * as turn from "../turn.js";
 import type * as validators from "../validators.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   prompt: typeof prompt;
   render: typeof render;
   sessions: typeof sessions;
+  spikes: typeof spikes;
   testing: typeof testing;
   turn: typeof turn;
   validators: typeof validators;

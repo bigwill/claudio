@@ -85,7 +85,25 @@ const VARIANTS: Record<TrackId, Record<string, Pattern>> = {
     busy: notes(chord([2, 6, 10, 14], 1)),
   },
 };
-const variantOrder = ["a", "busy"];
+/**
+ * Slice 1b: Sonnet 5's real set_pattern answers, if scripts/spike-1b.mjs has
+ * written them. Each becomes a variant ("s1", "s2", …) on its track, so V
+ * cycles through them and the landing can be heard in context.
+ */
+interface SpikeRun {
+  role: TrackId;
+  note: string;
+  pattern: Pattern | null;
+  say?: string;
+}
+const spikeFiles = import.meta.glob<{ runs: SpikeRun[] }>("../../docs/spikes/1b-band.json", { eager: true, import: "default" });
+const sonnetNotes: Record<string, string> = {};
+Object.values(spikeFiles)[0]?.runs.forEach((r, i) => {
+  if (!r.pattern) return;
+  VARIANTS[r.role][`s${i + 1}`] = r.pattern;
+  sonnetNotes[`${r.role}:s${i + 1}`] = `“${r.note}” → ${r.say ?? ""}`;
+});
+const variantsOf = (t: TrackId) => Object.keys(VARIANTS[t]);
 
 // --- page --------------------------------------------------------------------
 
@@ -175,7 +193,8 @@ function drawStatus(): void {
     }
     const n = engine.landsIn(id);
     const sound = id === "drums" ? "Kit" : id === "bass" ? SOUNDS["rubber-bass"].name : SOUNDS[state.keysSound].name;
-    st.textContent = `${sound} · ${state.variant[id]}${n !== null && engine.running ? ` · lands in ${Math.ceil(n / 4)} beats` : ""}${state.muted.has(id) ? " · muted" : ""}`;
+    const why = sonnetNotes[`${id}:${state.variant[id]}`];
+    st.textContent = `${sound} · ${state.variant[id]}${why ? ` · ${why}` : ""}${n !== null && engine.running ? ` · lands in ${Math.ceil(n / 4)} beats` : ""}${state.muted.has(id) ? " · muted" : ""}`;
   }
 }
 
@@ -256,7 +275,8 @@ window.addEventListener(
       engine.setMuted(state.focus, m);
     } else if (e.code === "KeyV" && state.focus !== "you") {
       const t = state.focus;
-      stageTrack(t, variantOrder[(variantOrder.indexOf(state.variant[t]) + 1) % variantOrder.length]);
+      const order = variantsOf(t);
+      stageTrack(t, order[(order.indexOf(state.variant[t]) + 1) % order.length]);
     } else if (e.code === "KeyG") {
       state.keysSound = state.keysSound === "spike-ep" ? "glass-ep" : "spike-ep";
       stageTrack("keys", state.variant.keys);

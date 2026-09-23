@@ -84,3 +84,32 @@ export async function ensureVite() {
   boot("vite", "npx", ["vite", "dev", "--port", new URL(APP_URL).port || "5173", "--strictPort"]);
   await waitFor("vite", () => answers(APP_URL), 60_000);
 }
+
+/**
+ * Run `fn` against real Claude: unset CLAUDIO_FAKE_LLM (plus any extra env,
+ * e.g. DESIGN_MODEL), confirm `testing:ping` says fake:false, and ALWAYS put
+ * the fake flag back and remove the extra env afterwards, verified by a second
+ * ping, so the dev loop can't fall through to real Claude by accident.
+ * Returns fn's result, or throws after restoring.
+ */
+export async function withRealModel(tag, fn, extraEnv = {}) {
+  await ensureConvex();
+  try {
+    convex("env", "remove", "CLAUDIO_FAKE_LLM");
+    for (const [k, v] of Object.entries(extraEnv)) convex("env", "set", k, v);
+    const p = ping();
+    if (p?.fake !== false) throw new Error(`expected fake:false after unsetting, got ${JSON.stringify(p)}`);
+    console.log(`[${tag}] real Claude is live on the local deployment`);
+    return await fn();
+  } finally {
+    convex("env", "set", "CLAUDIO_FAKE_LLM", "1");
+    for (const k of Object.keys(extraEnv)) convex("env", "remove", k);
+    const p = ping();
+    if (p?.fake !== true) {
+      console.error(`[${tag}] FAILED TO RESTORE the fake flag (ping: ${JSON.stringify(p)}). Run: npx convex env set CLAUDIO_FAKE_LLM 1`);
+      process.exitCode = 1;
+    } else {
+      console.log(`[${tag}] fake flag restored`);
+    }
+  }
+}

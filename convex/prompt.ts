@@ -44,6 +44,13 @@ export const MODEL = "claude-opus-5";
  */
 export const MAX_TOKENS = 16000;
 
+/**
+ * Appended as a final system block on forced turns for models that reject a
+ * forced tool_choice (Opus 5.5). The plan's no-tool guard (slice 4) backs it up.
+ */
+export const MUST_CALL_TOOL_RULE =
+  "Every turn in this design loop must call propose_preset or finalize. Do not reply with text alone.";
+
 // ---------------------------------------------------------------------------
 // Tools
 // ---------------------------------------------------------------------------

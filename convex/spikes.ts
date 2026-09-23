@@ -1,0 +1,159 @@
+/**
+ * Slice 1b spikes: real-model measurements taken before the band is built.
+ *
+ * `bandTurn` sends one band turn to Sonnet 5 with the plan's request shape
+ * (strict tools, tool_choice any, low effort) and returns latency plus the
+ * clamped pattern, so the part can be played in the spike page. It refuses
+ * while CLAUDIO_FAKE_LLM=1: real calls go through `scripts/spike-1b.mjs`, which
+ * unsets the flag and always restores it.
+ *
+ * `designReport` summarizes one design session for the Opus 5.5 spike: which
+ * tool each assistant turn called (or none), and the measured distances.
+ *
+ * Spike code: deleted or folded into llm.ts / prompts in slice 5.
+ */
+import type Anthropic from "@anthropic-ai/sdk";
+import { v } from "convex/values";
+
+import { clampPattern, summarizePattern, type PitchedRole } from "../src/shared/pattern";
+import { internalAction, internalQuery } from "./_generated/server";
+import { fakeLlmEnabled } from "./fakeClaude";
+
+const BAND_MODEL = "claude-sonnet-5";
+const BAND_TIMEOUT_MS = 30_000;
+
+const noteSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["step", "deg", "len", "vel", "accent"],
+  properties: {
+    step: { type: "integer", description: "0-based sixteenth step within the part (0..lengthBars*16-1)" },
+    deg: { type: "integer", description: "Chord-relative scale degree: 0 root, 2 third, 4 fifth, 7 root an octave up; negatives go down" },
+    len: { type: "integer", description: "Length in sixteenth steps" },
+    vel: { type: "number", description: "Velocity 0..1" },
+    accent: { type: "boolean", description: "Accent: +0.25 velocity, for push" },
+  },
+} as const;
+
+const TOOLS: Anthropic.Tool[] = [
+  {
+    name: "set_pattern",
+    description: "Replace your part. It lands at the next loop line while the band keeps playing.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["say", "lengthBars", "notes"],
+      properties: {
+        say: { type: "string", description: "One short line to the producer about what you changed" },
+        lengthBars: { type: "integer", enum: [1, 2, 4], description: "Part length in bars; it repeats" },
+        notes: { type: "array", items: noteSchema },
+      },
+    },
+  },
+  {
+    name: "just_reply",
+    description: "Answer without changing your part. Never use this for a note about your part.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["say"],
+      properties: { say: { type: "string" } },
+    },
+  },
+];
+
+const SYSTEM = `You are a musician in a small band with a human producer, playing a looped section that never stops.
+You play one instrument through a step sequencer. The loop has 16 sixteenth-note steps per bar.
+Pitches are chord-relative scale degrees: degree 0 is the current chord's root, 2 its third, 4 its fifth, 7 the root an octave up, and negatives go down. Because degrees are chord-relative, a 1-bar part follows the chords automatically.
+Accents add push. Prefer short parts (1 or 2 bars) that repeat.
+A note from the producer about your part must change your part: answer it with set_pattern, and say one short line about what you did.
+Example: "@bass steadier" → set_pattern {lengthBars:1, notes:[{step:0,deg:0,len:3,vel:0.9,accent:true},{step:8,deg:0,len:3,vel:0.8,accent:false}], say:"Roots on 1 and 3, nothing fancy."}`;
+
+const ROLE: Record<PitchedRole, string> = {
+  bass: "You are the bassist (monophonic, one note per step). Lock to the kick; leave the top end to keys.",
+  keys: "You are the keys player (up to 4 notes per step). Voice chords with degrees 0/2/4, stabs or sustained; leave room for the bass and the producer.",
+};
+
+export const bandTurn = internalAction({
+  args: { role: v.union(v.literal("bass"), v.literal("keys")), snapshot: v.string(), note: v.string() },
+  returns: v.any(),
+  handler: async (_ctx, args) => {
+    if (fakeLlmEnabled()) throw new Error("spikes:bandTurn makes real calls; run it through scripts/spike-1b.mjs");
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set on this deployment");
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), BAND_TIMEOUT_MS);
+    const t0 = Date.now();
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: BAND_MODEL,
+          max_tokens: 8000,
+          thinking: { type: "adaptive" },
+          output_config: { effort: "low" },
+          system: [{ type: "text", text: `${SYSTEM}\n\n${ROLE[args.role]}` }],
+          tools: TOOLS,
+          tool_choice: { type: "any" },
+          messages: [{ role: "user", content: `${args.snapshot}\n\n[producer → @${args.role}] ${args.note}` }],
+        }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 600)}`);
+      const msg = (await res.json()) as Anthropic.Message;
+      const ms = Date.now() - t0;
+      const calls = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+      const set = calls.find((c) => c.name === "set_pattern");
+      const pattern = set ? clampPattern(args.role, set.input) : null;
+      return {
+        ms,
+        stopReason: msg.stop_reason,
+        usage: msg.usage,
+        tools: calls.map((c) => c.name),
+        say: calls.map((c) => (c.input as { say?: string }).say ?? "").join(" / "),
+        rawNoteCount: set ? ((set.input as { notes?: unknown[] }).notes ?? []).length : 0,
+        pattern,
+        summary: pattern ? summarizePattern(args.role, pattern) : null,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+});
+
+export const designReport = internalQuery({
+  args: { slug: v.string() },
+  returns: v.any(),
+  handler: async (ctx, { slug }) => {
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!session) return null;
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_session_seq", (q) => q.eq("sessionId", session._id))
+      .take(200);
+    const turns = messages
+      .filter((m) => m.role === "assistant")
+      .map((m) => {
+        const blocks = Array.isArray(m.content) ? (m.content as Array<{ type: string; name?: string }>) : [];
+        return blocks.find((b) => b.type === "tool_use")?.name ?? "none";
+      });
+    const attempts = await ctx.db
+      .query("attempts")
+      .withIndex("by_session_iteration", (q) => q.eq("sessionId", session._id))
+      .take(50);
+    return {
+      status: session.status,
+      lastError: session.lastError,
+      turns,
+      noToolTurns: turns.filter((t) => t === "none").length,
+      attempts: attempts.map((a) => ({ iteration: a.iteration, name: a.preset.name, distance: a.distance, isFinal: a.isFinal })),
+    };
+  },
+});
