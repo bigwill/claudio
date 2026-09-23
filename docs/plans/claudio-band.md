@@ -221,7 +221,8 @@ erDiagram
 
 ### 2. Patterns (`src/shared/pattern.ts`, imports nothing; **built in slice 1**)
 
-**Pitched notes:** `{step, deg, len, vel, accent, tie}`. `deg` is a **chord-relative scale degree**: the pitch is `degreeToMidi(key, scale, progression[bar] + deg, octave)`, and `deg 0/2/4` are always chord tones.
+**Pitched notes:** `{step, deg, len, vel, accent, tie}`. `deg` is a **chord-relative scale degree**: the pitch is `degreeToMidi(key, scale, chordRootDegree(progression, bar) + deg, octave)`, and `deg 0/2/4` are always chord tones.
+- `chordRootDegree` wraps each root into −3…+3 degrees around the tonic, so parts stay near home (D minor: B♭1 to A2 for the bass, not B♭2). Octaves are fixed per role: bass 2, keys 4. `deg` is clamped to −7…14.
 - **`accent`:** velocity +0.25, clamped to 1.
 - **`tie`** (wave 2; until then `clampPattern` forces `false` and the tools don't expose it):
   - **bass** glides into the next hit;
@@ -233,7 +234,7 @@ erDiagram
 **Rules**
 - `lengthBars` is 1, 2 or 4, and repeats.
 - **`clampPattern()`** clamps and never rejects. It dedupes, caps notes per step (bass 1, keys 4) and in total (at most 256, i.e. 64 steps × 4). An empty pattern means "lay out".
-- **`summarizePattern()`:** explicit step lists, with accents as `X` vs `x` and ties as `~`, e.g. `kick 0,4,8,12 · snare 4,12` and `0:0~ 4:4`.
+- **`summarizePattern()`:** explicit step lists with the length first. An accent is an `X` suffix, a tie is `~`, and a length over one step is `/len`, e.g. `1 bar · kick 0X,4,8,12 · snare 4,12` and `2 bars · 0:0X 4:4/2 6:-1~`. An empty pattern reads `1 bar · lays out`.
 - **Tool schemas** follow the `PRESET_JSON_SCHEMA` rules: strict, every field required, no min/max.
 
 ### 3. Client audio (`src/client/audio/`)
@@ -284,7 +285,7 @@ Accent is folded into `vel`.
 
     | Event | Engine call |
     |---|---|
-    | `attack` | `triggerAttackRelease(hz, \`${durTicks}i\`, time, vel)`, a tick string so it follows tempo; `{ticks: n}` is not valid Tone time and throws. A tied attack is `triggerAttack` |
+    | `attack` | `triggerAttackRelease(hz, durSec, time, vel)`, with `durSec` converted from `durTicks` at the step's own bpm. (A `"Ni"` tick string would be converted at the transport's *current* bpm, which lags a tempo change scheduled at `time`.) A tied attack is `triggerAttack` |
     | `glide` | `bass.frequency.exponentialRampTo(hz, glideSec, time)` (bass `portamento` stays 0, otherwise notes glide by accident) |
     | `release` | `triggerRelease(midi, time)` for poly, `triggerRelease(time)` for the mono bass |
     | `hit` | `kit.hit(voice, time, vel)` |
@@ -605,3 +606,5 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
 - 2026-09-22: Step 1 signed off by Will: layout, schema, scenario list.
 - 2026-09-22: State boundary (Will): removed `liveOctave` (now `chat.octave`), `musicians.lastError`, `statusSince`, `producerClientId` (render lease via `claimRender`); added `designs.targetAudioId`; mute is local-first. Best-practice pass: removed dead `turnJobId`, both `msgSeq` counters, `designs.jamId`; added `library.by_role_jam`; `chatSeq` kept (why not `_creationTime`/`commitTs` recorded); hygiene rules added to §1. S6 reload wording clarified.
 - 2026-09-22: **Slice 0 done.** `npx convex ai-files install` also installs `get-convex/agent-skills` (`skills-lock.json`, `.agents/skills`, `.claude/skills`), so a separate `npx skills add` wasn't needed. The typecheck is split into three projects, which clears the 2-error `process` baseline. Unit tests are colocated. `@playwright/test` brings Playwright up to 1.63 (`npx playwright install chromium`). The e2e runner kills whatever it booted by process group. It doesn't clear test jams yet, because jams arrive in slice 3. `smoke:real` needs `--yes`. `fakeScripts` has index `by_match_turn`. Rails: unit, convex-test and e2e placeholders green, `verify:loop` green. No frozen test changed.
+- 2026-09-22: Slice 1 (code): `pattern.ts` and `sequencer.ts` written tests-first (47 unit tests). Then `engine.ts` + `instruments.ts` (kit, bass, poly, spy wrapper), the `?spike=1` page (entry is now `src/client/boot.ts`) and `e2e/spike.spec.ts` (S3 landing and countdown, S3 spy calls and live keys, onset, S3s), all green. A mutation that shifted bass notes 4ms late failed both same-time assertions. Decisions: durations are passed in seconds at the step's bpm, not as `"Ni"` strings (§3 table updated). Chord roots wrap to −3…+3 (§2). The summary format is recorded in §2. The onset test asserts sample-accurate grid spacing (±1ms) plus a fixed latency of at most 10ms, because the master Limiter (a DynamicsCompressor) adds Chrome's ~6ms pre-delay; the measured latency was 263–264 samples at 44.1kHz. The spike page uses hand-written sounds until slice 2's starters.
+- 2026-09-22: **Slice 1 done.** Will's listen passed: the kit grooves, your keys feel instant, and the keystrokes work.
