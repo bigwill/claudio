@@ -12,6 +12,8 @@ import type * as agent from "../agent.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as fakeClaude from "../fakeClaude.js";
+import type * as model_drain from "../model/drain.js";
+import type * as model_history from "../model/history.js";
 import type * as model_messages from "../model/messages.js";
 import type * as model_presence from "../model/presence.js";
 import type * as model_sessions from "../model/sessions.js";
@@ -37,6 +39,8 @@ declare const fullApi: ApiFromModules<{
   chat: typeof chat;
   crons: typeof crons;
   fakeClaude: typeof fakeClaude;
+  "model/drain": typeof model_drain;
+  "model/history": typeof model_history;
   "model/messages": typeof model_messages;
   "model/presence": typeof model_presence;
   "model/sessions": typeof model_sessions;
