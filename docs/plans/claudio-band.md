@@ -70,7 +70,9 @@ The producer's screen is the product, so it is designed and reviewed first.
 - **design iterations sit in the strip** (distance bars, newest distance, latest rationale, Cancel);
 - **chat is in the right column.**
 
-The data-model review is in progress; its feedback so far is folded into §1 (state boundary, best-practice fixes). The sketch below is redrawn as lanes.
+Will's data-model feedback is folded into §1 (state boundary, best-practice fixes). The sketch below is redrawn as lanes.
+
+**Step 1 signed off (Will, 2026-09-22):** layout, schema (§1 as of `73c638c`) and scenario list (S1–S12 + H, with S9a/S9b). Next is slice 0.
 
 ```
 ┌ Claudio Band · 6ZQQ59Y8 ─ JAM │ Space ▶ │ 96 bpm │ D minor │ Dm B♭ [F] C │ 4 bars │ 3.2 │ scenes [A] B │ reacts ● ┐
@@ -597,4 +599,5 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
 - 2026-09-22: Step 1: Will approved lanes-down, design rail in the strip, chat on the right; the sketch is redrawn as lanes.
 - 2026-09-22: Convex components audited (Workpool and Gateway adoption drafted, then refuted on review); gateway deferred to after wave 1. See "Convex components considered".
 - 2026-09-22: Hardening: named timeouts below leases; commit fallback from the action; fake `delay` honours the timeout and new `hang`; failure copy as system rows. S9 splits into S9a (timeout) and S9b (watchdog); S9 was not yet green, so no frozen test changed.
+- 2026-09-22: Step 1 signed off by Will: layout, schema, scenario list.
 - 2026-09-22: State boundary (Will): removed `liveOctave` (now `chat.octave`), `musicians.lastError`, `statusSince`, `producerClientId` (render lease via `claimRender`); added `designs.targetAudioId`; mute is local-first. Best-practice pass: removed dead `turnJobId`, both `msgSeq` counters, `designs.jamId`; added `library.by_role_jam`; `chatSeq` kept (why not `_creationTime`/`commitTs` recorded); hygiene rules added to §1. S6 reload wording clarified.
