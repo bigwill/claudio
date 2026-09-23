@@ -1,0 +1,46 @@
+{
+  "model": "claude-opus-5-5",
+  "at": "2026-09-23T00:50:46.819Z",
+  "wav": "electric_piano_jd800_soft_ep.wav",
+  "outcome": "done",
+  "wallMs": 40295,
+  "slug": "QS9NM4TCGYRK",
+  "report": {
+    "attempts": [
+      {
+        "distance": 50.4,
+        "isFinal": false,
+        "iteration": 1,
+        "name": "Soft Tine Keys"
+      },
+      {
+        "distance": 65,
+        "isFinal": false,
+        "iteration": 2,
+        "name": "x"
+      },
+      {
+        "distance": 72.3,
+        "isFinal": false,
+        "iteration": 3,
+        "name": "x"
+      },
+      {
+        "distance": null,
+        "isFinal": true,
+        "iteration": 3,
+        "name": "Soft Tine Keys"
+      }
+    ],
+    "lastError": null,
+    "noToolTurns": 0,
+    "status": "done",
+    "turns": [
+      "propose_preset",
+      "propose_preset",
+      "propose_preset",
+      "finalize"
+    ]
+  },
+  "log": []
+}
