@@ -55,6 +55,17 @@ test("S1: a new jam opens in soundcheck with 4 strips and starter sounds; the tr
   expect(errors).toEqual([]);
 });
 
+test("the page reaches Convex through its own origin, so it works from another machine", async ({ page }) => {
+  // Opened from a laptop at http://<this machine>:5173, a client pointed at
+  // 127.0.0.1:3210 would dial the laptop itself and never load a jam.
+  const sockets: string[] = [];
+  page.on("websocket", (ws) => sockets.push(ws.url()));
+  await openJam(page);
+  const origin = new URL(page.url()).host;
+  expect(sockets.length).toBeGreaterThan(0);
+  for (const url of sockets.filter((u) => u.includes("/api/"))) expect(new URL(url).host).toBe(origin);
+});
+
 test("S1: in soundcheck, the keyboard auditions the focused strip; drums audition A=kick", async ({ page }) => {
   await openJam(page);
   await page.keyboard.press("Digit3");

@@ -1,14 +1,20 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 /**
- * Plain Vite. The @cloudflare/vite-plugin is gone with the Worker it existed to
- * bundle — Cloudflare now serves static assets and nothing else, and the backend
- * is Convex.
+ * Plain Vite. The backend is Convex; Cloudflare serves the built static assets.
  *
- * A welcome side effect: the CLOUDFLARE_ENV build-time trap goes with it. The
- * plugin baked a fully-resolved Worker config into dist/, which meant
- * `wrangler deploy --env production` was silently ignored and the environment had
- * to be chosen at BUILD time. With no Worker script, --env behaves normally
- * again — see the deploy scripts in package.json.
+ * In dev, Convex's traffic (`/api/…`, including the sync websocket) is proxied
+ * through Vite to the local backend, and the client dials the page's own
+ * origin. So a jam opened from another machine (http://<this machine>:5173)
+ * works: pointed at 127.0.0.1:3210 directly, that browser would dial itself.
  */
-export default defineConfig({});
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+  return {
+    server: {
+      proxy: {
+        "/api": { target: env.VITE_CONVEX_URL ?? "http://127.0.0.1:3210", ws: true, changeOrigin: true },
+      },
+    },
+  };
+});

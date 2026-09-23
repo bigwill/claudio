@@ -13,7 +13,7 @@ import * as Tone from "tone";
 
 import { BandEngine, loadKick, type ChannelId } from "../audio/engine";
 import type { Harmony, PartRef, TrackId } from "../audio/sequencer";
-import { band, errorText, type ChatRow, type JamState, type LibraryRow, type Pip, type Strip } from "../convex";
+import { band, convexUrl, errorText, type ChatRow, type JamState, type LibraryRow, type Pip, type Strip } from "../convex";
 import { DRUM_VOICES, ROLE_OCTAVE, STEPS_PER_BAR, degreeToMidi } from "../../shared/pattern";
 import type { DrumHit, Pattern, PitchedNote, Scale } from "../../shared/pattern";
 import { newSessionId } from "../../shared/protocol";
@@ -732,10 +732,28 @@ Object.assign(window, {
   },
 });
 
+function showConnection(text: string): void {
+  if (state) return;
+  $("strips").innerHTML = `<p class="hint" data-testid="connecting" style="padding:24px">${esc(text)}</p>`;
+}
+
 async function boot(): Promise<void> {
-  await band.create(slug, createOpts);
+  showConnection("Connecting to the band…");
+  const slow = setTimeout(
+    () => showConnection(`Still can't reach the backend at ${convexUrl}. Is \`npx convex dev\` running on the machine serving this page?`),
+    6000,
+  );
+  try {
+    await band.create(slug, createOpts);
+  } catch (e) {
+    clearTimeout(slow);
+    showConnection(`Couldn't create the jam: ${errorText(e)}`);
+    return;
+  }
+  clearTimeout(slow);
   band.onState(slug, async (s) => {
     if (!s) return;
+    if (!state) $("strips").innerHTML = "";
     state = s;
     await ensureEngine(s);
     reconcile(s);

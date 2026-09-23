@@ -11,7 +11,12 @@ import type { Id } from "../../convex/_generated/dataModel";
 const url = import.meta.env.VITE_CONVEX_URL as string | undefined;
 if (!url) throw new Error("VITE_CONVEX_URL is not set — run `npx convex dev` to configure a deployment.");
 
-export const convex = new ConvexClient(url);
+/**
+ * In dev, dial the page's own origin: Vite proxies /api to the local backend
+ * (vite.config.ts), which is what makes the jam reachable from another machine.
+ */
+export const convexUrl = import.meta.env.DEV ? location.origin : url;
+export const convex = new ConvexClient(convexUrl, { skipConvexDeploymentUrlCheck: true });
 
 export type JamState = NonNullable<FunctionReturnType<typeof api.jams.state>>;
 export type Strip = JamState["musicians"][number];
