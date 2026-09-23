@@ -19,12 +19,14 @@ function requireFake(): void {
 
 export const ping = query({
   args: {},
+  returns: v.object({ fake: v.boolean() }),
   handler: async () => ({ fake: fakeLlmEnabled() }),
 });
 
 /** Upsert the script for one (match, turnIndex). */
 export const setScript = mutation({
   args: { match: v.string(), turnIndex: v.number(), response: v.any() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     requireFake();
     const existing = await ctx.db
@@ -36,11 +38,13 @@ export const setScript = mutation({
     } else {
       await ctx.db.insert("fakeScripts", args);
     }
+    return null;
   },
 });
 
 export const listScripts = query({
   args: {},
+  returns: v.array(v.object({ _id: v.id("fakeScripts"), _creationTime: v.number(), match: v.string(), turnIndex: v.number(), response: v.any() })),
   handler: async (ctx) => {
     requireFake();
     return await ctx.db.query("fakeScripts").take(500);
@@ -49,10 +53,12 @@ export const listScripts = query({
 
 export const clearScripts = mutation({
   args: {},
+  returns: v.null(),
   handler: async (ctx) => {
     requireFake();
     for (const row of await ctx.db.query("fakeScripts").take(500)) {
       await ctx.db.delete(row._id);
     }
+    return null;
   },
 });

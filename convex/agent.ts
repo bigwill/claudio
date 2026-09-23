@@ -81,7 +81,7 @@ export const runTurn = internalAction({
     // a machine with no ANTHROPIC_API_KEY still runs the full loop.
     if (fakeLlmEnabled()) {
       const fake = fakeClaudeMessage(plan as PlanForAction);
-      await withRetry(() =>
+      await commitOrFail(ctx, args, () =>
         ctx.runMutation(internal.turn.commit, {
           designId: args.designId,
           turnSeq: args.turnSeq,
@@ -111,7 +111,7 @@ export const runTurn = internalAction({
       return null;
     }
 
-    await withRetry(() =>
+    await commitOrFail(ctx, args, () =>
       ctx.runMutation(internal.turn.commit, {
         designId: args.designId,
         turnSeq: args.turnSeq,
@@ -193,16 +193,23 @@ async function fail(
  * exactly once at the end. The turnSeq fence makes a duplicate commit a no-op,
  * so retrying costs nothing.
  */
-async function withRetry<T>(fn: () => Promise<T>): Promise<T | null> {
+async function withRetry(fn: () => Promise<unknown>): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      return await fn();
+      await fn();
+      return true;
     } catch (err) {
-      if (attempt === 2) {
-        console.error("turn commit failed after 3 attempts", err);
-        return null;
-      }
+      if (attempt === 2) console.error("turn commit failed after 3 attempts", err);
     }
   }
-  return null;
+  return false;
+}
+
+/**
+ * The commit didn't land after its retries (plan §4: "If the action's
+ * withRetry(commit) returns null, the action calls fail"). Fenced on turnSeq,
+ * so this is a no-op if the commit actually did land.
+ */
+async function commitOrFail(ctx: ActionCtx, args: { designId: Id<"designs">; turnSeq: number }, commit: () => Promise<unknown>): Promise<void> {
+  if (!(await withRetry(commit))) await fail(ctx, args, "the designer's reply couldn't be saved", true);
 }

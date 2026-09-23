@@ -127,6 +127,24 @@ describe("S10a: history and picks", () => {
     expect((await partOf(t, slug, bass._id)).basedOn).toBe(1);
   });
 
+  test("history still works past 500 versions: it reads the newest rows, not the oldest", async () => {
+    const { t, slug, bass } = await newJam();
+    await t.mutation(api.parts.pick, { musicianId: bass._id, libraryId: await libraryId(t, "bass-sub") }); // v2
+    await t.run(async (ctx) => {
+      const base = (await ctx.db.query("parts").withIndex("by_musician_version", (q) => q.eq("musicianId", bass._id).eq("version", 2)).unique())!;
+      const { _id, _creationTime, ...row } = base;
+      void _id;
+      void _creationTime;
+      for (let v = 3; v <= 603; v++) await ctx.db.insert("parts", { ...row, version: v, basedOn: v % 2 ? 1 : 2, source: "history" });
+    });
+    // Row 603 is a copy of v1, so ← has nowhere to go and → goes to v2.
+    await t.mutation(api.parts.history, { musicianId: bass._id, move: { kind: "step", dir: 1 } });
+    const p = await partOf(t, slug, bass._id);
+    expect(p.version).toBe(604);
+    expect(p.basedOn).toBe(2);
+    expect((await t.query(api.parts.rail, { musicianId: bass._id })).map((x) => x.label)).toEqual(["v1", "v2"]);
+  });
+
   test("mute writes no part", async () => {
     const { t, slug, keys } = await newJam();
     await t.mutation(api.musicians.setMuted, { musicianId: keys._id, muted: true });

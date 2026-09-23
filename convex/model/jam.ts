@@ -35,6 +35,11 @@ export async function newestPart(ctx: QueryCtx, musicianId: Id<"musicians">): Pr
   return p;
 }
 
+/** The tempo range, shared by create and setBpm. */
+export function clampBpm(bpm: number): number {
+  return Math.min(240, Math.max(60, Math.round(bpm)));
+}
+
 /** One id per mutation, stamped on every row it writes (wave 2 undo). */
 export function newTxn(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -97,4 +102,36 @@ export async function contentRow(ctx: QueryCtx, musicianId: Id<"musicians">, bas
     .unique();
   if (!p) throw new Error(`no version ${basedOn} for ${musicianId}`);
   return p;
+}
+
+const CONTENT_SOURCES = ["starter", "agent", "pick", "design"] as const;
+
+/**
+ * What planHistory needs: every content version (the pips; few, since copies
+ * are excluded) plus the newest row, and for a jump the row it names.
+ * Reading by source keeps this bounded however many ←/→ copies pile up.
+ */
+export async function historyRows(ctx: QueryCtx, musicianId: Id<"musicians">, jumpVersion?: number): Promise<Part[]> {
+  const content = (
+    await Promise.all(
+      CONTENT_SOURCES.map((source) =>
+        ctx.db
+          .query("parts")
+          .withIndex("by_musician_source", (q) => q.eq("musicianId", musicianId).eq("source", source))
+          .order("desc")
+          .take(200),
+      ),
+    )
+  ).flat();
+  const rows = new Map(content.map((r) => [r.version, r]));
+  const newest = await newestPart(ctx, musicianId);
+  rows.set(newest.version, newest);
+  if (jumpVersion !== undefined && !rows.has(jumpVersion)) {
+    const j = await ctx.db
+      .query("parts")
+      .withIndex("by_musician_version", (q) => q.eq("musicianId", musicianId).eq("version", jumpVersion))
+      .unique();
+    if (j) rows.set(j.version, j);
+  }
+  return [...rows.values()].sort((a, b) => a.version - b.version);
 }

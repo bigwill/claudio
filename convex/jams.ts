@@ -11,10 +11,101 @@ import { ConvexError, v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx } from "./_generated/server";
-import { anyDesignRunning, appendPart, contentRow, discardTurn, jamBySlug, musiciansOf, newestPart, newTxn } from "./model/jam";
+import { anyDesignRunning, appendPart, clampBpm, contentRow, discardTurn, jamBySlug, musiciansOf, newestPart, newTxn } from "./model/jam";
 import { DEFAULT_SOUNDS, STARTER_PARTS, STARTER_SOUNDS } from "../src/shared/starters";
+import {
+  vBandStatus,
+  vChatKind,
+  vDesignOrigin,
+  vDesignStatus,
+  vDrumHit,
+  vLengthBars,
+  vMusicianKind,
+  vPartSource,
+  vPhase,
+  vPitchedNote,
+  vRole,
+  vScale,
+  vTurnCause,
+} from "./schema";
+import { vPreset, vRenderSpec } from "./validators";
 
 const vSceneName = v.union(v.literal("A"), v.literal("B"));
+const nullable = <T extends Parameters<typeof v.union>[0]>(x: T) => v.union(v.null(), x);
+
+/** The client's main contract: one strip. */
+const vStrip = v.object({
+  _id: v.id("musicians"),
+  kind: vMusicianKind,
+  role: vRole,
+  name: v.string(),
+  muted: v.boolean(),
+  status: vBandStatus,
+  turnCause: nullable(vTurnCause),
+  turnDeadline: v.number(),
+  activeDesignId: nullable(v.id("designs")),
+  part: v.object({
+    version: v.number(),
+    basedOn: v.number(),
+    source: vPartSource,
+    label: v.string(),
+    lengthBars: vLengthBars,
+    notes: v.union(v.array(vPitchedNote), v.array(vDrumHit)),
+    libraryId: nullable(v.id("library")),
+    sound: nullable(v.object({ name: v.string(), preset: vPreset })),
+  }),
+  design: nullable(
+    v.object({
+      _id: v.id("designs"),
+      status: vDesignStatus,
+      origin: vDesignOrigin,
+      iteration: v.number(),
+      pendingPresetId: nullable(v.string()),
+      renderOwnerClientId: nullable(v.string()),
+      renderLeaseUntil: v.number(),
+      renderAttemptNo: v.number(),
+      renderSpec: nullable(vRenderSpec),
+      attempts: v.array(
+        v.object({
+          presetId: v.string(),
+          iteration: v.number(),
+          preset: vPreset,
+          rationale: v.string(),
+          distance: nullable(v.number()),
+          isFinal: v.boolean(),
+        }),
+      ),
+    }),
+  ),
+});
+
+const vState = v.object({
+  jam: v.object({
+    _id: v.id("jams"),
+    slug: v.string(),
+    phase: vPhase,
+    reactive: v.boolean(),
+    bpm: v.number(),
+    keyPc: v.number(),
+    scale: vScale,
+    bars: vLengthBars,
+    progression: v.array(v.number()),
+    scenesSaved: v.object({ A: v.boolean(), B: v.boolean() }),
+    activeScene: nullable(vSceneName),
+  }),
+  musicians: v.array(vStrip),
+});
+
+const vChatRow = v.object({
+  seq: v.number(),
+  kind: vChatKind,
+  fromMusicianId: nullable(v.id("musicians")),
+  to: v.array(v.id("musicians")),
+  reactor: nullable(v.id("musicians")),
+  replyToSeq: nullable(v.number()),
+  text: v.string(),
+  octave: nullable(v.number()),
+});
 
 /** Upsert the starter library by starterKey. Library rows are immutable, so an existing key is left alone. */
 async function upsertStarters(ctx: MutationCtx): Promise<Map<string, Id<"library">>> {
@@ -64,7 +155,7 @@ export const create = mutation({
       slug,
       phase: "soundcheck",
       reactive: true,
-      bpm: bpm ? Math.min(240, Math.max(60, Math.round(bpm))) : 96,
+      bpm: bpm ? clampBpm(bpm) : 96,
       keyPc: 2,
       scale: "minor",
       bars: bars ?? 4,
@@ -131,6 +222,7 @@ function activeScene(
 
 export const state = query({
   args: { slug: v.string() },
+  returns: v.union(v.null(), vState),
   handler: async (ctx, { slug }) => {
     const jam = await jamBySlug(ctx, slug);
     if (!jam) return null;
@@ -212,6 +304,7 @@ export const state = query({
 /** The band chat, newest 200 rows. */
 export const chat = query({
   args: { jamId: v.id("jams") },
+  returns: v.array(vChatRow),
   handler: async (ctx, { jamId }) => {
     const rows = await ctx.db
       .query("chat")
@@ -305,7 +398,7 @@ export const setBpm = mutation({
   returns: v.null(),
   handler: async (ctx, { jamId, bpm }) => {
     await requireJam(ctx, jamId);
-    await ctx.db.patch(jamId, { bpm: Math.min(180, Math.max(60, Math.round(bpm))) });
+    await ctx.db.patch(jamId, { bpm: clampBpm(bpm) });
     return null;
   },
 });

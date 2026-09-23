@@ -50,6 +50,9 @@ type DiffForPrompt = Pick<
   harmonics: readonly unknown[];
 };
 
+/** A design log is ~10 messages; band logs are windowed in slice 5 before they get near this. */
+const MAX_LOG_MESSAGES = 400;
+
 export type ConvoId = Id<"musicians"> | Id<"designs">;
 
 /** The newest message of a conversation, or null. */
@@ -83,7 +86,8 @@ export async function loadMessages(ctx: QueryCtx, convoId: ConvoId): Promise<Mes
     .query("messages")
     .withIndex("by_convo_seq", (q) => q.eq("convoId", convoId))
     .order("asc")
-    .collect();
+    .take(MAX_LOG_MESSAGES);
+  if (rows.length === MAX_LOG_MESSAGES) throw new Error(`conversation ${convoId} hit ${MAX_LOG_MESSAGES} messages`);
   return rows.map((r) => ({ role: r.role, content: decodeContent(r.content) }) as MessageParam);
 }
 

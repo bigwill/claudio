@@ -183,7 +183,7 @@ erDiagram
   - `source`: starter, agent, pick, design, history, scene or undo.
   - `label`: the rail caption, from the agent's `say` or the pick name.
   - The next version is read newest-first from `by_musician_version`, plus one.
-  - Indexes: `by_musician_version`, `by_jam` (newest first).
+  - Indexes: `by_musician_version`, `by_musician_source` (the rail's content versions, read without scanning history copies), `by_jam` (newest first).
 - **designs:** today's `sessions` row, re-keyed.
   - `status`: thinking, awaiting_render, done or failed.
   - `origin`: wav or prompt.
@@ -652,3 +652,18 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
     - A text-only design turn fails the design for now; slice 4 turns it into the two-strike guard.
   - **Deleted:** sessions, presence, `fork`, the session chat queue, `main.ts`, `reconcile.ts`, `identity.ts`, `verify:loop`, and the session-based spike functions and replay script (their results stay in `docs/spikes/`).
   - **Retired until slice 4:** `build-starters.mjs` (it drove the deleted app) and `spike-1b.mjs --design`.
+- 2026-09-22: **Slice 3, steps 3–4.**
+  - **Step 3 (convex-test first: S1, S6, S10a history and picks; unit: `parseMentions`).** New: `jams.create`/`state`/`chat`/`start`/`saveScene`/`recallScene`/`setBpm`/`setReactive`, `parts.history`/`pick`/`rail`, `musicians.setMuted`, `library.list`, `chat.send`. Decisions:
+    - Picking the sound a strip already plays writes nothing.
+    - Recall writes scene copies only for strips whose basedOn differs, and restores mute.
+    - `jams.create` takes optional `bpm`/`bars`, used only at creation (test jams: 200 bpm, 1 bar).
+  - **Step 4:** the band UI (`src/client/band/app.ts`, styles from the approved mockup), with E2E S1, S3 and S6 driven from the keyboard; 14/14 green. In soundcheck the keyboard auditions the focused strip (bass or keys instrument, or the kit on A/S/D/F); in the jam it always plays yours. The engine gained `liveHit`, per-channel live notes and `setYourSound`.
+- 2026-09-22: **Slice 3 `convex-reviewer` pass.** It found no violations of the core rules (no `.filter()`, no `Date.now()` in queries, scheduling only to `internal.*`, `state` never reads the counters, model content as text). Fixed:
+  - History and the rail read `take(500)` ascending, so past 500 rows they read stale rows and would write duplicate versions. They now read content versions via the new `parts.by_musician_source` plus the newest row; a new test at 600 rows failed before the fix.
+  - `returns` validators on every public function (`jams.state`'s is the full client contract).
+  - One counters write per `chat.send`.
+  - A design commit that fails after its retries now calls `fail` (fenced on `turnSeq`), instead of waiting for the watchdog.
+  - One tempo clamp (60–240).
+  - `loadMessages` is bounded (400).
+  - Deferred to slice 4: routing every terminal design branch through `endDesign`, so a failed design frees its musician.
+  - Left as is: design progress inside `jams.state` (the plan accepts it at demo scale); the unused `clientId` on submits (harmless); `parts.by_jam` and `library.by_role_jam`, which wave 2 undo and slice 5's snapshot need.

@@ -131,10 +131,12 @@ export default defineSchema({
     lengthBars: vLengthBars,
     /** Pitched notes or drum hits; ≤ 256. Empty = lays out. */
     notes: v.union(v.array(vPitchedNote), v.array(vDrumHit)),
-    /** The sound; null for the kit and for a producer part's… never (you always have a sound). */
+    /** The sound; null for the kit. */
     libraryId: nullable(v.id("library")),
   })
     .index("by_musician_version", ["musicianId", "version"])
+    /** Content versions (the rail's pips) without scanning every history copy. */
+    .index("by_musician_source", ["musicianId", "source", "version"])
     .index("by_jam", ["jamId"]),
 
   /** A sound-design job: today's measured loop, owned by one musician. */

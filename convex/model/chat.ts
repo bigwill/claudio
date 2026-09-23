@@ -17,6 +17,8 @@ export interface ChatRowInput {
   reactor?: Id<"musicians"> | null;
   replyToSeq?: number | null;
   octave?: number | null;
+  /** Producer notes grant the reaction budget in the same counters write. */
+  reactionBudget?: number;
 }
 
 export async function countersFor(ctx: MutationCtx, jamId: Id<"jams">): Promise<Doc<"jamCounters">> {
@@ -34,6 +36,7 @@ export async function postChat(ctx: MutationCtx, jamId: Id<"jams">, row: ChatRow
   const seq = counters.chatSeq + 1;
   const patch: Partial<Doc<"jamCounters">> = { chatSeq: seq };
   if (row.kind === "producer") patch.lastProducerSeq = seq;
+  if (row.reactionBudget !== undefined) patch.reactionBudget = row.reactionBudget;
   await ctx.db.patch(counters._id, patch);
   await ctx.db.insert("chat", {
     jamId,

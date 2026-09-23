@@ -7,7 +7,7 @@
 import { ConvexError, v } from "convex/values";
 
 import { mutation } from "./_generated/server";
-import { countersFor, postChat } from "./model/chat";
+import { postChat } from "./model/chat";
 import { musiciansOf } from "./model/jam";
 import { parseMentions } from "./model/mentions";
 
@@ -22,8 +22,12 @@ export const send = mutation({
       body,
       band.map((m) => ({ id: m._id, name: m.name, role: m.role, kind: m.kind })),
     );
-    const counters = await countersFor(ctx, jamId);
-    await ctx.db.patch(counters._id, { reactionBudget: to.length === 1 ? 1 : 0 });
-    return await postChat(ctx, jamId, { kind: "producer", text: body, to, octave: Math.round(octave) });
+    return await postChat(ctx, jamId, {
+      kind: "producer",
+      text: body,
+      to,
+      octave: Math.round(octave),
+      reactionBudget: to.length === 1 ? 1 : 0,
+    });
   },
 });
