@@ -67,7 +67,7 @@ interface AnthropicResponse {
 }
 
 export const runTurn = internalAction({
-  args: { sessionId: v.id("sessions"), turnSeq: v.number() },
+  args: { designId: v.id("designs"), turnSeq: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const planned = await ctx.runQuery(internal.turn.planForAction, args);
@@ -83,7 +83,7 @@ export const runTurn = internalAction({
       const fake = fakeClaudeMessage(plan as PlanForAction);
       await withRetry(() =>
         ctx.runMutation(internal.turn.commit, {
-          sessionId: args.sessionId,
+          designId: args.designId,
           turnSeq: args.turnSeq,
           content: JSON.stringify(fake.content),
           stopReason: fake.stop_reason,
@@ -113,7 +113,7 @@ export const runTurn = internalAction({
 
     await withRetry(() =>
       ctx.runMutation(internal.turn.commit, {
-        sessionId: args.sessionId,
+        designId: args.designId,
         turnSeq: args.turnSeq,
         content: JSON.stringify(message.content),
         stopReason: message.stop_reason,
@@ -176,7 +176,7 @@ async function callClaude(apiKey: string, plan: PlanForAction): Promise<Anthropi
 
 async function fail(
   ctx: ActionCtx,
-  args: { sessionId: Id<"sessions">; turnSeq: number },
+  args: { designId: Id<"designs">; turnSeq: number },
   message: string,
   retryable: boolean,
 ): Promise<void> {

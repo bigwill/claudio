@@ -174,29 +174,6 @@ export const vRenderSpec = v.object({
   gateMs: v.number(),
 });
 
-export const vStatus = v.union(
-  v.literal("idle"),
-  v.literal("thinking"),
-  v.literal("awaiting_render"),
-  v.literal("done"),
-  v.literal("error"),
-);
-
-export const vChatKind = v.union(v.literal("user"), v.literal("agent"), v.literal("system"));
-
-export const vChatStatus = v.union(
-  v.literal("queued"),
-  v.literal("sent"),
-  v.literal("cancelled"),
-);
-
-/** Attribution only. Spoofable by design — never used for access control. */
-export const vContributor = v.object({
-  clientId: v.string(),
-  nickname: v.string(),
-  color: v.string(),
-});
-
 // ---------------------------------------------------------------------------
 // Drift guards.
 //

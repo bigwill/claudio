@@ -14,7 +14,6 @@
     "analyze": "node --experimental-strip-types scripts/analyze-samples.ts",
     "deploy": "vite build && wrangler deploy",
     "deploy:prod": "convex deploy --cmd 'vite build' && wrangler deploy --env production",
-    "verify:loop": "node scripts/verify-loop.mjs",
     "test:unit": "vitest run --project unit",
     "test:convex": "vitest run --project convex",
     "check": "npm run typecheck && npm run test:unit && npm run test:dsp && npm run test:convex",

@@ -11,7 +11,6 @@
  *   Records wall time and no-tool turns to docs/spikes/1b-design.json.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { runDesign } from "./design-run.mjs";
 import { convex, withRealModel } from "./devstack.mjs";
 
 if (!process.argv.includes("--yes")) {
@@ -65,18 +64,9 @@ async function band() {
   return out;
 }
 
-async function design() {
-  const wav = "samples/electric_piano_jd800_soft_ep.wav";
-  const r = await runDesign({ wav, screenshot: `docs/spikes/1b-design-${designModel}.png` });
-  const out = { model: designModel, at: new Date().toISOString(), wav: "electric_piano_jd800_soft_ep.wav", ...r };
-  writeFileSync(`docs/spikes/1b-design-${designModel}.json`, JSON.stringify(out, null, 2) + "\n");
-  console.log(`[design] ${r.outcome} in ${(r.wallMs / 1000).toFixed(1)}s; turns ${r.report?.turns?.join(",")}; no-tool turns ${r.report?.noToolTurns}`);
-  return out;
-}
-
 try {
   if (doBand) await withRealModel("spike-1b band", band);
-  if (doDesign) await withRealModel("spike-1b design", design, { DESIGN_MODEL: designModel });
+  if (doDesign) console.error("[spike-1b] --design drove the pre-band app, deleted in slice 3; see docs/spikes/ for its results.");
 } catch (e) {
   console.error(`[spike-1b] ${e.message}`);
   process.exitCode = 1;

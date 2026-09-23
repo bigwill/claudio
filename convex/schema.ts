@@ -1,197 +1,230 @@
 /**
- * The database that replaces SessionDO's two SQLite tables.
+ * Claudio Band's database (plan §1). The plan's rules, briefly:
  *
- * The Durable Object kept `history: Attempt[]` inline in one meta row, because a
- * single-threaded actor gets serialization for free. Under Convex's optimistic
- * concurrency that inlining is actively harmful: recording a measurement would
- * rewrite the same document that presence heartbeats and turn commits also touch,
- * manufacturing write conflicts between operations that have nothing to do with
- * each other. So anything with its own write cadence gets its own table.
+ * - Part versions are append-only and the newest one plays; no "current"
+ *   pointer. Content versions (starter/agent/pick/design) are rail pips; copies
+ *   (history/scene/undo) restate a content version's basedOn.
+ * - Each value with its own write rhythm gets its own document: the hot chat
+ *   counters live in jamCounters, so a chat insert never re-runs jams.state.
+ * - Each conversation has one log (`messages.convoId` is a musician or a design),
+ *   stored as JSON text, because Convex sorts object keys and the model must see
+ *   its own tool calls exactly as it wrote them.
+ * - Library rows are immutable. There is no presence and no heartbeat.
  *
- * `sessions` is the hot document — status transitions and lease claims write it
- * constantly — so it holds scalars only, and everything that grows lives beside it.
+ * Nullable fields are `v.union(v.null(), X)`, never `v.optional(X)`: Convex
+ * stores `undefined` as an absent key, and this code tests `=== null`.
  */
 
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-import {
-  vChatKind,
-  vChatStatus,
-  vFeatureSummary,
-  vPreset,
-  vRenderSpec,
-  vStatus,
-  vTargetInfo,
-} from "./validators";
+import { vFeatureSummary, vPreset, vRenderSpec, vTargetInfo } from "./validators";
 
-/**
- * Note on nullable fields throughout: `v.union(v.null(), X)`, never
- * `v.optional(X)`. Convex documents cannot hold `undefined` — `{a: undefined}` is
- * stored as `{}` — and the ported logic tests `=== null` (e.g. `bestDistance`,
- * `pendingToolUseId`). `v.optional` would mean "key absent", which reads back as
- * `undefined` and quietly fails those comparisons.
- */
+const nullable = <T extends Parameters<typeof v.union>[0]>(x: T) => v.union(v.null(), x);
+
+export const vPhase = v.union(v.literal("soundcheck"), v.literal("jam"));
+export const vScale = v.union(v.literal("major"), v.literal("minor"), v.literal("dorian"), v.literal("mixolydian"));
+export const vMusicianKind = v.union(v.literal("agent"), v.literal("human"));
+export const vRole = v.union(v.literal("drums"), v.literal("bass"), v.literal("keys"), v.literal("producer"));
+export const vPitchedRole = v.union(v.literal("bass"), v.literal("keys"));
+export const vBandStatus = v.union(v.literal("idle"), v.literal("thinking"));
+export const vTurnCause = v.union(v.literal("producer"), v.literal("nudge"));
+export const vPartSource = v.union(
+  v.literal("starter"),
+  v.literal("agent"),
+  v.literal("pick"),
+  v.literal("design"),
+  v.literal("history"),
+  v.literal("scene"),
+  v.literal("undo"),
+);
+export const vDesignStatus = v.union(
+  v.literal("thinking"),
+  v.literal("awaiting_render"),
+  v.literal("done"),
+  v.literal("failed"),
+);
+export const vDesignOrigin = v.union(v.literal("wav"), v.literal("prompt"));
+export const vChatKind = v.union(v.literal("producer"), v.literal("musician"), v.literal("system"), v.literal("nudge"));
+export const vLibraryOrigin = v.union(v.literal("starter"), v.literal("designed"), v.literal("tweak"));
+export const vLengthBars = v.union(v.literal(1), v.literal(2), v.literal(4));
+
+export const vPitchedNote = v.object({
+  step: v.number(),
+  deg: v.number(),
+  len: v.number(),
+  vel: v.number(),
+  accent: v.boolean(),
+  tie: v.boolean(),
+});
+export const vDrumHit = v.object({
+  step: v.number(),
+  voice: v.union(v.literal("kick"), v.literal("snare"), v.literal("hat"), v.literal("openhat")),
+  vel: v.number(),
+  accent: v.boolean(),
+});
+
+/** A scene: each musician's content version and mute, keyed by musician id. */
+export const vScene = v.record(v.id("musicians"), v.object({ basedOn: v.number(), muted: v.boolean() }));
+
 export default defineSchema({
-  sessions: defineTable({
-    /** The 12-char Crockford id in the URL. Minted client-side; NOT auth. */
+  jams: defineTable({
+    /** The id in the URL. Not a credential. */
     slug: v.string(),
+    phase: vPhase,
+    /** "Band reacts" (wave 2 nudges). */
+    reactive: v.boolean(),
+    bpm: v.number(),
+    keyPc: v.number(),
+    scale: vScale,
+    bars: vLengthBars,
+    /** Chord roots as scale degrees, one per bar; ≤ 4. */
+    progression: v.array(v.number()),
+    scenes: v.object({ A: nullable(vScene), B: nullable(vScene) }),
+  }).index("by_slug", ["slug"]),
 
-    // --- ported from SessionDO's Meta ------------------------------------
-    status: vStatus,
-    statusSince: v.number(),
-    target: v.union(v.null(), vFeatureSummary),
-    targetInfo: v.union(v.null(), vTargetInfo),
-    /** Convex storage id for the prepared target audio, so joiners can hear it. */
-    targetAudioId: v.union(v.null(), v.id("_storage")),
-    /** Set for prompt-started sessions; also makes "already started" observable. */
-    promptText: v.union(v.null(), v.string()),
-    iteration: v.number(),
-    maxIterations: v.number(),
-    bestPresetId: v.union(v.null(), v.string()),
-    bestDistance: v.union(v.null(), v.number()),
-    /** THE CRUX: the tool_use we owe a tool_result for. */
-    pendingToolUseId: v.union(v.null(), v.string()),
-    pendingPresetId: v.union(v.null(), v.string()),
+  /** Hot counters, kept off `jams` so a chat insert never re-runs jams.state. */
+  jamCounters: defineTable({
+    jamId: v.id("jams"),
+    /** Every chat insert reads and writes it: chat order is commit order. */
+    chatSeq: v.number(),
+    reactionBudget: v.number(),
+    lastProducerSeq: v.number(),
+  }).index("by_jam", ["jamId"]),
 
-    /**
-     * Pinned once, at setTarget/startFromPrompt, and used verbatim by every
-     * browser that renders for this session. Tone.Offline takes sampleRate
-     * explicitly, so a fixed spec makes renders comparable across machines.
-     */
-    renderSpec: v.union(v.null(), vRenderSpec),
-
-    // --- turn control (replaces the DO's single-threaded serialization) ---
-    /**
-     * The fencing token, and the entire answer to "actions are not
-     * transactional". Every terminal branch bumps it; commit/fail/watchdog
-     * no-op unless their token still matches. An action that overran its lease
-     * therefore cannot append a tool_use into a log that has moved on.
-     */
+  musicians: defineTable({
+    jamId: v.id("jams"),
+    kind: vMusicianKind,
+    role: vRole,
+    name: v.string(),
+    muted: v.boolean(),
+    status: vBandStatus,
+    turnCause: nullable(vTurnCause),
+    /** Fencing token for band turns; every terminal branch bumps it. */
     turnSeq: v.number(),
     /** ms epoch; 0 when no turn is in flight. */
     turnDeadline: v.number(),
-    /** Who triggered this turn — inherits render duty for its proposal. */
-    turnStartedBy: v.union(v.null(), v.string()),
-    /** tool_choice: "any" in the refine loop, "auto" in chat. */
-    turnForce: v.boolean(),
-    turnIsFirstProposal: v.boolean(),
-    turnJobId: v.union(v.null(), v.id("_scheduled_functions")),
-
-    // --- render lease ----------------------------------------------------
-    renderOwnerClientId: v.union(v.null(), v.string()),
-    renderLeaseUntil: v.number(),
-    /**
-     * Lease generation. The client's dedupe key is `${presetId}#${attemptNo}`,
-     * never presetId alone — otherwise a client that tried once and failed would
-     * permanently blacklist the very preset it may later need to rescue.
-     */
-    renderAttemptNo: v.number(),
-
-    // --- bookkeeping -----------------------------------------------------
-    msgSeq: v.number(),
-    chatSeq: v.number(),
-    lastError: v.union(v.null(), v.string()),
-    lastErrorRetryable: v.boolean(),
+    /** The last chat seq this musician has read. */
+    chatCursor: v.number(),
+    /** Set while a design runs; holds the band inbox. */
+    activeDesignId: nullable(v.id("designs")),
   })
-    .index("by_slug", ["slug"])
-    // Watchdog scan for turns whose action died without committing.
+    .index("by_jam", ["jamId"])
+    .index("by_status_deadline", ["status", "turnDeadline"]),
+
+  parts: defineTable({
+    musicianId: v.id("musicians"),
+    jamId: v.id("jams"),
+    version: v.number(),
+    basedOn: v.number(),
+    /** The basedOn this row replaced (for wave 2 undo); null on the first row. */
+    prev: nullable(v.number()),
+    /** Mute before a scene recall (wave 2 undo). */
+    prevMuted: nullable(v.boolean()),
+    /** One mutation stamps all its rows with one txn. */
+    txn: v.string(),
+    /** Set on undo copies: the txn they reverse. */
+    undoes: nullable(v.string()),
+    source: vPartSource,
+    /** Rail caption: the agent's `say` or the pick name. */
+    label: v.string(),
+    lengthBars: vLengthBars,
+    /** Pitched notes or drum hits; ≤ 256. Empty = lays out. */
+    notes: v.union(v.array(vPitchedNote), v.array(vDrumHit)),
+    /** The sound; null for the kit and for a producer part's… never (you always have a sound). */
+    libraryId: nullable(v.id("library")),
+  })
+    .index("by_musician_version", ["musicianId", "version"])
+    .index("by_jam", ["jamId"]),
+
+  /** A sound-design job: today's measured loop, owned by one musician. */
+  designs: defineTable({
+    musicianId: v.id("musicians"),
+    status: vDesignStatus,
+    origin: vDesignOrigin,
+    target: nullable(vFeatureSummary),
+    /** Filename etc. of the target WAV, for the library's provenance. */
+    targetInfo: nullable(vTargetInfo),
+    targetAudioId: nullable(v.id("_storage")),
+    prompt: nullable(v.string()),
+    renderSpec: nullable(vRenderSpec),
+    iteration: v.number(),
+    /** THE CRUX: the tool_use we owe a tool_result for. */
+    pendingToolUseId: nullable(v.string()),
+    pendingPresetId: nullable(v.string()),
+    /** First caller of claimRender wins the lease. */
+    renderOwnerClientId: nullable(v.string()),
+    renderLeaseUntil: v.number(),
+    /** Lease generation; fences leaseExpired and dedupes client renders. */
+    renderAttemptNo: v.number(),
+    turnSeq: v.number(),
+    turnDeadline: v.number(),
+    noToolStrikes: v.number(),
+    lastError: nullable(v.string()),
+  })
+    .index("by_musician", ["musicianId"])
     .index("by_status_deadline", ["status", "turnDeadline"])
-    // Watchdog scan for renders nobody completed. Without this, awaiting_render
-    // has no recovery at all: a failed leaseExpired job is never re-run.
     .index("by_render_lease", ["status", "renderLeaseUntil"]),
 
-  /**
-   * The Anthropic conversation, append-only.
-   *
-   * `content` is v.any() deliberately. Hand-writing Anthropic's block union
-   * (text / thinking + signature / redacted_thinking / tool_use / tool_result /
-   * whatever ships next quarter) would reject new block types after an SDK bump
-   * and brick every live session — and there is no trust argument for validating
-   * it, since it is server-authored inside the turn action and never
-   * client-supplied. The assistant turn must be persisted VERBATIM or the next
-   * request breaks.
-   */
+  /** The Anthropic conversations: a musician's band log or a design's log. */
   messages: defineTable({
-    sessionId: v.id("sessions"),
+    convoId: v.union(v.id("musicians"), v.id("designs")),
     seq: v.number(),
     role: v.union(v.literal("user"), v.literal("assistant")),
-    content: v.any(),
-  }).index("by_session_seq", ["sessionId", "seq"]),
+    /** JSON text of the content, exactly as sent or returned (see model/messages). */
+    content: v.string(),
+  }).index("by_convo_seq", ["convoId", "seq"]),
 
   attempts: defineTable({
-    sessionId: v.id("sessions"),
-    /** The Anthropic tool_use id. Unique per proposal, so no id minting in a mutation. */
+    designId: v.id("designs"),
+    /** The tool_use id. */
     presetId: v.string(),
     iteration: v.number(),
     preset: vPreset,
     rationale: v.string(),
-    features: v.union(v.null(), vFeatureSummary),
-    distance: v.union(v.null(), v.number()),
-    /** Attribution only, both of these. Spoofable; never used for access control. */
-    askedByClientId: v.union(v.null(), v.string()),
-    measuredByClientId: v.union(v.null(), v.string()),
+    features: nullable(vFeatureSummary),
+    distance: nullable(v.number()),
     isFinal: v.boolean(),
   })
-    .index("by_session_iteration", ["sessionId", "iteration"])
-    .index("by_session_preset", ["sessionId", "presetId"]),
+    .index("by_design_iteration", ["designId", "iteration"])
+    .index("by_design_preset", ["designId", "presetId"]),
 
-  /**
-   * Persisted, multi-author chat — and the queue.
-   *
-   * Deliberately not two tables. A queued message is just a row with
-   * status:"queued", so the UI already has it (attributed, in order, with the
-   * preset its author was looking at) and the drain is "oldest queued row".
-   * Nothing has to be reconciled between a display list and a work list.
-   */
+  /** The band chat. `postChat` is its only writer. */
   chat: defineTable({
-    sessionId: v.id("sessions"),
+    jamId: v.id("jams"),
     seq: v.number(),
     kind: vChatKind,
-    status: vChatStatus,
-    authorClientId: v.union(v.null(), v.string()),
-    /** Sanitized server-side: this gets spliced into the prompt as `[nickname]`. */
-    nickname: v.union(v.null(), v.string()),
-    color: v.union(v.null(), v.string()),
+    fromMusicianId: nullable(v.id("musicians")),
+    /** Musician ids (≤ 3); empty means every agent. */
+    to: v.array(v.id("musicians")),
+    /** The one musician a nudge may trigger. */
+    reactor: nullable(v.id("musicians")),
+    replyToSeq: nullable(v.number()),
     text: v.string(),
-    /** Which preset the author was looking at — turns a stale referent into context. */
-    aboutPresetId: v.union(v.null(), v.string()),
-    suggestions: v.array(v.string()),
+    /** Producer rows: the octave you were playing in when you sent it. */
+    octave: nullable(v.number()),
+  }).index("by_jam_seq", ["jamId", "seq"]),
+
+  /** Every sound anyone has: starters, designs and tweaks. Immutable rows. */
+  library: defineTable({
+    name: v.string(),
+    role: vPitchedRole,
+    preset: vPreset,
+    features: nullable(vFeatureSummary),
+    origin: vLibraryOrigin,
+    /** The WAV filename, the prompt, or "tweak of X". */
+    source: v.string(),
+    designId: nullable(v.id("designs")),
+    fromJamId: nullable(v.id("jams")),
+    starterKey: nullable(v.string()),
   })
-    .index("by_session_seq", ["sessionId", "seq"])
-    .index("by_session_status_seq", ["sessionId", "status", "seq"]),
+    .index("by_role", ["role"])
+    .index("by_role_jam", ["role", "fromJamId"])
+    .index("by_starterKey", ["starterKey"]),
 
   /**
-   * Who is here. Its own table AND its own subscription: a heartbeat must touch
-   * nothing else, or the read set joins every live turn commit's conflict domain,
-   * and a 10s heartbeat per contributor would otherwise re-push every preset in
-   * the session to everyone.
-   */
-  presence: defineTable({
-    sessionId: v.id("sessions"),
-    clientId: v.string(),
-    nickname: v.string(),
-    color: v.string(),
-    joinedAt: v.number(),
-    lastSeen: v.number(),
-    /**
-     * ms epoch through which this client expects to be playing notes.
-     * Tone.Offline swaps the global Tone context, so drafting someone as renderer
-     * mutes them mid-phrase — this is how render duty prefers a silent lurker.
-     */
-    playingUntil: v.number(),
-  })
-    .index("by_session_client", ["sessionId", "clientId"])
-    .index("by_session_lastSeen", ["sessionId", "lastSeen"]),
-
-  /**
-   * Scripted responses for the fake LLM (CLAUDIO_FAKE_LLM=1). In the schema on
-   * every deployment so tests and dev share one shape; every read and write
-   * through `testing:*` is refused unless the flag is set.
-   *
-   * `match` is the cue (role or "design", plus a keyword); `turnIndex` picks
-   * which turn of that cue gets `response`. `response` is v.any() for the same
-   * reason `messages.content` is: it's a test fixture, shaped by fakeClaude.
+   * Scripted responses for the fake LLM (CLAUDIO_FAKE_LLM=1). Every read and
+   * write through `testing:*` is refused unless the flag is set.
    */
   fakeScripts: defineTable({
     match: v.string(),

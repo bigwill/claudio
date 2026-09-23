@@ -3,4 +3,4 @@
  * the app, so the engine can be heard and tested on its own.
  */
 if (new URLSearchParams(location.search).has("spike")) void import("./spike");
-else void import("./main");
+else void import("./band/app");

@@ -7,11 +7,17 @@
  * Each starter keeps its provenance (the WAV it was designed from) so the
  * library drawer can show where a sound came from. Re-running a key replaces
  * just that entry; the others are kept.
+ *
+ * RETIRED IN SLICE 3: this drives the pre-band app (deleted). Slice 4 brings it
+ * back on designs.start. The starters it built are in src/shared/starterSounds.ts.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 import { runDesign } from "./design-run.mjs";
 import { convex, withRealModel } from "./devstack.mjs";
+
+console.error("[build-starters] retired until slice 4 (it drove the deleted pre-band app).");
+process.exit(2);
 
 if (!process.argv.includes("--yes")) {
   console.error("[build-starters] spends real API money. Re-run with --yes.");

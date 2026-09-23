@@ -2,6 +2,9 @@
  * Drive one WAV design through today's app in a real browser (the browser does
  * the renders), and report its outcome. Used by spike-1b.mjs and
  * build-starters.mjs. Call inside withRealModel().
+ *
+ * RETIRED IN SLICE 3: this drives the pre-band app (deleted). Slice 4 brings it
+ * back on designs.start. The starters it built are in src/shared/starterSounds.ts.
  */
 import { chromium } from "playwright";
 

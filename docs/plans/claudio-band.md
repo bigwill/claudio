@@ -642,3 +642,13 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **Tests (written first):** unique keys, presets already in range, provenance present, the parts already clamped, none laying out.
   - **Spike page:** now plays the starters; `B` cycles the focused bass or keys strip through its starter sounds (it was `G` at first, but `G` is a playing key; `B` is the key map's library key). Waiting on Will's listen.
 - 2026-09-22: **Slice 2 done.** Will's listen passed: the starter loop sounds good on its own, with sound cycling on `B`.
+- 2026-09-22: **Slice 3, steps 1–2.**
+  - **Step 1 (tests first):** `planHistory` + `pipLabels`, `planDrain`, `routeKey` (including the S11b unit matrix).
+    - `version` is sequential over all part rows; pips are labelled by their order among content versions, so the canonical example reads v1–v5.
+  - **Step 2:** local data wiped with `convex import --replace-all` (env vars survive; deleting the backend's sqlite would have lost the API key). The new §1 schema is in, and the design loop is re-keyed onto `designs`:
+    - Same fence and commit branches; `planForAction` and `commit` carry JSON text.
+    - Render ownership is first-caller-wins: a proposal opens a claim window, and a lapsed window or lease reopens until `MAX_RENDER_ATTEMPTS`, then fails.
+    - Design notices go to the band chat through `postChat`.
+    - A text-only design turn fails the design for now; slice 4 turns it into the two-strike guard.
+  - **Deleted:** sessions, presence, `fork`, the session chat queue, `main.ts`, `reconcile.ts`, `identity.ts`, `verify:loop`, and the session-based spike functions and replay script (their results stay in `docs/spikes/`).
+  - **Retired until slice 4:** `build-starters.mjs` (it drove the deleted app) and `spike-1b.mjs --design`.

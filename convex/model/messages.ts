@@ -50,61 +50,41 @@ type DiffForPrompt = Pick<
   harmonics: readonly unknown[];
 };
 
-/**
- * Append to the log and advance the session's sequence counter in the same
- * transaction. In the Durable Object these were two `sql.exec` calls that a
- * crash could split; here they cannot come apart.
- */
-export async function appendMessage(
-  ctx: MutationCtx,
-  session: Doc<"sessions">,
-  message: MessageParam,
-): Promise<number> {
-  const seq = session.msgSeq;
-  await ctx.db.insert("messages", {
-    sessionId: session._id,
-    seq,
-    role: message.role,
-    content: encodeContent(message.content),
-  });
-  await ctx.db.patch(session._id, { msgSeq: seq + 1 });
-  // Keep the caller's copy usable for further appends in the same transaction.
-  session.msgSeq = seq + 1;
-  return seq;
-}
+export type ConvoId = Id<"musicians"> | Id<"designs">;
 
-export async function loadMessages(
-  ctx: QueryCtx,
-  sessionId: Id<"sessions">,
-): Promise<MessageParam[]> {
-  const rows = await ctx.db
-    .query("messages")
-    .withIndex("by_session_seq", (q) => q.eq("sessionId", sessionId))
-    .order("asc")
-    .collect();
-  return rows.map((r) => ({ role: r.role, content: decodeContent(r.content) }) as MessageParam);
-}
-
-export async function tailMessage(
-  ctx: QueryCtx,
-  sessionId: Id<"sessions">,
-): Promise<Doc<"messages"> | null> {
+/** The newest message of a conversation, or null. */
+export async function tailMessage(ctx: QueryCtx, convoId: ConvoId): Promise<Doc<"messages"> | null> {
   return await ctx.db
     .query("messages")
-    .withIndex("by_session_seq", (q) => q.eq("sessionId", sessionId))
+    .withIndex("by_convo_seq", (q) => q.eq("convoId", convoId))
     .order("desc")
     .first();
 }
 
-export async function clearMessages(
-  ctx: MutationCtx,
-  sessionId: Id<"sessions">,
-): Promise<void> {
+/**
+ * Append to a conversation. The next seq is read newest-first from the index,
+ * plus one: no counter on the (subscribed) musician or design document, so an
+ * append never re-runs a query that reads them.
+ */
+export async function appendMessage(ctx: MutationCtx, convoId: ConvoId, message: MessageParam): Promise<number> {
+  const tail = await tailMessage(ctx, convoId);
+  const seq = tail ? tail.seq + 1 : 0;
+  await ctx.db.insert("messages", {
+    convoId,
+    seq,
+    role: message.role,
+    content: encodeContent(message.content),
+  });
+  return seq;
+}
+
+export async function loadMessages(ctx: QueryCtx, convoId: ConvoId): Promise<MessageParam[]> {
   const rows = await ctx.db
     .query("messages")
-    .withIndex("by_session_seq", (q) => q.eq("sessionId", sessionId))
+    .withIndex("by_convo_seq", (q) => q.eq("convoId", convoId))
+    .order("asc")
     .collect();
-  for (const r of rows) await ctx.db.delete(r._id);
+  return rows.map((r) => ({ role: r.role, content: decodeContent(r.content) }) as MessageParam);
 }
 
 /**
