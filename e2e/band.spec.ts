@@ -186,3 +186,15 @@ test("focus: Esc closes the ? overlay and the library picker, and ? toggles", as
   await expect(page.getByTestId("picker")).toHaveCount(0);
   await expect(page.getByTestId("mode")).toHaveText("PLAY");
 });
+
+test("focus: clicking back into the main pane leaves chat, and the keyboard plays again", async ({ page }) => {
+  await openJam(page);
+  await page.getByTestId("chat-input").click();
+  await expect(page.getByTestId("mode")).toHaveText("CHAT");
+  await page.locator("#strips").click({ position: { x: 600, y: 520 } });
+  await expect(page.getByTestId("mode")).toHaveText("PLAY");
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("KeyA");
+  const calls = await page.evaluate(() => (window as unknown as W).__band.calls);
+  expect(calls.some((c) => c.track === "bass" && c.method === "attack")).toBe(true);
+});

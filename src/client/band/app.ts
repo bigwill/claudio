@@ -679,6 +679,11 @@ $<HTMLInputElement>("chatin").addEventListener("keydown", (e) => {
 $<HTMLInputElement>("chatin").addEventListener("focus", () => {
   if (ui.mode !== "chat") setMode("chat");
 });
+// Clicking anywhere else takes focus from the chat box: that also leaves chat,
+// or every key would keep "typing" into a box that no longer has focus.
+$<HTMLInputElement>("chatin").addEventListener("blur", () => {
+  if (ui.mode === "chat") setMode("play");
+});
 
 document.addEventListener("click", (e) => {
   const t = e.target as HTMLElement;
