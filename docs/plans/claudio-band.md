@@ -741,3 +741,9 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **Prompt:** a note about a sound's character now means `set_sound` (a named tweak), and `use_library_sound` only when a sound is named or a different instrument is asked for. On real Sonnet, "@keys make it glassier" went 5/5 to a tweak (3.7–4.8s); before the change it had picked a library sound.
   - **`docs/headline.md`:** the keystroke script, updated for bar landing, design in chat and `V`. The fallback is picking the EP designed earlier from the same WAV.
   - **E2E H (the headline, steps 1–5, keyboard-first).** It found a real race: `B` `↓` `Enter` typed before the library loaded opened chat. `B` now enters picker mode at once and applies keys typed ahead (new E2E test).
+- 2026-09-23: **Slice 6 done (wave 1 complete).** `npm run smoke:real -- --yes` now runs the headline on real models (S2, S4, S5 and scenes, with screenshots in `test-results/smoke/`).
+  - **Result: 3/3 headline runs passed; band reply p50 3.9s** over 12 notes (bar: ≤ 10s).
+  - **Design (Opus 5.5):** 21.8 / 23.7 / 23.8s, no text-only turns. That sets the headline cutoff at 60s (in `docs/headline.md`).
+  - "Glassier" was a `set_sound` tweak 3/3, "one try too far" landed 3/3, and ← restored the good version 3/3.
+  - The first smoke attempt reported 0/3 because of a harness bug: an earlier "keys now plays …" system row counted as keys' answer. Fixed to count only rows after the note; the rerun is the result above.
+  - Rails: E2E H green, `npm run check` green, smoke 3/3.
