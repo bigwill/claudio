@@ -143,3 +143,66 @@ export function fakeClaudeMessage(plan: FakePlan): { content: unknown; stop_reas
     stop_reason: "tool_use",
   };
 }
+
+// ---------------------------------------------------------------------------
+// Band turns (slice 5): keyword defaults, so the whole band loop runs offline.
+// "busier" includes an accent (plan: the summary shows X).
+// ---------------------------------------------------------------------------
+
+type Msg = { role: string; content: unknown };
+
+function lastUserText(messages: Msg[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "user") continue;
+    if (typeof m.content === "string") return m.content;
+    const text = (m.content as Array<{ type: string; text?: string }>).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+    if (text.includes("[band snapshot]")) return text;
+  }
+  return "";
+}
+
+export function fakeBandMessage(role: "drums" | "bass" | "keys", messages: Msg[]): { content: unknown; stop_reason: string } {
+  const text = lastUserText(messages);
+  const notes = text.split("\n").filter((l) => l.startsWith("[producer"));
+  const note = (notes.at(-1) ?? "").toLowerCase();
+  const turn = messages.filter((m) => m.role === "assistant").length;
+  const use = (name: string, input: Record<string, unknown>) => ({
+    content: [{ type: "tool_use", id: `toolu_fakeband${role}${String(turn).padStart(4, "0")}`, name, input }],
+    stop_reason: "tool_use",
+  });
+
+  if (note.includes("?")) return use("just_reply", { say: "Happy where it sits. Say the word and I'll move." });
+
+  if (role === "drums") {
+    const hat = Array.from({ length: 16 }, (_, step) => ({ step, voice: step === 14 ? "openhat" : "hat", vel: 0.55, accent: step % 4 === 0 }));
+    const hits = [0, 6, 8, 11].map((step) => ({ step, voice: "kick", vel: 0.95, accent: step === 0 })).concat(
+      [4, 12].map((step) => ({ step, voice: "snare", vel: 0.8, accent: false })),
+      hat,
+    );
+    return use("set_drum_pattern", { say: "Sixteenth hats, a kick push into 3.", lengthBars: 1, hits });
+  }
+
+  if (/glass|bright|dark|warm|mellow|shimmer|sound|tone/.test(note)) {
+    const current = text.match(/^Your sound: (.+)\n(\{.*\})$/m);
+    const preset = current ? (JSON.parse(current[2]) as Record<string, unknown>) : { ...DEFAULT_PRESET };
+    const brighter = !/dark|warm|mellow/.test(note);
+    const mi = Number(preset.modulationIndex ?? 4);
+    return use("set_sound", {
+      say: brighter ? "More shimmer on top." : "Rounded it off.",
+      preset: {
+        ...preset,
+        name: `${current?.[1] ?? "Sound"} (${brighter ? "glassier" : "warmer"})`,
+        modulationIndex: Math.max(0, mi + (brighter ? 4 : -3)),
+        harmonicity: brighter ? 3.5 : preset.harmonicity,
+      },
+    });
+  }
+
+  const eighths = [0, 2, 4, 6, 8, 10, 12, 14];
+  const notesOut =
+    role === "bass"
+      ? eighths.map((step) => ({ step, deg: step === 6 || step === 14 ? 4 : 0, len: 1, vel: 0.8, accent: step === 0 || step === 8 }))
+      : eighths.flatMap((step) => [0, 2, 4].map((deg) => ({ step, deg, len: 1, vel: 0.6, accent: step === 0 })));
+  return use("set_pattern", { say: role === "bass" ? "Eighths on the root, a fifth at the ends." : "Eighth-note stabs.", lengthBars: 1, notes: notesOut });
+}

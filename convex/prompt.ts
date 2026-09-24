@@ -165,7 +165,7 @@ The iteration budget is small (usually 3). Spend it: iteration 1 picks an archet
 largest weighted errors — or deliberately chase character the numbers don't capture, if that makes it better.
 `.trim();
 
-const ENGINE_FACTS = `
+export const ENGINE_FACTS = `
 THE ENGINE (fixed topology, four operators, no algorithm switching):
 
     op4 --(modulatorFm.index)--> op3 --(modulationIndex)--+

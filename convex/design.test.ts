@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { inboxPlan } from "./model/design";
+import { inboxPlan } from "./model/inbox";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -226,16 +226,19 @@ describe("S8: design failures", () => {
     expect((await designOf(t, designId)).status).toBe("awaiting_render");
   });
 
-  test("a note held during the design is waiting in the inbox when the design ends", async () => {
+  test("a note held during the design is delivered afterwards: it starts that musician's band turn", async () => {
+    // Was "…is waiting in the inbox…" (slice 4, before band turns existed).
+    // Changed in slice 5 to what S8 specifies; see the plan's change log.
     const { t, jamId, keys } = await scripted([{ stop_reason: "refusal", content: [] }]);
     const designId = await startWav(t, keys._id);
-    const noteSeq = await t.mutation(api.chat.send, { jamId, text: "@keys glassier please", octave: 4 });
+    await t.mutation(api.chat.send, { jamId, text: "@keys glassier please", octave: 4 });
     expect(await t.run((ctx) => inboxPlan(ctx, keys._id))).toEqual({ action: "hold" });
-    await settle(t);
+    await settle(t); // the design refuses and ends; the held note starts a band turn
     expect((await designOf(t, designId)).status).toBe("failed");
-    const plan = await t.run((ctx) => inboxPlan(ctx, keys._id));
-    expect(plan).toMatchObject({ action: "turn", cause: "producer" });
-    expect((plan as { rows: number[] }).rows).toContain(noteSeq);
+    const m = await musician(t, keys._id);
+    expect(m.status).toBe("thinking");
+    const log = await t.run((ctx) => ctx.db.query("messages").withIndex("by_convo_seq", (q) => q.eq("convoId", keys._id)).collect());
+    expect(log.at(-1)!.content).toContain("glassier please");
   });
 });
 

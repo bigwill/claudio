@@ -9,18 +9,21 @@
  */
 
 import type * as agent from "../agent.js";
+import type * as band from "../band.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as designs from "../designs.js";
 import type * as fakeClaude from "../fakeClaude.js";
 import type * as jams from "../jams.js";
 import type * as library from "../library.js";
+import type * as llm from "../llm.js";
 import type * as model_bandTools from "../model/bandTools.js";
 import type * as model_chat from "../model/chat.js";
 import type * as model_commit from "../model/commit.js";
 import type * as model_design from "../model/design.js";
 import type * as model_drain from "../model/drain.js";
 import type * as model_history from "../model/history.js";
+import type * as model_inbox from "../model/inbox.js";
 import type * as model_jam from "../model/jam.js";
 import type * as model_llmConfig from "../model/llmConfig.js";
 import type * as model_messages from "../model/messages.js";
@@ -29,6 +32,7 @@ import type * as model_tools from "../model/tools.js";
 import type * as musicians from "../musicians.js";
 import type * as parts from "../parts.js";
 import type * as prompt from "../prompt.js";
+import type * as prompts_band from "../prompts/band.js";
 import type * as render from "../render.js";
 import type * as spikes from "../spikes.js";
 import type * as testing from "../testing.js";
@@ -43,18 +47,21 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agent: typeof agent;
+  band: typeof band;
   chat: typeof chat;
   crons: typeof crons;
   designs: typeof designs;
   fakeClaude: typeof fakeClaude;
   jams: typeof jams;
   library: typeof library;
+  llm: typeof llm;
   "model/bandTools": typeof model_bandTools;
   "model/chat": typeof model_chat;
   "model/commit": typeof model_commit;
   "model/design": typeof model_design;
   "model/drain": typeof model_drain;
   "model/history": typeof model_history;
+  "model/inbox": typeof model_inbox;
   "model/jam": typeof model_jam;
   "model/llmConfig": typeof model_llmConfig;
   "model/messages": typeof model_messages;
@@ -63,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   musicians: typeof musicians;
   parts: typeof parts;
   prompt: typeof prompt;
+  "prompts/band": typeof prompts_band;
   render: typeof render;
   spikes: typeof spikes;
   testing: typeof testing;

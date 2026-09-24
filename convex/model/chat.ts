@@ -3,11 +3,11 @@
  *
  * The seq comes from jamCounters (read and written in this transaction), so
  * chat order is commit order and a musician's cursor can never skip a row.
- * Draining each target's inbox after the insert is slice 5 (drainInbox).
  */
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { drainInbox } from "./inbox";
 
 export interface ChatRowInput {
   kind: Doc<"chat">["kind"];
@@ -30,7 +30,11 @@ export async function countersFor(ctx: MutationCtx, jamId: Id<"jams">): Promise<
   return c;
 }
 
-/** Insert one chat row; returns its seq. */
+/**
+ * Insert one chat row, then drain each target's inbox (plan §4): the row's
+ * `to[]`, or every agent when it's empty, never its own author. A producer
+ * note to an idle musician starts its turn in this same mutation.
+ */
 export async function postChat(ctx: MutationCtx, jamId: Id<"jams">, row: ChatRowInput): Promise<number> {
   const counters = await countersFor(ctx, jamId);
   const seq = counters.chatSeq + 1;
@@ -49,5 +53,13 @@ export async function postChat(ctx: MutationCtx, jamId: Id<"jams">, row: ChatRow
     text: row.text.slice(0, 2000),
     octave: row.octave ?? null,
   });
+  const band = await ctx.db
+    .query("musicians")
+    .withIndex("by_jam", (q) => q.eq("jamId", jamId))
+    .take(4);
+  const targets = band.filter(
+    (m) => m.kind === "agent" && m._id !== row.fromMusicianId && (!row.to?.length || row.to.includes(m._id)),
+  );
+  for (const m of targets) await drainInbox(ctx, m._id);
   return seq;
 }

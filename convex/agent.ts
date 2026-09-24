@@ -26,28 +26,14 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { fakeClaudeMessage, fakeLlmEnabled } from "./fakeClaude";
+import { fakeClaudeMessage } from "./fakeClaude";
+import { callModel } from "./llm";
 import { v } from "convex/values";
 
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, type ActionCtx } from "./_generated/server";
 import { MAX_TOKENS, MUST_CALL_TOOL_RULE, SYSTEM_BLOCKS, TOOLS } from "./prompt";
-import { TURN_LEASE_MS } from "../src/shared/protocol";
-
-const API_URL = "https://api.anthropic.com/v1/messages";
-const API_VERSION = "2023-06-01";
-
-/**
- * Bound the call explicitly.
- *
- * Under Cloudflare this was free: the edge killed any request past ~100s, so a
- * hung call could not outlive its turn. Nothing bounds it in a Convex action, so
- * without this a single wedged request could hold a session far past the point
- * anyone is still waiting. Kept under TURN_LEASE_MS so the abort fires before the
- * watchdog reclaims the turn underneath it.
- */
-const REQUEST_TIMEOUT_MS = Math.floor(TURN_LEASE_MS * 0.6);
 
 /**
  * The design model, switchable per deployment (plan slice 1b):
@@ -63,11 +49,6 @@ function designModel(): string {
 const DEFAULT_DESIGN_MODEL = "claude-opus-5-5";
 const FORCED_TOOL_CHOICE_UNSUPPORTED = new Set(["claude-opus-5-5"]);
 
-interface AnthropicResponse {
-  content: unknown;
-  stop_reason: string | null;
-}
-
 export const runTurn = internalAction({
   args: { designId: v.id("designs"), turnSeq: v.number() },
   returns: v.null(),
@@ -79,52 +60,27 @@ export const runTurn = internalAction({
     // Parsed here, not in the query: see planForAction's messagesJson.
     const plan = { ...planned, messages: JSON.parse(planned.messagesJson) as Anthropic.MessageParam[] };
 
-    // Offline mode: skip the network entirely. Checked BEFORE the key lookup so
-    // a machine with no ANTHROPIC_API_KEY still runs the full loop.
-    if (fakeLlmEnabled()) {
-      // A scripted response (fakeScripts, keyed by how many assistant turns
-      // came before) wins; otherwise the deterministic stub.
-      const turnIndex = plan.messages.filter((m) => m.role === "assistant").length;
-      const scripted = await ctx.runQuery(internal.testing.scriptFor, { match: "design", turnIndex });
-      const fake = scripted
-        ? (JSON.parse(scripted) as { content: unknown; stop_reason: string | null })
-        : fakeClaudeMessage(plan as PlanForAction);
-      await commitOrFail(ctx, args, () =>
-        ctx.runMutation(internal.turn.commit, {
-          designId: args.designId,
-          turnSeq: args.turnSeq,
-          content: JSON.stringify(fake.content),
-          stopReason: fake.stop_reason,
-        }),
-      );
+    const turnIndex = plan.messages.filter((m) => m.role === "assistant").length;
+    const outcome = await callModel(ctx, "design", designRequest(plan as PlanForAction), {
+      match: "design",
+      turnIndex,
+      fallback: () => fakeClaudeMessage(plan as PlanForAction),
+    });
+    if (outcome.kind === "hang") return null; // the watchdog reclaims it
+    if (outcome.kind === "timeout") {
+      await fail(ctx, args, "the designer took too long to answer", true);
       return null;
     }
-
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      await fail(
-        ctx,
-        args,
-        "ANTHROPIC_API_KEY is not set on this Convex deployment. Run: npx convex env set ANTHROPIC_API_KEY sk-ant-…",
-        false,
-      );
+    if (outcome.kind === "error") {
+      await fail(ctx, args, `the model call failed (${outcome.message})`, true);
       return null;
     }
-
-    let message: AnthropicResponse;
-    try {
-      message = await callClaude(apiKey, plan as PlanForAction);
-    } catch (err) {
-      await fail(ctx, args, `Claude call failed: ${String(err)}`, true);
-      return null;
-    }
-
     await commitOrFail(ctx, args, () =>
       ctx.runMutation(internal.turn.commit, {
         designId: args.designId,
         turnSeq: args.turnSeq,
-        content: JSON.stringify(message.content),
-        stopReason: message.stop_reason,
+        content: JSON.stringify(outcome.content),
+        stopReason: outcome.stopReason,
       }),
     );
     return null;
@@ -137,49 +93,23 @@ interface PlanForAction {
   isFirstProposal: boolean;
 }
 
-async function callClaude(apiKey: string, plan: PlanForAction): Promise<AnthropicResponse> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+/** The design request (plan §4 "Design jobs"); llm.ts sends it. */
+function designRequest(plan: PlanForAction): Record<string, unknown> {
   const model = designModel();
   const canForce = !FORCED_TOOL_CHOICE_UNSUPPORTED.has(model);
   const system =
     plan.force && !canForce ? [...SYSTEM_BLOCKS, { type: "text" as const, text: MUST_CALL_TOOL_RULE }] : SYSTEM_BLOCKS;
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": API_VERSION,
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: MAX_TOKENS,
-        thinking: { type: "adaptive" },
-        output_config: { effort: plan.isFirstProposal ? "medium" : "low" },
-        system,
-        tools: TOOLS,
-        tool_choice:
-          plan.force && canForce
-            ? { type: "any", disable_parallel_tool_use: true }
-            : { type: "auto", disable_parallel_tool_use: true },
-        messages: plan.messages,
-      }),
-    });
-
-    if (!res.ok) {
-      // Include the body: Anthropic's 400s say exactly what is wrong with the
-      // request shape, and that message is the difference between a five-minute
-      // fix and an afternoon.
-      const body = await res.text().catch(() => "");
-      throw new Error(`${res.status} ${res.statusText} ${body.slice(0, 600)}`);
-    }
-    return (await res.json()) as AnthropicResponse;
-  } finally {
-    clearTimeout(timer);
-  }
+  return {
+    model,
+    max_tokens: MAX_TOKENS,
+    thinking: { type: "adaptive" },
+    output_config: { effort: plan.isFirstProposal ? "medium" : "low" },
+    system,
+    tools: TOOLS,
+    tool_choice:
+      plan.force && canForce ? { type: "any", disable_parallel_tool_use: true } : { type: "auto", disable_parallel_tool_use: true },
+    messages: plan.messages,
+  };
 }
 
 async function fail(

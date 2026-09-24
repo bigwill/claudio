@@ -24,7 +24,7 @@ import { ConvexError } from "convex/values";
 import type { FeatureSummary } from "../../src/shared/features";
 import { MAX_ITERATIONS, MAX_RENDER_ATTEMPTS, RENDER_LEASE_MS, TURN_LEASE_MS, type RenderSpec } from "../../src/shared/protocol";
 import { postChat } from "./chat";
-import { planDrain, type DrainPlan } from "./drain";
+import { drainInbox } from "./inbox";
 import { appendPart, discardTurn, newestPart, newTxn } from "./jam";
 import { abandonedRenderToolResult, appendMessage } from "./messages";
 
@@ -171,39 +171,6 @@ export async function endDesign(ctx: MutationCtx, design: Design, outcome: Desig
     await postChat(ctx, m.jamId, { kind: "system", text: `${m.name}'s sound design stopped: ${outcome.why}.`, to: [m._id] });
   }
   await drainInbox(ctx, m._id);
-}
-
-/** planDrain over a musician's unread chat (plan §4 drainInbox, step 2). */
-export async function inboxPlan(ctx: QueryCtx, musicianId: Id<"musicians">): Promise<DrainPlan> {
-  const m = await ctx.db.get(musicianId);
-  if (!m) return { action: "none" };
-  const counters = await ctx.db
-    .query("jamCounters")
-    .withIndex("by_jam", (q) => q.eq("jamId", m.jamId))
-    .unique();
-  const jam = await ctx.db.get(m.jamId);
-  const rows = await ctx.db
-    .query("chat")
-    .withIndex("by_jam_seq", (q) => q.eq("jamId", m.jamId).gt("seq", m.chatCursor))
-    .take(50);
-  return planDrain({
-    musician: { id: m._id, kind: m.kind, status: m.status, activeDesignId: m.activeDesignId, chatCursor: m.chatCursor },
-    rows: rows.map((r) => ({ seq: r.seq, kind: r.kind, fromMusicianId: r.fromMusicianId, to: r.to, reactor: r.reactor })),
-    lastProducerSeq: counters?.lastProducerSeq ?? 0,
-    reactionBudget: counters?.reactionBudget ?? 0,
-    reactive: jam?.reactive ?? true,
-  });
-}
-
-/**
- * Drain a musician's inbox. Slice 4 applies the cursor for "advance"; a
- * "turn" (a held producer note, say) stays unread until slice 5, where this
- * appends the user turn and begins the band turn in the same mutation.
- */
-export async function drainInbox(ctx: MutationCtx, musicianId: Id<"musicians">): Promise<DrainPlan> {
-  const plan = await inboxPlan(ctx, musicianId);
-  if (plan.action === "advance") await ctx.db.patch(musicianId, { chatCursor: plan.cursor });
-  return plan;
 }
 
 /** A claim window or lease lapsed: reopen it for the next caller, or give up. */

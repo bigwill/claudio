@@ -16,6 +16,7 @@ import { beginDesignTurn, endDesign, openRenderWindow, reopenOrAbandonRender } f
 export const NO_TOOL_NUDGE = "Call propose_preset or finalize now.";
 import { appendMessage, decodeContent, finalizeToolResult, loadMessages, unknownToolResult } from "./model/messages";
 import { readAssistantTurn, readToolInput } from "./model/tools";
+import { failTurn } from "./band";
 
 /**
  * Everything the action needs, in ONE read. Null when this turn has been
@@ -167,7 +168,7 @@ export const fail = internalMutation({
 /**
  * The backstop for design turns and renders that died without telling anyone.
  * `thinking` covers a crashed or killed action; `awaiting_render` covers a
- * lease whose one-shot leaseExpired job failed. Band turns join in slice 5.
+ * lease whose one-shot leaseExpired job failed; band turns likewise.
  */
 export const watchdog = internalMutation({
   args: {},
@@ -186,6 +187,14 @@ export const watchdog = internalMutation({
       .withIndex("by_render_lease", (q) => q.eq("status", "awaiting_render").lt("renderLeaseUntil", now))
       .take(25);
     for (const d of stuckRenders) await reopenOrAbandonRender(ctx, d, now);
+
+    // Band turns (plan §4 "Band watchdog"): a turn past its deadline is failed
+    // with the ignore note and its system row, then drained.
+    const stuckBand = await ctx.db
+      .query("musicians")
+      .withIndex("by_status_deadline", (q) => q.eq("status", "thinking").lt("turnDeadline", now))
+      .take(25);
+    for (const m of stuckBand) await failTurn(ctx, m, "stuck");
     return null;
   },
 });
