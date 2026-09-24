@@ -41,6 +41,22 @@ export function decodeContent(stored: unknown): unknown {
   return typeof stored === "string" ? JSON.parse(stored) : stored;
 }
 
+/**
+ * Merge adjacent same-role messages, the same way on every call. The Anthropic
+ * docs disagree on whether consecutive user messages are allowed; merging makes
+ * it moot. Nothing stored is edited: this shapes the request only.
+ */
+export function mergeAdjacentRoles(messages: MessageParam[]): MessageParam[] {
+  const blocks = (c: unknown): unknown[] => (typeof c === "string" ? [{ type: "text", text: c }] : Array.isArray(c) ? c : [c]);
+  const out: MessageParam[] = [];
+  for (const m of messages) {
+    const last = out[out.length - 1];
+    if (last && last.role === m.role) last.content = [...blocks(last.content), ...blocks(m.content)];
+    else out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
 /** What the diff needs to look like to be serialized into a tool_result. */
 type DiffForPrompt = Pick<
   FeatureDiff,

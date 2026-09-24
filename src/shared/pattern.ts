@@ -85,6 +85,15 @@ export function chordRootDegree(progression: readonly number[], bar: number): nu
   return r > 3 ? r - 7 : r;
 }
 
+export const NOTE_NAMES = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"] as const;
+
+/** "Dm", "B♭", "F": the chord built on a scale degree (minor if its third is minor). */
+export function chordName(keyPc: number, scale: Scale, deg: number): string {
+  const root = degreeToMidi(keyPc, scale, deg, 4);
+  const third = degreeToMidi(keyPc, scale, deg + 2, 4) - root;
+  return `${NOTE_NAMES[root % 12]}${third === 3 ? "m" : ""}`;
+}
+
 export function accentedVel(vel: number, accent: boolean): number {
   return accent ? Math.min(1, vel + ACCENT_BOOST) : vel;
 }
