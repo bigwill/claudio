@@ -13,3 +13,6 @@ dist/
 # Playwright
 test-results/
 playwright-report/
+
+# Claudio Band hosted copy (scripts/deploy-band.mjs)
+.env.band
