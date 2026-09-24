@@ -19,6 +19,7 @@ import { DRUM_VOICES, ROLE_OCTAVE, STEPS_PER_BAR, degreeToMidi } from "../../sha
 import type { DrumHit, Pattern, PitchedNote, Scale } from "../../shared/pattern";
 import { newSessionId } from "../../shared/protocol";
 import { routeNote } from "../../shared/route";
+import { LLM } from "../../../convex/model/llmConfig";
 import { routeKey, type KeyAction, type Mode, type Strip as StripKey } from "./keys";
 import { CSS } from "./styles";
 
@@ -314,7 +315,9 @@ function updatePills(): void {
       text = `designing · iter ${m.design?.iteration ?? 0}`;
     } else if (m.status === "thinking") {
       cls = "thinking";
-      text = "thinking…";
+      // Computed on the client (plan §7): the query never reads the clock.
+      const since = m.turnDeadline - LLM.band.leaseMs;
+      text = `thinking… ${Math.max(0, Math.round((Date.now() - since) / 1000))}s`;
     } else {
       const n = engine?.running ? engine.landsIn(m.role as TrackId) : null;
       if (n !== null && n !== undefined) {
@@ -346,17 +349,32 @@ function renderDock(): void {
 function renderChat(): void {
   if (!state) return;
   const names = new Map(state.musicians.map((m) => [m._id as string, m.name]));
+  const roles = new Map(state.musicians.map((m) => [m._id as string, m.role]));
   const rows = [...chatRows].sort((a, b) => a.seq - b.seq);
+  // Replies thread under the note they answer (plan §7).
+  const notes = new Set(rows.filter((r) => r.kind === "producer").map((r) => r.seq));
+  const replies = new Map<number, ChatRow[]>();
+  for (const r of rows) {
+    if (r.kind === "musician" && r.replyToSeq !== null && notes.has(r.replyToSeq)) {
+      replies.set(r.replyToSeq, [...(replies.get(r.replyToSeq) ?? []), r]);
+    }
+  }
+  const one = (r: ChatRow): string => {
+    const to = r.to.length ? r.to.map((id) => `@${names.get(id) ?? "?"}`).join(" ") : "@all";
+    // The arrow already says who it's to, so leading @mentions aren't repeated.
+    const body = r.text.replace(/^(\s*@[a-z]+\b[\s,:]*)+/i, "") || r.text;
+    if (r.kind === "producer") return `<div class="msg" data-seq="${r.seq}"><span class="a" style="color:var(--you)">you</span><span class="to">→ ${esc(to)}:</span> ${esc(body)}</div>`;
+    if (r.kind === "musician") {
+      const role = roles.get(r.fromMusicianId ?? "") ?? "accent";
+      const who = names.get(r.fromMusicianId ?? "") ?? "band";
+      const threaded = r.replyToSeq !== null && notes.has(r.replyToSeq);
+      return `<div class="msg${threaded ? " reply" : ""}" data-testid="reply-${role}" data-reply-to="${r.replyToSeq ?? ""}"><span class="a" style="color:var(--${role})">${esc(who)}</span>${esc(r.text)}</div>`;
+    }
+    return `<div class="msg ${r.kind}">${esc(r.text)}</div>`;
+  };
   $("chatrows").innerHTML = rows
-    .map((r) => {
-      const to = r.to.length ? r.to.map((id) => `@${names.get(id) ?? "?"}`).join(" ") : "@all";
-      if (r.kind === "producer") return `<div class="msg"><span class="a" style="color:var(--you)">you</span><span class="to">→ ${esc(to)}:</span> ${esc(r.text)}</div>`;
-      if (r.kind === "musician") {
-        const who = names.get(r.fromMusicianId ?? "") ?? "band";
-        return `<div class="msg reply"><span class="a">${esc(who)}</span>${esc(r.text)}</div>`;
-      }
-      return `<div class="msg ${r.kind}">${esc(r.text)}</div>`;
-    })
+    .filter((r) => !(r.kind === "musician" && r.replyToSeq !== null && notes.has(r.replyToSeq)))
+    .map((r) => one(r) + (replies.get(r.seq) ?? []).map(one).join(""))
     .join("");
   const box = $("chatrows");
   box.scrollTop = box.scrollHeight;
@@ -648,9 +666,8 @@ async function act(a: KeyAction): Promise<void> {
       renderModal();
       return;
     case "vary":
-      // Slice 5 sends "@<strip> give me a variation" as a chat note, which the
-      // musician answers with a new part. Until band turns exist, say so.
-      toast(`Asking ${a.strip} for a variation arrives with the band's turns (slice 5).`);
+      // A chat note the musician answers with a new part (Will, 2026-09-22).
+      await run(band.send(j._id, `@${a.strip} give me a variation`, ui.octave, specForPrompt()));
       return;
     case "undo":
     case "cancel":
@@ -854,6 +871,8 @@ async function boot(): Promise<void> {
   });
 }
 let chatSub: (() => void) | null = null;
+// "thinking… Ns" ticks even while the transport is stopped.
+setInterval(() => updatePills(), 1000);
 
 // ---------------------------------------------------------------------------
 // Designs: starting them, and rendering their proposals in this browser

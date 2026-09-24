@@ -724,3 +724,9 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - **Tests.** convex-test S4, S5, S9a (invalid call, timeout, refusal), S9b, and S10a's two-call turn, rollback-while-thinking, rollback-mid-call (it caught a missing test: the commit-fence mutation only failed once this was added) and the rollback note.
   - **Test-only `timeoutMs` override on fake scripts:** the timeout test runs on real timers with a 50ms timeout, because convex-test's scheduler stalls under fake timers when an action waits on its own timer. It's the same abort path; the unit test pins the real 30s < 45s.
   - **Frozen test changed (S8):** "a note held during the design is waiting in the inbox…" became "…is delivered afterwards: it starts that musician's band turn", which is what S8 specifies now that band turns exist.
+- 2026-09-23: **Slice 5, step 3: the UI.**
+  - The pill shows "thinking… Ns", computed on the client from `turnDeadline − LLM.band.leaseMs`, and ticks while stopped.
+  - Replies thread under the note they answer; the reply rows are colored by role. A note's leading @mentions aren't repeated after the "→ @bass:" arrow.
+  - `V` sends "@<strip> give me a variation".
+  - E2E (keyboard-first, so it also covers S11a): S4 (threaded reply; the new part lands on a bar line), S5 (glassier sound lands; ← brings the old one back on a bar line), S10a (← and → after a band turn).
+  - **Frozen test changed:** the `V` E2E test ("…a hint until band turns exist…") now asserts the note is sent and answered, as planned for slice 5.

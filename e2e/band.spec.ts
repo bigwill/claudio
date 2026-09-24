@@ -203,11 +203,13 @@ test("focus: clicking back into the main pane leaves chat, and the keyboard play
   expect(calls.some((c) => c.track === "bass" && c.method === "attack")).toBe(true);
 });
 
-test("V on a band strip answers (a hint until band turns exist), and is never silent", async ({ page }) => {
+test("V asks the focused musician for a variation: the note is sent and the musician answers", async ({ page }) => {
+  // Was "…answers (a hint until band turns exist)…"; slice 5 made it real, as planned.
   await openJam(page);
   await page.keyboard.press("Digit3");
   await page.keyboard.press("KeyV");
-  await expect(page.getByTestId("toast")).toContainText(/variation/i);
+  await expect(page.getByTestId("chat")).toContainText("→ @bass: give me a variation");
+  await expect(page.getByTestId("reply-bass")).toBeVisible();
 });
 
 test("S2: a WAV for keys (focused) from the chat, in soundcheck: it iterates with distances, finalizes, the keys sound swaps; Start is refused meanwhile", async ({ page }) => {
@@ -340,4 +342,70 @@ test("design stays available in the jam: design keys while the band plays; the n
   const landed = (await page.evaluate(() => (window as unknown as W).__band.promotions)).slice(promos).filter((p) => p.track === "keys");
   expect(landed.every((p) => p.g % 16 === 0)).toBe(true);
   expect(await page.evaluate(() => (window as unknown as W).__band.running)).toBe(true);
+});
+
+async function startJam(page: Page) {
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => (window as unknown as W).__band.running && (window as unknown as W).__band.g >= 2);
+}
+
+async function say(page: Page, focus: string, text: string) {
+  await page.keyboard.press(focus);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(text);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+}
+
+const promotionsAfter = (page: Page, n: number, track: string) =>
+  page.evaluate(([n, track]) => (window as unknown as W).__band.promotions.slice(n as number).filter((p) => p.track === track), [n, track] as const);
+
+test("S4: \"@bass busier, eighth notes\" from the keyboard: a threaded reply, and bass's new part lands on a bar line", async ({ page }) => {
+  const { errors } = await openJam(page);
+  await startJam(page);
+  const before = await page.evaluate(() => (window as unknown as W).__band.promotions.length);
+  await say(page, "Digit3", "busier, eighth notes");
+  const reply = page.getByTestId("reply-bass");
+  await expect(reply).toBeVisible();
+  // Threaded: the reply sits right after the note it answers.
+  const threaded = await page.evaluate(() => {
+    const r = document.querySelector("[data-testid=reply-bass]") as HTMLElement;
+    const prev = r.previousElementSibling as HTMLElement | null;
+    return prev?.dataset.seq === r.dataset.replyTo && r.classList.contains("reply");
+  });
+  expect(threaded).toBe(true);
+  await page.waitForFunction((n) => (window as unknown as W).__band.promotions.slice(n).some((p) => p.track === "bass"), before);
+  const landed = await promotionsAfter(page, before, "bass");
+  expect(landed.every((p) => p.g % 16 === 0)).toBe(true);
+  expect((await strip(page, "bass")).basedOn).toBe(2);
+  expect(errors).toEqual([]);
+});
+
+test("S5: \"@keys make it glassier\": the new sound lands on a bar line; ← brings the old one back on a bar line", async ({ page }) => {
+  await openJam(page);
+  await startJam(page);
+  const first = (await strip(page, "keys")).sound!;
+  await say(page, "Digit4", "make it glassier");
+  await page.waitForFunction((f) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.sound !== f, first);
+  expect((await strip(page, "keys")).sound).toContain("glassier");
+  const before = await page.evaluate(() => (window as unknown as W).__band.promotions.length);
+  await page.keyboard.press("Digit4");
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForFunction((f) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.sound === f, first);
+  await page.waitForFunction((n) => (window as unknown as W).__band.promotions.slice(n).some((p) => p.track === "keys"), before);
+  expect((await promotionsAfter(page, before, "keys")).every((p) => p.g % 16 === 0)).toBe(true);
+});
+
+test("S10a: history from the keyboard after a band turn: ← back to v1, → to v2, both landing on bar lines", async ({ page }) => {
+  await openJam(page);
+  await startJam(page);
+  await say(page, "Digit3", "busier");
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.basedOn === 2);
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.basedOn === 1);
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.basedOn === 2);
+  const promos = (await page.evaluate(() => (window as unknown as W).__band.promotions)).filter((p) => p.track === "bass" && p.g > 0);
+  expect(promos.every((p) => p.g % 16 === 0)).toBe(true);
 });
