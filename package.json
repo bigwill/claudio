@@ -19,7 +19,8 @@
     "check": "npm run typecheck && npm run test:unit && npm run test:dsp && npm run test:convex",
     "e2e": "node scripts/e2e.mjs",
     "smoke:real": "node scripts/smoke-real.mjs",
-    "deploy:band": "node scripts/deploy-band.mjs"
+    "deploy:band": "node scripts/deploy-band.mjs",
+    "og:card": "node scripts/og-card.mjs"
   },
   "dependencies": {
     "convex": "^1.46.0",

@@ -127,6 +127,8 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
 .pick.sel{background:#2a2440;outline:1px solid var(--accent)}
 .pick small{color:var(--faint)}
 .keymap{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px}
+.tooltip{position:fixed;z-index:20;max-width:320px;background:#26233a;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12px;line-height:1.4;color:var(--text);box-shadow:0 6px 18px #0008;pointer-events:none}
+.tooltip[hidden]{display:none}
 .toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:#2a2440;border:1px solid var(--accent);border-radius:8px;padding:6px 12px;font-size:12.5px;z-index:11}
 @media (max-width: 900px){ .body{grid-template-columns:minmax(0,1fr)} .chat{display:none} .strip{grid-template-columns:1fr} .shead{border-right:0;border-bottom:1px solid var(--line2)} }
 `;

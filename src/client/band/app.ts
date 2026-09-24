@@ -84,27 +84,27 @@ document.body.innerHTML = `
   <header class="topbar">
     <span class="brand">Claudio <span>Band</span></span>
     <span class="slug" id="slug"></span>
-    <span class="chip" id="phase" data-testid="phase"></span>
-    <span class="tp"><kbd>Space</kbd><span id="tp"></span></span>
-    <span class="ctl"><span class="box" id="bpm"></span><small>bpm</small></span>
-    <span class="ctl"><span class="box" id="key"></span></span>
-    <span class="prog" id="prog"></span>
-    <span class="ctl"><span class="box" id="bars"></span></span>
-    <span class="pos" id="pos">–</span>
+    <span class="chip" id="phase" data-testid="phase" data-tip="Soundcheck: build the band's sounds first; nothing plays until you start. Jam: the loop is running."></span>
+    <span class="tp" data-tip="Space: start or stop the band. The first press starts the jam (not while a sound is still being designed)."><kbd>Space</kbd><span id="tp"></span></span>
+    <span class="ctl" data-tip="Tempo. , and . nudge it down or up by 2; the change lands at the next loop line."><span class="box" id="bpm"></span><small>bpm</small></span>
+    <span class="ctl" data-tip="The key. Your home row (A–;) plays this scale, so every note fits."><span class="box" id="key"></span></span>
+    <span class="prog" id="prog" data-tip="The chords, one per bar. The musicians' parts follow them automatically."></span>
+    <span class="ctl" data-tip="How many bars the loop is."><span class="box" id="bars"></span></span>
+    <span class="pos" id="pos" data-tip="Where the loop is: bar.beat.">–</span>
     <span class="spacer"></span>
     <span class="tp">scenes
-      <button class="scene" id="scene-A" data-testid="scene-A" data-active="false">A</button>
-      <button class="scene" id="scene-B" data-testid="scene-B" data-active="false">B</button>
+      <button class="scene" id="scene-A" data-testid="scene-A" data-active="false" data-tip="Scene A. Shift+[ saves the band as it is now; [ brings it back (every part at the next bar line). Filled means the band matches A right now.">A</button>
+      <button class="scene" id="scene-B" data-testid="scene-B" data-active="false" data-tip="Scene B. Shift+] saves the band as it is now; ] brings it back (every part at the next bar line). Filled means the band matches B right now.">B</button>
     </span>
-    <span class="reacts" id="reacts"></span>
+    <span class="reacts" id="reacts" data-tip="Band reacts: when one musician changes, a bandmate adjusts once. \\ toggles it. (Arrives in wave 2.)"></span>
   </header>
   <div class="body">
     <div class="main">
       <div class="strips" id="strips"></div>
-      <div class="loopbar"><span id="loopn">loop</span><span class="lb"><i id="lbfill" style="--p:0"></i></span><span id="loopnext"></span></div>
+      <div class="loopbar" data-tip="The loop's progress. Changes to a part land at the next bar line; tempo, key and chords at the next loop line."><span id="loopn">loop</span><span class="lb"><i id="lbfill" style="--p:0"></i></span><span id="loopnext"></span></div>
       <div class="dock">
-        <span class="mode play" id="mode" data-testid="mode">PLAY</span>
-        <span class="kbrow" id="kbrow"></span>
+        <span class="mode play" id="mode" data-testid="mode" data-tip="PLAY: keys play and run commands. CHAT: keys type (Esc or a click back returns to PLAY). PICKER: ↑/↓ and Enter choose a sound.">PLAY</span>
+        <span class="kbrow" id="kbrow" data-tip="The home row A–; plays the scale (Q–P an octave up). Z / X shift the octave. In soundcheck it plays the focused strip; in the jam, always you."></span>
         <span class="dockinfo" id="dockinfo"></span>
         <span class="r"><span><kbd>B</kbd> library</span><span><kbd>?</kbd> keys</span></span>
       </div>
@@ -115,17 +115,18 @@ document.body.innerHTML = `
       <div class="dropchip" id="dropchip" data-testid="drop-chip" hidden></div>
       <div class="cin">
         <div class="cinrow">
-          <input id="chatin" data-testid="chat-input" placeholder="@bass busier · @keys design a glassy bell" autocomplete="off" />
-          <button class="mini wav" id="chatwav" data-testid="chat-wav" title="Design the focused strip's sound from a WAV">＋ WAV</button>
+          <input id="chatin" data-testid="chat-input" placeholder="@bass busier · @keys design a glassy bell" autocomplete="off" data-tip="Talk to the band. Enter or / opens it, aimed at the focused strip. '@bass busier' changes a part; '@keys design a glassy bell' starts a measured sound design; '@me …' designs your sound. Enter sends and stays; Esc leaves." />
+          <button class="mini wav" id="chatwav" data-testid="chat-wav" data-tip="Design the focused strip's sound from a WAV (~30s, measured against it). You can also drop a WAV on the chat.">＋ WAV</button>
           <input type="file" accept="audio/*" hidden id="designfile" data-testid="design-file" />
         </div>
-        <div class="route" id="route" data-testid="route"></div>
+        <div class="route" id="route" data-testid="route" data-tip="Where Enter will send this: a note to a musician, a new sound design, or why it can't go."></div>
       </div>
     </aside>
   </div>
 </div>
 <div id="modal"></div>
-<div id="toast"></div>`;
+<div id="toast"></div>
+<div class="tooltip" id="tooltip" data-testid="tooltip" hidden></div>`;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 $("slug").textContent = slug;
@@ -193,12 +194,12 @@ function renderStrips(): void {
     el.className = `strip ${m.role}${ui.focus === ROLE_KEY[m.role] ? " focus" : ""}${mutedOf(m) ? " muted" : ""}`;
     el.innerHTML = `
       <div class="shead">
-        <div class="nm"><span class="num">${i + 1}</span><span class="who">${esc(m.name)}</span>
-          <button class="snd" data-pick="${m.role}" ${m.role === "drums" ? "disabled" : ""}>${esc(m.part.sound?.name ?? "Kit")}</button>
-          <span class="ms"><span class="${mutedOf(m) ? "on" : ""}">M</span><span class="${ui.solo.has(m.role) ? "on" : ""}">S</span></span>
+        <div class="nm" data-tip="${esc(stripTip(m, i + 1))}"><span class="num">${i + 1}</span><span class="who">${esc(m.name)}</span>
+          <button class="snd" data-pick="${m.role}" ${m.role === "drums" ? "disabled" : ""} data-tip="${m.role === "drums" ? "Drums play the kit." : "B (with this strip focused), or click: pick a sound from the library. It shows where each sound came from."}">${esc(m.part.sound?.name ?? "Kit")}</button>
+          <span class="ms" data-tip="M: mute this strip (instant). N: solo it."><span class="${mutedOf(m) ? "on" : ""}">M</span><span class="${ui.solo.has(m.role) ? "on" : ""}">S</span></span>
         </div>
-        <span class="pill" data-pill="${m.role}"></span>
-        <div class="rail" data-rail="${m.role}">${railHtml(m)}</div>
+        <span class="pill" data-pill="${m.role}" data-tip="${m.role === "producer" ? "Your strip: you play it live on the keyboard." : "What this musician is doing: idle, thinking… (answering your note), lands in N beats (a change waiting for the bar line), or designing (a sound design running)."}"></span>
+        <div class="rail" data-rail="${m.role}" data-tip="This strip's versions. The filled pip is playing; a dashed one is waiting for the bar line. Click a pip to jump, ← / → to step, Shift+← / → for oldest / newest.">${railHtml(m)}</div>
         ${designRailHtml(m)}
       </div>
       <div class="gwrap">${m.role === "producer" ? liveHtml() : gridHtml(m)}</div>`;
@@ -230,6 +231,15 @@ function designRailHtml(m: Strip): string {
   // Designs start from the chat (a WAV, or "@keys design …"), aimed at the
   // focused strip (Will, 2026-09-22); the strip shows only their progress.
   return "";
+}
+
+/** The strip name's tip: every key that acts on this strip. */
+function stripTip(m: Strip, n: number): string {
+  if (m.role === "producer") {
+    return `${n}: focus your strip. In soundcheck the home row auditions your sound; in the jam it always plays you. Enter: '@me …' designs your sound. B: pick a sound. ← / →: your versions. M: mute.`;
+  }
+  const extra = m.role === "drums" ? "" : " B: pick a sound from the library.";
+  return `${n}: focus ${m.name}. Enter: talk to ${m.name}. V: ask ${m.name} for a variation.${extra} ← / →: step through versions. M: mute · N: solo. In soundcheck the home row auditions ${m.role === "drums" ? "the kit (A S D F)" : `the ${m.name}`}.`;
 }
 
 function railHtml(m: Strip): string {
@@ -413,6 +423,27 @@ function renderModal(): void {
       .join("")}</div></div></div>`;
   } else host.innerHTML = "";
 }
+
+// --- tooltips: one floating tip for every [data-tip], kept inside the window
+// (strip heads clip overflow, so CSS-only tips would be cut off).
+document.addEventListener("mouseover", (e) => {
+  const el = (e.target as HTMLElement).closest?.<HTMLElement>("[data-tip]");
+  const tip = $("tooltip");
+  if (!el || !el.dataset.tip) {
+    tip.hidden = true;
+    return;
+  }
+  tip.textContent = el.dataset.tip;
+  tip.hidden = false;
+  const r = el.getBoundingClientRect();
+  const w = tip.offsetWidth;
+  const h = tip.offsetHeight;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+  const below = r.bottom + 6;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${below + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : below}px`;
+});
+document.addEventListener("mouseleave", () => ($("tooltip").hidden = true));
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 function toast(text: string): void {

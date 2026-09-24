@@ -747,3 +747,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - "Glassier" was a `set_sound` tweak 3/3, "one try too far" landed 3/3, and ← restored the good version 3/3.
   - The first smoke attempt reported 0/3 because of a harness bug: an earlier "keys now plays …" system row counted as keys' answer. Fixed to count only rows after the note; the rerun is the result above.
   - Rails: E2E H green, `npm run check` green, smoke 3/3.
+- 2026-09-23: **Wave 1 polish (Will's asks).** Tooltips: every wave 1 control has a `data-tip` naming what it does and its key (a strip name lists 3 · Enter · V · B · ←/→ · M/N; scenes list Shift+[ / ] and [ / ]). One floating tip is kept inside the window, since strip heads clip overflow. New E2E: "tooltips". Link previews: `index.html` has Open Graph and Twitter tags, plus a 1200×630 card (`public/og.png`, redrawn by `npm run og:card`) and a favicon.

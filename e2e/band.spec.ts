@@ -501,3 +501,24 @@ test("B ↓ Enter typed fast (before the library loads) still picks", async ({ p
   await page.waitForFunction((b) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.sound !== b, before);
   await expect(page.getByTestId("mode")).toHaveText("PLAY");
 });
+
+test("tooltips: hovering a control shows what it does and its key", async ({ page }) => {
+  await openJam(page);
+  const tip = page.getByTestId("tooltip");
+  await page.locator("#strip-bass .who").hover();
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText("V");
+  await expect(tip).toContainText("variation");
+  await expect(tip).toContainText("B");
+  await page.locator("#strip-bass .snd").hover();
+  await expect(tip).toContainText("library");
+  await page.getByTestId("chat-wav").hover();
+  await expect(tip).toContainText("WAV");
+  await page.getByTestId("scene-A").hover();
+  await expect(tip).toContainText("Shift");
+  // The tip stays on screen, even for controls at the right edge.
+  const box = (await tip.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.mouse.move(5, 500);
+  await expect(tip).toBeHidden();
+});
