@@ -730,3 +730,8 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - `V` sends "@<strip> give me a variation".
   - E2E (keyboard-first, so it also covers S11a): S4 (threaded reply; the new part lands on a bar line), S5 (glassier sound lands; ← brings the old one back on a bar line), S10a (← and → after a band turn).
   - **Frozen test changed:** the `V` E2E test ("…a hint until band turns exist…") now asserts the note is sent and answered, as planned for slice 5.
+- 2026-09-23: **Slice 5 real-model check (Sonnet 5 through the UI, a few cents).** 4 notes, 4 changed parts, 0 failures.
+  - "@bass busier, eighth notes": 16.8s. "@keys make it glassier": 2.4s. "@drums tighter hats, sixteenths": 11.9s. `V` on keys: 4.4s.
+  - Median ≈ 8s, within the 10s bar but slower than 1b's 3.2s (the first call was the slowest; the snapshot and tools are larger now).
+  - For slice 6's prompt tuning: "glassier" picked a library sound (Drawbar Glass) via `use_library_sound` rather than a `set_sound` tweak. Headline step 4 needs a tweak that joins the library.
+  - The local deployment is left on real models (fake flag off) for Will's listen.
