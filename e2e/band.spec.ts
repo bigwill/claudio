@@ -409,3 +409,95 @@ test("S10a: history from the keyboard after a band turn: ← back to v1, → to 
   const promos = (await page.evaluate(() => (window as unknown as W).__band.promotions)).filter((p) => p.track === "bass" && p.g > 0);
   expect(promos.every((p) => p.g % 16 === 0)).toBe(true);
 });
+
+test("H: the headline, steps 1–5 in order, keyboard-first (docs/headline.md)", async ({ page }) => {
+  test.setTimeout(90_000);
+  const { errors } = await openJam(page);
+  const bassSound = (await strip(page, "bass")).sound;
+
+  // 1. Soundcheck: design keys from a WAV first; pick bass and your sound meanwhile; audition.
+  await page.keyboard.press("Digit4");
+  await expect(page.getByTestId("chat-input")).toHaveValue("@keys ");
+  await page.getByTestId("design-file").setInputFiles("samples/electric_piano_jd800_soft_ep.wav");
+  await page.waitForFunction(() => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing);
+  await page.keyboard.press("Digit2");
+  for (const k of ["KeyA", "KeyS", "KeyD", "KeyF"]) await page.keyboard.press(k);
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("KeyB");
+  await expect(page.getByTestId("picker")).toBeVisible(); // the library loads before the picker opens
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction((b) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.sound !== b, bassSound);
+  await page.keyboard.press("KeyA");
+  await page.keyboard.press("Digit1");
+  const yourSound = (await strip(page, "producer")).sound;
+  await page.keyboard.press("KeyB");
+  await expect(page.getByTestId("picker")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction((y) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "producer")!.sound !== y, yourSound);
+  await page.keyboard.press("KeyA");
+  await page.waitForFunction(() => !(window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.designing, undefined, { timeout: 30_000 });
+  await expect(page.getByTestId("chat")).toContainText("keys now plays");
+  const auditions = await page.evaluate(() => (window as unknown as W).__band.calls);
+  expect(auditions.some((c) => c.track === "drums" && c.note === "snare")).toBe(true);
+  expect(auditions.some((c) => c.track === "bass" && c.method === "attack")).toBe(true);
+
+  // 2. Space: the jam starts; you play along.
+  await startJam(page);
+  await expect(page.getByTestId("phase")).toHaveText(/jam/i);
+  await page.keyboard.press("KeyA");
+
+  // 3. "@bass busier, eighth notes": a threaded reply; the new part lands on a bar line.
+  let before = await page.evaluate(() => (window as unknown as W).__band.promotions.length);
+  await say(page, "Digit3", "busier, eighth notes");
+  await expect(page.getByTestId("reply-bass")).toBeVisible();
+  await page.waitForFunction((n) => (window as unknown as W).__band.promotions.slice(n).some((p) => p.track === "bass"), before);
+
+  // 4. "@keys make it glassier", one try too far, then ← back to the good one.
+  const designed = (await strip(page, "keys")).sound!;
+  await say(page, "Digit4", "make it glassier");
+  await page.waitForFunction((d) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.sound !== d, designed);
+  const good = (await strip(page, "keys")).sound!;
+  expect(good).toContain("glassier");
+  await say(page, "Digit4", "even glassier, really metallic");
+  await page.waitForFunction((g) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.sound !== g, good);
+  before = await page.evaluate(() => (window as unknown as W).__band.promotions.length);
+  await page.keyboard.press("Digit4");
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForFunction((g) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "keys")!.sound === g, good);
+  await page.waitForFunction((n) => (window as unknown as W).__band.promotions.slice(n).some((p) => p.track === "keys"), before);
+  expect((await promotionsAfter(page, before, "keys")).every((p) => p.g % 16 === 0)).toBe(true);
+
+  // 5. Scenes: save A, reshape, save B, flip.
+  await page.keyboard.press("Shift+BracketLeft");
+  await expect(page.getByTestId("scene-A")).toHaveAttribute("data-active", "true");
+  const drumsA = (await strip(page, "drums")).basedOn;
+  await say(page, "Digit2", "half-time, sparse");
+  await page.waitForFunction((d) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "drums")!.basedOn !== d, drumsA);
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("KeyV");
+  await expect(page.getByTestId("reply-bass").nth(1)).toBeVisible();
+  await page.keyboard.press("Shift+BracketRight");
+  await expect(page.getByTestId("scene-B")).toHaveAttribute("data-active", "true");
+  await page.keyboard.press("BracketLeft");
+  await expect(page.getByTestId("scene-A")).toHaveAttribute("data-active", "true");
+  expect((await strip(page, "drums")).basedOn).toBe(drumsA);
+  await page.keyboard.press("BracketRight");
+  await expect(page.getByTestId("scene-B")).toHaveAttribute("data-active", "true");
+
+  expect(await page.evaluate(() => (window as unknown as W).__band.missedSteps)).toBe(0);
+  expect(await page.evaluate(() => (window as unknown as W).__band.running)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("B ↓ Enter typed fast (before the library loads) still picks", async ({ page }) => {
+  await openJam(page);
+  const before = (await strip(page, "bass")).sound;
+  await page.keyboard.press("Digit3");
+  await page.keyboard.press("KeyB");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction((b) => (window as unknown as W).__band.view()!.strips.find((x) => x.role === "bass")!.sound !== b, before);
+  await expect(page.getByTestId("mode")).toHaveText("PLAY");
+});

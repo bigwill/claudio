@@ -736,3 +736,8 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - For slice 6's prompt tuning: "glassier" picked a library sound (Drawbar Glass) via `use_library_sound` rather than a `set_sound` tweak. Headline step 4 needs a tweak that joins the library.
   - The local deployment is left on real models (fake flag off) for Will's listen.
 - 2026-09-23: **Slice 5 done.** Will's listen ("pretty good") passed: a bass change lands musically. Deployed to the hosted copy.
+- 2026-09-23: **Slice 6, part 1.**
+  - **`testing:clearTestJams` (by slug prefix; tests first).** `npm run e2e` now clears earlier "E2E…" jams and the sounds they designed, which had filled the global library with the fake's "Init" sounds (2,580 rows the first time). Ad-hoc check jams were cleared once by hand.
+  - **Prompt:** a note about a sound's character now means `set_sound` (a named tweak), and `use_library_sound` only when a sound is named or a different instrument is asked for. On real Sonnet, "@keys make it glassier" went 5/5 to a tweak (3.7–4.8s); before the change it had picked a library sound.
+  - **`docs/headline.md`:** the keystroke script, updated for bar landing, design in chat and `V`. The fallback is picking the EP designed earlier from the same WAV.
+  - **E2E H (the headline, steps 1–5, keyboard-first).** It found a real race: `B` `↓` `Enter` typed before the library loaded opened chat. `B` now enters picker mode at once and applies keys typed ahead (new E2E test).

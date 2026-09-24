@@ -81,3 +81,50 @@ describe("testing:* with the fake flag", () => {
     expect(listed[0].response).toEqual({ hang: true });
   });
 });
+
+describe("testing:clearTestJams", () => {
+  test("removes test jams (by slug prefix) and everything they made, including their library rows; keeps the rest", async () => {
+    vi.stubEnv("CLAUDIO_FAKE_LLM", "1");
+    const t = convexTest(schema, modules);
+    await t.mutation(api.jams.create, { slug: "E2EXAMPLE001" });
+    await t.mutation(api.jams.create, { slug: "KEEPME000001" });
+    const s = (await t.query(api.jams.state, { slug: "E2EXAMPLE001" }))!;
+    const keys = s.musicians.find((m) => m.role === "keys")!;
+    await t.run(async (ctx) => {
+      await ctx.db.insert("library", {
+        name: "Init",
+        role: "keys",
+        preset: (await ctx.db.query("library").first())!.preset,
+        features: null,
+        origin: "designed",
+        source: "x.wav",
+        designId: null,
+        fromJamId: s.jam._id,
+        starterKey: null,
+      });
+      await ctx.db.insert("messages", { convoId: keys._id, seq: 0, role: "user", content: "[]" });
+    });
+    await t.mutation(api.chat.send, { jamId: s.jam._id, text: "hello band", octave: 4 });
+
+    let removed = 1;
+    while (removed > 0) removed = await t.mutation(api.testing.clearTestJams, { prefix: "E2E" });
+
+    const left = await t.run(async (ctx) => ({
+      jams: (await ctx.db.query("jams").collect()).map((j) => j.slug),
+      musicians: (await ctx.db.query("musicians").collect()).length,
+      chat: (await ctx.db.query("chat").collect()).length,
+      messages: (await ctx.db.query("messages").collect()).length,
+      designedOrTweak: (await ctx.db.query("library").collect()).filter((l) => l.origin !== "starter").length,
+      starters: (await ctx.db.query("library").collect()).filter((l) => l.origin === "starter").length,
+    }));
+    expect(left).toEqual({ jams: ["KEEPME000001"], musicians: 4, chat: 0, messages: 0, designedOrTweak: 0, starters: 5 });
+  });
+
+  test("refuses without the fake flag, and refuses an empty prefix", async () => {
+    vi.stubEnv("CLAUDIO_FAKE_LLM", "");
+    const t = convexTest(schema, modules);
+    await expect(t.mutation(api.testing.clearTestJams, { prefix: "E2E" })).rejects.toThrow(/CLAUDIO_FAKE_LLM/);
+    vi.stubEnv("CLAUDIO_FAKE_LLM", "1");
+    await expect(t.mutation(api.testing.clearTestJams, { prefix: "" })).rejects.toThrow(/prefix/);
+  });
+});

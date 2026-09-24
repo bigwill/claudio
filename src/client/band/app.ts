@@ -62,7 +62,8 @@ const ui = {
   held: new Map<string, { midi: number; on: "you" | "bass" | "keys" } | { hit: true }>(),
   localMute: new Map<Strip["role"], boolean>(),
   solo: new Set<Strip["role"]>(),
-  picker: null as null | { strip: StripKey; rows: LibraryRow[]; sel: number },
+  /** While `loading`, keys typed ahead (↓, Enter) are kept and applied when the library arrives. */
+  picker: null as null | { strip: StripKey; rows: LibraryRow[]; sel: number; loading: boolean; ahead: number; choose: boolean },
   overlay: false,
   /** What each band track is actually sounding (from engine promotions). */
   sounding: new Map<TrackId, string>(),
@@ -384,7 +385,7 @@ function renderModal(): void {
   const host = $("modal");
   if (ui.picker) {
     const p = ui.picker;
-    host.innerHTML = `<div class="modal"><div class="card" data-testid="picker"><h3>Library · ${esc(p.strip)}</h3>${p.rows
+    host.innerHTML = `<div class="modal"><div class="card" data-testid="picker"><h3>Library · ${esc(p.strip)}</h3>${p.loading ? `<p class="hint">loading…</p>` : ""}${p.rows
       .map(
         (r, i) =>
           `<div class="pick${i === p.sel ? " sel" : ""}" data-pickrow="${i}"><span>${esc(r.name)}</span><small>${esc(r.origin)} · ${esc(r.source)}</small></div>`,
@@ -629,19 +630,34 @@ async function act(a: KeyAction): Promise<void> {
       const m = focusedStrip();
       if (!m) return;
       if (m.role === "drums") return toast("Drums play the kit; there's no sound to pick.");
-      const rows = await band.library(m.role === "producer" ? "pitched" : (m.role as "bass" | "keys"));
-      const cur = rows.findIndex((r) => r._id === m.part.libraryId);
-      ui.picker = { strip: a.strip, rows, sel: Math.max(0, cur) };
+      // Picker mode starts now, so keys typed while the library loads land in it.
       setMode("picker");
+      const picker = { strip: a.strip, rows: [] as LibraryRow[], sel: 0, loading: true, ahead: 0, choose: false };
+      ui.picker = picker;
+      renderModal();
+      const rows = await band.library(m.role === "producer" ? "pitched" : (m.role as "bass" | "keys"));
+      if (ui.picker !== picker) return; // closed meanwhile
+      const cur = Math.max(0, rows.findIndex((r) => r._id === m.part.libraryId));
+      Object.assign(picker, { rows, loading: false, sel: rows.length ? (((cur + picker.ahead) % rows.length) + rows.length) % rows.length : 0 });
+      renderModal();
+      if (picker.choose) await act({ kind: "picker-choose" });
       return;
     }
     case "picker-move":
+      if (ui.picker?.loading) {
+        ui.picker.ahead += a.delta;
+        return;
+      }
       if (ui.picker && ui.picker.rows.length) {
         ui.picker.sel = (ui.picker.sel + a.delta + ui.picker.rows.length) % ui.picker.rows.length;
         renderModal();
       }
       return;
     case "picker-choose": {
+      if (ui.picker?.loading) {
+        ui.picker.choose = true;
+        return;
+      }
       const p = ui.picker;
       const m = focusedStrip();
       setMode("play");
