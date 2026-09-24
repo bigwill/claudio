@@ -735,3 +735,4 @@ Audited against the plan, with adversarial review; none adopted for wave 1.
   - Median ≈ 8s, within the 10s bar but slower than 1b's 3.2s (the first call was the slowest; the snapshot and tools are larger now).
   - For slice 6's prompt tuning: "glassier" picked a library sound (Drawbar Glass) via `use_library_sound` rather than a `set_sound` tweak. Headline step 4 needs a tweak that joins the library.
   - The local deployment is left on real models (fake flag off) for Will's listen.
+- 2026-09-23: **Slice 5 done.** Will's listen ("pretty good") passed: a bass change lands musically. Deployed to the hosted copy.
